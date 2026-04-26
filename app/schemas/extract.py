@@ -20,3 +20,21 @@ class ExtractResponse(BaseModel):
     method: str
     quality: str
     needs_review: bool
+
+
+class EntityExtractRequest(BaseModel):
+    text: str
+
+
+class EntityExtractResponse(BaseModel):
+    military_equipment: list[str]
+    manufacturers: list[str]
+    contracts: list[str]
+
+
+class SummaryRequest(BaseModel):
+    text: str
+
+
+class SummaryResponse(BaseModel):
+    annotation: str
