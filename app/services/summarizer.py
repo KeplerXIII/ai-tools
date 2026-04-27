@@ -1,17 +1,13 @@
+from typing import Generator
+
 from fastapi import HTTPException
 
 from app.core.config import settings
 from app.services.llm_client import chat
 
 
-def summarize_text(text: str) -> str:
-    if not text.strip():
-        raise HTTPException(
-            status_code=400,
-            detail="Текст пустой",
-        )
-
-    prompt = f"""
+def build_summary_prompt(text: str) -> str:
+    return f"""
 Ты выполняешь аннотирование статьи строго по предоставленному тексту.
 
 Правила:
@@ -32,8 +28,26 @@ def summarize_text(text: str) -> str:
 {text}
 """
 
+
+def summarize_text(
+    text: str,
+    stream: bool = False,
+) -> str | Generator[str, None, None]:
+    if not text.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="Текст пустой",
+        )
+
+    prompt = build_summary_prompt(text)
+
     return chat(
         prompt=prompt,
         model=settings.llm_model,
         temperature=0.2,
+        stream=stream,
+        meta={
+            "tool": "summarizer",
+            "text_chars": len(text),
+        },
     )
