@@ -1,6 +1,10 @@
-# app/services/translator.py
+from typing import Generator
 
 from langdetect import detect
+
+from app.core.config import settings
+from app.services.llm_client import chat
+
 
 LANG_MAP = {
     "en": ("English", "en"),
@@ -25,7 +29,33 @@ Produce only the {tgt_name} translation, without any additional explanations or 
 def detect_language(text: str) -> str:
     try:
         lang = detect(text)
-    except:
+    except Exception:
         return "en"
 
     return lang if lang in LANG_MAP else "en"
+
+
+def translate_text(
+    text: str,
+    target_lang: str = "ru",
+    stream: bool = False,
+) -> str | Generator[str, None, None]:
+    source_lang = detect_language(text)
+    prompt = build_prompt(
+        text=text,
+        source=source_lang,
+        target=target_lang,
+    )
+
+    return chat(
+        prompt=prompt,
+        model=settings.translate_model,
+        temperature=0,
+        stream=stream,
+        meta={
+            "tool": "translator",
+            "source_lang": source_lang,
+            "target_lang": target_lang,
+            "text_chars": len(text),
+        },
+    )
