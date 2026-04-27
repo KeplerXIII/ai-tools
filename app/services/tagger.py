@@ -1,23 +1,46 @@
+import json
+import re
+
 from fastapi import HTTPException
 
 from app.core.config import settings
-from app.services.llm_ollama_client import chat_structured
+from app.services.llm_client import chat
 
 
-TAG_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "tags": {
-            "type": "array",
-            "items": {"type": "string"},
-        }
-    },
-    "required": ["tags"],
-}
+def extract_json_object(raw: str) -> dict:
+    """
+    Достаёт JSON даже если модель обернула его в ```json ... ```
+    или добавила лишний текст.
+    """
+    raw = raw.strip()
+
+    raw = re.sub(r"^```json\s*", "", raw)
+    raw = re.sub(r"^```\s*", "", raw)
+    raw = re.sub(r"\s*```$", "", raw)
+
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        pass
+
+    match = re.search(r"\{.*\}", raw, re.DOTALL)
+    if not match:
+        raise HTTPException(
+            status_code=502,
+            detail=f"LLM не вернула JSON: {raw[:500]}",
+        )
+
+    try:
+        return json.loads(match.group(0))
+    except json.JSONDecodeError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Некорректный JSON от LLM: {exc}",
+        )
 
 
 def tag_text(text: str, max_tags: int = 12) -> dict:
-    if not text.strip():
+    if not text or not text.strip():
         raise HTTPException(
             status_code=400,
             detail="Текст пустой",
@@ -26,35 +49,51 @@ def tag_text(text: str, max_tags: int = 12) -> dict:
     prompt = f"""
 Ты выполняешь тематическое тегирование текста.
 
+Верни только JSON без markdown, без пояснений, без текста вокруг.
+
+Формат ответа:
+{{
+  "tags": ["tag 1", "tag 2", "tag 3"]
+}}
+
 Правила:
 - используй только содержание текста
 - не добавляй внешние знания
-- теги короткие (1-4 слова)
-- на русском языке
+- теги короткие: 1-4 слова
+- язык тегов: тот же, что и язык исходного текста
+- если текст на немецком — теги на немецком
+- если текст на английском — теги на английском
+- если текст на русском — теги на русском
 - не более {max_tags} тегов
-- верни строго JSON
+- без повторов
 
 Текст:
 {text}
-"""
+""".strip()
 
-    data = chat_structured(
+    raw = chat(
         prompt=prompt,
-        schema=TAG_SCHEMA,
         model=settings.llm_model,
         temperature=0,
+        meta={"op": "tagging"},
     )
+
+    data = extract_json_object(raw)
 
     tags = data.get("tags", [])
 
     if not isinstance(tags, list):
         return {"tags": []}
 
-    # нормализация
     clean = []
-    for t in tags:
-        tag = str(t).strip()
-        if tag and tag not in clean:
+
+    for tag in tags:
+        tag = str(tag).strip()
+
+        if not tag:
+            continue
+
+        if tag not in clean:
             clean.append(tag)
 
     return {

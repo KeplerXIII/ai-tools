@@ -10,6 +10,12 @@ class ExtractHtmlRequest(BaseModel):
     url: str | None = None
 
 
+class ImageInfo(BaseModel):
+    url: str
+    alt: str | None = None
+    title: str | None = None
+
+
 class ExtractResponse(BaseModel):
     title: str | None = None
     author: str | None = None
@@ -20,6 +26,8 @@ class ExtractResponse(BaseModel):
     method: str
     quality: str
     needs_review: bool
+    images: list[ImageInfo] = []
+    main_image: str | None = None
 
 
 class EntityExtractRequest(BaseModel):
@@ -38,6 +46,7 @@ class SummaryRequest(BaseModel):
 
 class SummaryResponse(BaseModel):
     annotation: str
+
 
 class TagRequest(BaseModel):
     text: str

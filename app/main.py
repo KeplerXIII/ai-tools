@@ -1,7 +1,16 @@
+import logging
+
 from fastapi import FastAPI
 
 from app.api.v1.router import api_router
 from app.core.config import settings
+
+
+# 🔥 ВКЛЮЧАЕМ ЛОГИ
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+)
 
 
 def create_app() -> FastAPI:

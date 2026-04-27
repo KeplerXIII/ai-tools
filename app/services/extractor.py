@@ -3,6 +3,7 @@ import trafilatura
 from fastapi import HTTPException
 
 from app.core.config import settings
+from app.services.image_extractor import extract_images, pick_main_image
 
 
 def download_html(url: str) -> str:
@@ -65,6 +66,9 @@ def extract_article_text(html: str, url: str | None = None) -> dict:
     metadata = trafilatura.extract_metadata(html)
     quality, needs_review = estimate_quality(text)
 
+    images = extract_images(html, url) if url else []
+    main_image = pick_main_image(images, html=html, base_url=url) if url else None
+
     return {
         "title": metadata.title if metadata else None,
         "author": metadata.author if metadata else None,
@@ -75,4 +79,6 @@ def extract_article_text(html: str, url: str | None = None) -> dict:
         "method": "trafilatura",
         "quality": quality,
         "needs_review": needs_review,
+        "images": images,
+        "main_image": main_image,
     }

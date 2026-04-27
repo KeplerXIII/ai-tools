@@ -12,7 +12,7 @@ def chat_structured(
 ) -> dict:
     try:
         response = requests.post(
-            settings.ollama_url,  # http://172.20.0.1:11434/api/chat
+            settings.ollama_url,
             json={
                 "model": model,
                 "stream": False,
