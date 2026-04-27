@@ -38,3 +38,11 @@ class SummaryRequest(BaseModel):
 
 class SummaryResponse(BaseModel):
     annotation: str
+
+class TagRequest(BaseModel):
+    text: str
+    max_tags: int = 12
+
+
+class TagResponse(BaseModel):
+    tags: list[str]

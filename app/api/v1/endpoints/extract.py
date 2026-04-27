@@ -8,10 +8,13 @@ from app.schemas.extract import (
     ExtractUrlRequest,
     SummaryRequest,
     SummaryResponse,
+    TagRequest,
+    TagResponse
 )
 from app.services.entity_extractor import extract_entities
 from app.services.extractor import download_html, extract_article_text
 from app.services.summarizer import summarize_text
+from app.services.tagger import tag_text
 
 router = APIRouter(prefix="/extract", tags=["extract"])
 
@@ -36,3 +39,7 @@ def extract_article_entities(payload: EntityExtractRequest):
 def summarize_article(payload: SummaryRequest):
     annotation = summarize_text(payload.text)
     return SummaryResponse(annotation=annotation)
+
+@router.post("/tags", response_model=TagResponse)
+def tag_article_text(payload: TagRequest):
+    return tag_text(payload.text, payload.max_tags)
