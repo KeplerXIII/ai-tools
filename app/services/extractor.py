@@ -76,11 +76,7 @@ def render_html_with_playwright(url: str) -> str:
                     status_code=413,
                     detail="HTML после рендера слишком большой для обработки",
                 )
-            print("\n=== PLAYWRIGHT HTML DEBUG ===")
-            print("LENGTH:", len(html))
-            print("START:\n", html[:1000])
-            print("END:\n", html[-1000:])
-            print("=== END DEBUG ===\n")
+
             return html
 
     except PlaywrightTimeoutError:
