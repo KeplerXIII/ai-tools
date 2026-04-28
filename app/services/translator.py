@@ -3,7 +3,7 @@ from typing import Generator
 from langdetect import detect
 
 from app.core.config import settings
-from app.services.llm_client import chat
+from app.services.llm_openaisdk_client import chat
 
 
 LANG_MAP = {

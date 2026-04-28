@@ -9,12 +9,15 @@ class Settings(BaseSettings):
     request_timeout: int = 20
     max_html_length: int = 10000000
 
-    # === OpenAI-compatible (vLLM / Ollama proxy / OpenRouter) ===
+    # === OpenAI SDK (unified transport) ===
+    llm_openai_url: str = "http://172.20.0.1:11434/v1"
+    llm_openai_api_key: str = "ollama" #просто потому что на серваке в данный момент оллама
+    
+    # === OpenAI-compatible===
     llm_url: str = "http://172.20.0.1:11434/v1/chat/completions"
 
     # === Native Ollama ===
     ollama_url: str = "http://172.20.0.1:11434/api/chat"
-
     llm_timeout: int = 120
 
     # модели

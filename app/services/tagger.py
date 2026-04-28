@@ -4,7 +4,7 @@ import re
 from fastapi import HTTPException
 
 from app.core.config import settings
-from app.services.llm_client import chat
+from app.services.llm_openaisdk_client import chat
 
 
 def extract_json_object(raw: str) -> dict:

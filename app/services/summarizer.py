@@ -4,7 +4,7 @@ from fastapi import HTTPException
 
 from app.core.config import settings
 from app.schemas.extract import RefineSummaryMode
-from app.services.llm_client import chat
+from app.services.llm_openaisdk_client import chat
 
 
 def build_summary_prompt(text: str) -> str:

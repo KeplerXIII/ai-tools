@@ -8,9 +8,11 @@ dependencies = [
     "bs4>=0.0.2",
     "fastapi>=0.136.1",
     "langdetect>=1.0.9",
+    "openai>=2.33.0",
     "playwright>=1.58.0",
     "pydantic-settings>=2.14.0",
     "requests>=2.33.1",
+    "tiktoken>=0.12.0",
     "trafilatura>=2.0.0",
     "uvicorn[standard]>=0.46.0",
 ]
