@@ -8,6 +8,7 @@ services:
       - "8010:8000"
     networks:
       - ai_stack
+    shm_size: "1gb"
     restart: unless-stopped
 
 networks:
