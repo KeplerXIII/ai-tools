@@ -12,12 +12,37 @@ from app.core.config import settings
 logger = logging.getLogger("llm")
 
 
+def _build_options(
+    temperature: float = 0,
+    num_predict: int | None = None,
+    num_gpu: int | None = None,
+    options: dict | None = None,
+) -> dict:
+    result = {}
+
+    if options:
+        result.update(options)
+
+    result["temperature"] = temperature
+
+    if num_predict is not None:
+        result["num_predict"] = num_predict
+
+    if num_gpu is not None:
+        result["num_gpu"] = num_gpu
+
+    return result
+
+
 def chat(
     prompt: str,
     model: str,
     temperature: float = 0,
     meta: dict | None = None,
     stream: bool = False,
+    num_predict: int | None = None,
+    num_gpu: int | None = None,
+    options: dict | None = None,
 ) -> str | Generator[str, None, None]:
     if stream:
         return _chat_stream(
@@ -25,6 +50,9 @@ def chat(
             model=model,
             temperature=temperature,
             meta=meta,
+            num_predict=num_predict,
+            num_gpu=num_gpu,
+            options=options,
         )
 
     return _chat_full(
@@ -32,6 +60,9 @@ def chat(
         model=model,
         temperature=temperature,
         meta=meta,
+        num_predict=num_predict,
+        num_gpu=num_gpu,
+        options=options,
     )
 
 
@@ -40,8 +71,27 @@ def _chat_full(
     model: str,
     temperature: float = 0,
     meta: dict | None = None,
+    num_predict: int | None = None,
+    num_gpu: int | None = None,
+    options: dict | None = None,
 ) -> str:
     start_time = time.time()
+
+    request_options = _build_options(
+        temperature=temperature,
+        num_predict=num_predict,
+        num_gpu=num_gpu,
+        options=options,
+    )
+
+    body = {
+        "model": model,
+        "messages": [
+            {"role": "user", "content": prompt}
+        ],
+        "stream": False,
+        "options": request_options,
+    }
 
     logger.info(
         {
@@ -50,6 +100,8 @@ def _chat_full(
             "prompt_preview": "...",
             "prompt_chars": len(prompt),
             "temperature": temperature,
+            "num_predict": num_predict,
+            "num_gpu": num_gpu,
             "stream": False,
             "meta": meta,
         }
@@ -58,14 +110,7 @@ def _chat_full(
     try:
         response = requests.post(
             settings.llm_url,
-            json={
-                "model": model,
-                "messages": [
-                    {"role": "user", "content": prompt}
-                ],
-                "temperature": temperature,
-                "stream": False,
-            },
+            json=body,
             timeout=settings.llm_timeout,
         )
 
@@ -82,6 +127,8 @@ def _chat_full(
                 "duration_sec": round(duration, 3),
                 "prompt_chars": len(prompt),
                 "temperature": temperature,
+                "num_predict": num_predict,
+                "num_gpu": num_gpu,
                 "stream": False,
                 "meta": meta,
                 "error": str(exc),
@@ -110,6 +157,8 @@ def _chat_full(
                 "duration_sec": round(duration, 3),
                 "prompt_chars": len(prompt),
                 "temperature": temperature,
+                "num_predict": num_predict,
+                "num_gpu": num_gpu,
                 "stream": False,
                 "meta": meta,
                 "raw_response": response.text[:1000],
@@ -130,6 +179,8 @@ def _chat_full(
             "prompt_chars": len(prompt),
             "response_chars": len(content),
             "temperature": temperature,
+            "num_predict": num_predict,
+            "num_gpu": num_gpu,
             "stream": False,
             "meta": meta,
         }
@@ -143,10 +194,29 @@ def _chat_stream(
     model: str,
     temperature: float = 0,
     meta: dict | None = None,
+    num_predict: int | None = None,
+    num_gpu: int | None = None,
+    options: dict | None = None,
 ) -> Generator[str, None, None]:
     start_time = time.time()
     first_token_time = None
     total_chars = 0
+
+    request_options = _build_options(
+        temperature=temperature,
+        num_predict=num_predict,
+        num_gpu=num_gpu,
+        options=options,
+    )
+
+    body = {
+        "model": model,
+        "messages": [
+            {"role": "user", "content": prompt}
+        ],
+        "stream": True,
+        "options": request_options,
+    }
 
     logger.info(
         {
@@ -155,6 +225,8 @@ def _chat_stream(
             "prompt_preview": "...",
             "prompt_chars": len(prompt),
             "temperature": temperature,
+            "num_predict": num_predict,
+            "num_gpu": num_gpu,
             "stream": True,
             "meta": meta,
         }
@@ -165,14 +237,7 @@ def _chat_stream(
     try:
         response = requests.post(
             settings.llm_url,
-            json={
-                "model": model,
-                "messages": [
-                    {"role": "user", "content": prompt}
-                ],
-                "temperature": temperature,
-                "stream": True,
-            },
+            json=body,
             timeout=settings.llm_timeout,
             stream=True,
         )
@@ -206,6 +271,8 @@ def _chat_stream(
                             "ttft_sec": round(first_token_time - start_time, 3),
                             "prompt_chars": len(prompt),
                             "temperature": temperature,
+                            "num_predict": num_predict,
+                            "num_gpu": num_gpu,
                             "meta": meta,
                         }
                     )
@@ -229,6 +296,8 @@ def _chat_stream(
                 "prompt_chars": len(prompt),
                 "response_chars": total_chars,
                 "temperature": temperature,
+                "num_predict": num_predict,
+                "num_gpu": num_gpu,
                 "stream": True,
                 "meta": meta,
             }
@@ -244,6 +313,8 @@ def _chat_stream(
                 "duration_sec": round(duration, 3),
                 "prompt_chars": len(prompt),
                 "temperature": temperature,
+                "num_predict": num_predict,
+                "num_gpu": num_gpu,
                 "stream": True,
                 "meta": meta,
                 "error": str(exc),

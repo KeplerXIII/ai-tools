@@ -2,6 +2,7 @@ import requests
 import trafilatura
 from fastapi import HTTPException
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
+from bs4 import BeautifulSoup
 
 from app.core.config import settings
 from app.services.image_extractor import extract_images, pick_main_image
@@ -18,6 +19,21 @@ BROWSER_HEADERS = {
 }
 
 
+# ======================
+# HTML CLEANER
+# ======================
+def shrink_html(html: str) -> str:
+    soup = BeautifulSoup(html, "lxml")
+
+    for tag in soup(["script", "style", "noscript", "svg", "iframe"]):
+        tag.decompose()
+
+    return str(soup)
+
+
+# ======================
+# REQUESTS
+# ======================
 def download_html(url: str) -> str:
     try:
         response = requests.get(
@@ -34,15 +50,14 @@ def download_html(url: str) -> str:
 
     html = response.text
 
-    if len(html) > settings.max_html_length:
-        raise HTTPException(
-            status_code=413,
-            detail="HTML слишком большой для обработки",
-        )
+    print("REQUESTS HTML LENGTH:", len(html))
 
     return html
 
 
+# ======================
+# PLAYWRIGHT
+# ======================
 def render_html_with_playwright(url: str) -> str:
     try:
         with sync_playwright() as p:
@@ -69,13 +84,10 @@ def render_html_with_playwright(url: str) -> str:
             page.wait_for_timeout(3000)
 
             html = page.content()
-            browser.close()
 
-            if len(html) > settings.max_html_length:
-                raise HTTPException(
-                    status_code=413,
-                    detail="HTML после рендера слишком большой для обработки",
-                )
+            print("PLAYWRIGHT HTML LENGTH:", len(html))
+
+            browser.close()
 
             return html
 
@@ -84,15 +96,16 @@ def render_html_with_playwright(url: str) -> str:
             status_code=504,
             detail="Таймаут рендера страницы через Playwright",
         )
-    except HTTPException:
-        raise
     except Exception as exc:
         raise HTTPException(
             status_code=502,
-            detail=f"Ошибка Playwright при рендере страницы: {exc}",
+            detail=f"Ошибка Playwright: {exc}",
         )
 
 
+# ======================
+# TRAFILATURA
+# ======================
 def extract_text_from_html(html: str, url: str | None = None) -> str | None:
     text = trafilatura.extract(
         html,
@@ -114,6 +127,40 @@ def extract_text_from_html(html: str, url: str | None = None) -> str | None:
     )
 
 
+# ======================
+# BS4 FALLBACK
+# ======================
+def extract_text_with_bs4(html: str) -> str | None:
+    soup = BeautifulSoup(html, "lxml")
+
+    for tag in soup(["script", "style", "noscript", "svg", "nav", "footer", "header"]):
+        tag.decompose()
+
+    candidates = []
+
+    for selector in [
+        "article",
+        "main",
+        ".content",
+        ".article",
+        ".news",
+        "body",
+    ]:
+        block = soup.select_one(selector)
+        if block:
+            text = block.get_text("\n", strip=True)
+            if len(text) > 300:
+                candidates.append(text)
+
+    if not candidates:
+        return None
+
+    return max(candidates, key=len)
+
+
+# ======================
+# QUALITY
+# ======================
 def estimate_quality(text: str) -> tuple[str, bool]:
     length = len(text.strip())
 
@@ -126,22 +173,41 @@ def estimate_quality(text: str) -> tuple[str, bool]:
     return "low", True
 
 
+# ======================
+# MAIN
+# ======================
 def extract_article_text(html: str, url: str | None = None) -> dict:
     method = "requests+trafilatura"
 
+    # 1. сначала чистим HTML
+    html = shrink_html(html)
+
+    # 2. пробуем trafilatura
     text = extract_text_from_html(html, url=url)
 
+    # 3. fallback → playwright
     if not text and url:
         rendered_html = render_html_with_playwright(url)
+        rendered_html = shrink_html(rendered_html)
+
         text = extract_text_from_html(rendered_html, url=url)
         html = rendered_html
         method = "playwright+trafilatura"
+
+    # 4. fallback → bs4
+    if not text:
+        text = extract_text_with_bs4(html)
+        method = "beautifulsoup"
 
     if not text:
         raise HTTPException(
             status_code=422,
             detail="Не удалось извлечь содержательный текст статьи",
         )
+
+    # ограничиваем текст (а не HTML!)
+    if len(text) > 100_000:
+        text = text[:100_000]
 
     metadata = trafilatura.extract_metadata(html)
     quality, needs_review = estimate_quality(text)
