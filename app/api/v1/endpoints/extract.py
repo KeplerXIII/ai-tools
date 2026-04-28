@@ -2,6 +2,8 @@ from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 
 from app.schemas.extract import (
+    RefineSummaryRequest,
+    RefineSummaryResponse,
     EntityExtractRequest,
     EntityExtractResponse,
     ExtractHtmlRequest,
@@ -14,7 +16,7 @@ from app.schemas.extract import (
 )
 from app.services.entity_extractor import extract_entities
 from app.services.extractor import download_html, extract_article_text
-from app.services.summarizer import summarize_text
+from app.services.summarizer import summarize_text, refine_summary
 from app.services.tagger import tag_text
 
 router = APIRouter(prefix="/extract", tags=["extract"])
@@ -58,3 +60,32 @@ def summarize_article_stream(payload: SummaryRequest):
 @router.post("/tags", response_model=TagResponse)
 def tag_article_text(payload: TagRequest):
     return tag_text(payload.text, payload.max_tags)
+
+
+@router.post("/summary/refine", response_model=RefineSummaryResponse)
+def refine_article_summary(payload: RefineSummaryRequest):
+    refined_summary = refine_summary(
+        article_text=payload.article_text,
+        summary=payload.summary,
+        user_instruction=payload.user_instruction,
+        mode=payload.mode,
+        stream=False,
+    )
+
+    return RefineSummaryResponse(refined_summary=refined_summary)
+
+
+@router.post("/summary/refine/stream")
+def refine_article_summary_stream(payload: RefineSummaryRequest):
+    generator = refine_summary(
+        article_text=payload.article_text,
+        summary=payload.summary,
+        user_instruction=payload.user_instruction,
+        mode=payload.mode,
+        stream=True,
+    )
+
+    return StreamingResponse(
+        generator,
+        media_type="text/plain; charset=utf-8",
+    )

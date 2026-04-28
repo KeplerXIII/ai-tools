@@ -1,4 +1,5 @@
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel, HttpUrl, Field
+from enum import Enum
 
 
 class ExtractUrlRequest(BaseModel):
@@ -55,3 +56,20 @@ class TagRequest(BaseModel):
 
 class TagResponse(BaseModel):
     tags: list[str]
+
+
+class RefineSummaryMode(str, Enum):
+    shorten = "shorten"
+    expand = "expand"
+    add_context = "add_context"
+
+
+class RefineSummaryRequest(BaseModel):
+    article_text: str = Field(..., min_length=1)
+    summary: str = Field(..., min_length=1)
+    user_instruction: str = ""
+    mode: RefineSummaryMode = RefineSummaryMode.add_context
+
+
+class RefineSummaryResponse(BaseModel):
+    refined_summary: str
