@@ -38,6 +38,70 @@ def _build_extra_body(
     return extra_body
 
 
+def _get_completion_tokens_from_usage(usage) -> int | None:
+    if not usage:
+        return None
+
+    completion_tokens = getattr(usage, "completion_tokens", None)
+
+    if completion_tokens is None and isinstance(usage, dict):
+        completion_tokens = usage.get("completion_tokens")
+
+    if completion_tokens is None:
+        return None
+
+    try:
+        return int(completion_tokens)
+    except (TypeError, ValueError):
+        return None
+
+
+def _estimate_tokens_from_text(text: str) -> int:
+    """
+    Fallback, если backend не вернул usage.
+    Для точного подсчёта лучше использовать usage.completion_tokens.
+    """
+    if not text:
+        return 0
+
+    return max(1, int(len(text) / 4))
+
+
+def _build_metrics(
+    start_time: float,
+    end_time: float,
+    first_token_time: float | None,
+    completion_tokens: int | None,
+    content: str,
+) -> dict:
+    duration = end_time - start_time
+
+    ttft = None
+    generation_sec = None
+    tok_per_sec = None
+
+    if first_token_time is not None:
+        ttft = first_token_time - start_time
+        generation_sec = max(0.0, end_time - first_token_time)
+
+    tokens = completion_tokens
+
+    if tokens is None:
+        tokens = _estimate_tokens_from_text(content)
+
+    if generation_sec and generation_sec > 0 and tokens:
+        tok_per_sec = tokens / generation_sec
+
+    return {
+        "duration_sec": round(duration, 3),
+        "ttft_sec": round(ttft, 3) if ttft is not None else None,
+        "generation_sec": round(generation_sec, 3) if generation_sec is not None else None,
+        "completion_tokens": tokens,
+        "tok_per_sec": round(tok_per_sec, 1) if tok_per_sec is not None else None,
+        "tokens_source": "usage" if completion_tokens is not None else "estimated",
+    }
+
+
 def chat(
     prompt: str,
     model: str,
@@ -79,7 +143,7 @@ def _chat_full(
     num_gpu: int | None = None,
     options: dict | None = None,
 ) -> str:
-    start_time = time.time()
+    start_time = time.perf_counter()
 
     client = _get_client()
 
@@ -116,7 +180,8 @@ def _chat_full(
             extra_body=extra_body or None,
         )
 
-        duration = time.time() - start_time
+        end_time = time.perf_counter()
+
         content = completion.choices[0].message.content
 
         if not content or not content.strip():
@@ -124,8 +189,20 @@ def _chat_full(
 
         content = content.strip()
 
+        completion_tokens = _get_completion_tokens_from_usage(
+            getattr(completion, "usage", None)
+        )
+
+        metrics = _build_metrics(
+            start_time=start_time,
+            end_time=end_time,
+            first_token_time=None,
+            completion_tokens=completion_tokens,
+            content=content,
+        )
+
     except (OpenAIError, ValueError, KeyError, IndexError, TypeError) as exc:
-        duration = time.time() - start_time
+        duration = time.perf_counter() - start_time
 
         logger.error(
             {
@@ -153,7 +230,7 @@ def _chat_full(
             "event": "llm_success",
             "transport": "openai_sdk",
             "model": model,
-            "duration_sec": round(duration, 3),
+            **metrics,
             "prompt_chars": len(prompt),
             "response_chars": len(content),
             "temperature": temperature,
@@ -176,9 +253,11 @@ def _chat_stream(
     num_gpu: int | None = None,
     options: dict | None = None,
 ) -> Generator[str, None, None]:
-    start_time = time.time()
+    start_time = time.perf_counter()
     first_token_time = None
-    total_chars = 0
+
+    content_parts: list[str] = []
+    completion_tokens: int | None = None
 
     client = _get_client()
 
@@ -212,10 +291,18 @@ def _chat_stream(
             temperature=temperature,
             max_tokens=num_predict,
             stream=True,
+            stream_options={"include_usage": True},
             extra_body=extra_body or None,
         )
 
         for chunk in stream_response:
+            chunk_usage = getattr(chunk, "usage", None)
+
+            if chunk_usage:
+                usage_tokens = _get_completion_tokens_from_usage(chunk_usage)
+                if usage_tokens is not None:
+                    completion_tokens = usage_tokens
+
             if not chunk.choices:
                 continue
 
@@ -225,7 +312,7 @@ def _chat_stream(
                 continue
 
             if first_token_time is None:
-                first_token_time = time.time()
+                first_token_time = time.perf_counter()
 
                 logger.info(
                     {
@@ -241,22 +328,28 @@ def _chat_stream(
                     }
                 )
 
-            total_chars += len(delta)
+            content_parts.append(delta)
             yield delta
 
-        duration = time.time() - start_time
+        end_time = time.perf_counter()
+        content = "".join(content_parts).strip()
+
+        metrics = _build_metrics(
+            start_time=start_time,
+            end_time=end_time,
+            first_token_time=first_token_time,
+            completion_tokens=completion_tokens,
+            content=content,
+        )
 
         logger.info(
             {
                 "event": "llm_stream_success",
                 "transport": "openai_sdk",
                 "model": model,
-                "duration_sec": round(duration, 3),
-                "ttft_sec": round(first_token_time - start_time, 3)
-                if first_token_time
-                else None,
+                **metrics,
                 "prompt_chars": len(prompt),
-                "response_chars": total_chars,
+                "response_chars": len(content),
                 "temperature": temperature,
                 "num_predict": num_predict,
                 "num_gpu": num_gpu,
@@ -266,7 +359,7 @@ def _chat_stream(
         )
 
     except (OpenAIError, ValueError, KeyError, IndexError, TypeError) as exc:
-        duration = time.time() - start_time
+        duration = time.perf_counter() - start_time
 
         logger.error(
             {
@@ -274,6 +367,9 @@ def _chat_stream(
                 "transport": "openai_sdk",
                 "model": model,
                 "duration_sec": round(duration, 3),
+                "ttft_sec": round(first_token_time - start_time, 3)
+                if first_token_time
+                else None,
                 "prompt_chars": len(prompt),
                 "temperature": temperature,
                 "num_predict": num_predict,
