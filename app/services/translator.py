@@ -3,7 +3,7 @@ from typing import Generator
 from langdetect import detect
 
 from app.core.config import settings
-from app.services.llm_openaisdk_client import chat
+from app.services.llm_openrouter_client import chat
 
 
 LANG_MAP = {
@@ -49,7 +49,7 @@ def translate_text(
 
     return chat(
         prompt=prompt,
-        model=settings.translate_model,
+        model=settings.openrouter_model,
         temperature=0,
         stream=stream,
         meta={
