@@ -4,7 +4,7 @@ from fastapi import HTTPException
 
 from app.core.config import settings
 from app.schemas.extract import RefineSummaryMode
-from app.services.llm_openaisdk_client import chat
+from app.services.llm_openrouter_client import chat
 
 
 def build_summary_prompt(text: str) -> str:
@@ -40,7 +40,7 @@ def summarize_text(
 
     return chat(
         prompt=prompt,
-        model=settings.llm_model,
+        model=settings.openrouter_model,
         temperature=0.2,
         stream=stream,
         meta={
@@ -128,7 +128,7 @@ def refine_summary(
 
     return chat(
         prompt=prompt,
-        model=settings.llm_model,
+        model=settings.openrouter_model,
         temperature=0.2,
         stream=stream,
         meta={

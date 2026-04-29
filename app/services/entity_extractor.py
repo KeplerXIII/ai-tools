@@ -4,7 +4,7 @@ import re
 from fastapi import HTTPException
 
 from app.core.config import settings
-from app.services.llm_openaisdk_client import chat
+from app.services.llm_openrouter_client import chat
 
 
 def extract_json_object(content: str) -> dict:
@@ -100,7 +100,7 @@ def extract_entities(text: str) -> dict:
 
     content = chat(
         prompt=prompt,
-        model=settings.llm_model,
+        model=settings.openrouter_model,
         temperature=0,
     )
 
