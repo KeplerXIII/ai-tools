@@ -1,6 +1,8 @@
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 
+from app.api.error_mapping import map_app_error
+from app.domain.errors import AppError
 from app.schemas.extract import (
     RefineSummaryRequest,
     RefineSummaryResponse,
@@ -22,6 +24,15 @@ from app.services.tagger import tag_text
 router = APIRouter(prefix="/extract", tags=["extract"])
 
 
+def _safe_stream(generator):
+    try:
+        for chunk in generator:
+            yield chunk
+    except Exception as exc:
+        # Streaming response is already started; return inline error chunk instead of crashing ASGI.
+        yield f"\n[stream_error] {exc}"
+
+
 @router.post("/url", response_model=ExtractResponse)
 def extract_from_url(payload: ExtractUrlRequest):
     html = download_html(str(payload.url))
@@ -35,57 +46,75 @@ def extract_from_html(payload: ExtractHtmlRequest):
 
 @router.post("/entities", response_model=EntityExtractResponse)
 def extract_article_entities(payload: EntityExtractRequest):
-    return extract_entities(payload.text)
+    try:
+        return extract_entities(payload.text)
+    except AppError as exc:
+        raise map_app_error(exc) from exc
 
 
 @router.post("/summary", response_model=SummaryResponse)
 def summarize_article(payload: SummaryRequest):
-    annotation = summarize_text(payload.text)
+    try:
+        annotation = summarize_text(payload.text)
+    except AppError as exc:
+        raise map_app_error(exc) from exc
     return SummaryResponse(annotation=annotation)
 
 
 @router.post("/summary/stream")
 def summarize_article_stream(payload: SummaryRequest):
-    generator = summarize_text(
-        text=payload.text,
-        stream=True,
-    )
+    try:
+        generator = summarize_text(
+            text=payload.text,
+            stream=True,
+        )
+    except AppError as exc:
+        raise map_app_error(exc) from exc
 
     return StreamingResponse(
-        generator,
+        _safe_stream(generator),
         media_type="text/plain; charset=utf-8",
     )
 
 
 @router.post("/tags", response_model=TagResponse)
 def tag_article_text(payload: TagRequest):
-    return tag_text(payload.text, payload.max_tags)
+    try:
+        return tag_text(payload.text, payload.max_tags)
+    except AppError as exc:
+        raise map_app_error(exc) from exc
 
 
 @router.post("/summary/refine", response_model=RefineSummaryResponse)
 def refine_article_summary(payload: RefineSummaryRequest):
-    refined_summary = refine_summary(
-        article_text=payload.article_text,
-        summary=payload.summary,
-        user_instruction=payload.user_instruction,
-        mode=payload.mode,
-        stream=False,
-    )
+    try:
+        refined_summary = refine_summary(
+            article_text=payload.article_text,
+            summary=payload.summary,
+            user_instruction=payload.user_instruction,
+            mode=payload.mode,
+            stream=False,
+        )
+    except AppError as exc:
+        raise map_app_error(exc) from exc
 
     return RefineSummaryResponse(refined_summary=refined_summary)
 
 
 @router.post("/summary/refine/stream")
 def refine_article_summary_stream(payload: RefineSummaryRequest):
-    generator = refine_summary(
-        article_text=payload.article_text,
-        summary=payload.summary,
-        user_instruction=payload.user_instruction,
-        mode=payload.mode,
-        stream=True,
-    )
+    try:
+        generator = refine_summary(
+            article_text=payload.article_text,
+            summary=payload.summary,
+            user_instruction=payload.user_instruction,
+            mode=payload.mode,
+            stream=True,
+        )
+    except AppError as exc:
+        raise map_app_error(exc) from exc
 
     return StreamingResponse(
-        generator,
+        _safe_stream(generator),
         media_type="text/plain; charset=utf-8",
     )

@@ -2,8 +2,9 @@ from typing import Generator
 
 from langdetect import detect
 
+from app.bootstrap.container import get_llm_client
 from app.core.config import settings
-from app.services.llm_openrouter_client import chat
+from app.ports.llm import LLMRequest
 
 
 LANG_MAP = {
@@ -47,15 +48,18 @@ def translate_text(
         target=target_lang,
     )
 
-    return chat(
-        prompt=prompt,
-        model=settings.openrouter_model,
-        temperature=0,
-        stream=stream,
-        meta={
+    llm = get_llm_client()
+    return llm.chat(
+        LLMRequest(
+            prompt=prompt,
+            model=settings.model_translation,
+            temperature=0,
+            stream=stream,
+            meta={
             "tool": "translator",
             "source_lang": source_lang,
             "target_lang": target_lang,
             "text_chars": len(text),
-        },
+            },
+        )
     )

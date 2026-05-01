@@ -1,10 +1,10 @@
 import json
 import re
 
-from fastapi import HTTPException
-
+from app.bootstrap.container import get_llm_client
 from app.core.config import settings
-from app.services.llm_openrouter_client import chat
+from app.domain.errors import InvalidProviderResponseError, ValidationError
+from app.ports.llm import LLMRequest
 
 
 def extract_json_object(content: str) -> dict:
@@ -21,18 +21,14 @@ def extract_json_object(content: str) -> dict:
     match = re.search(r"\{.*\}", content, re.DOTALL)
 
     if not match:
-        raise HTTPException(
-            status_code=502,
-            detail=f"LLM не вернула JSON: {content[:500]}",
-        )
+        raise InvalidProviderResponseError(f"LLM не вернула JSON: {content[:500]}")
 
     try:
         return json.loads(match.group(0))
     except json.JSONDecodeError as exc:
-        raise HTTPException(
-            status_code=502,
-            detail=f"LLM вернула невалидный JSON: {exc}. Ответ: {content[:500]}",
-        )
+        raise InvalidProviderResponseError(
+            f"LLM вернула невалидный JSON: {exc}. Ответ: {content[:500]}"
+        ) from exc
 
 
 def normalize_list(value) -> list[str]:
@@ -70,10 +66,7 @@ def normalize_list(value) -> list[str]:
 
 def extract_entities(text: str) -> dict:
     if not text.strip():
-        raise HTTPException(
-            status_code=400,
-            detail="Текст пустой",
-        )
+        raise ValidationError("Текст пустой")
 
     prompt = f"""
 Извлеки из текста следующие сущности:
@@ -98,10 +91,13 @@ def extract_entities(text: str) -> dict:
 {text}
 """
 
-    content = chat(
-        prompt=prompt,
-        model=settings.openrouter_model,
-        temperature=0,
+    llm = get_llm_client()
+    content = llm.chat(
+        LLMRequest(
+            prompt=prompt,
+            model=settings.model_entity_extraction,
+            temperature=0,
+        )
     )
 
     data = extract_json_object(content)

@@ -1,10 +1,10 @@
 from typing import Generator
 
-from fastapi import HTTPException
-
+from app.bootstrap.container import get_llm_client
 from app.core.config import settings
+from app.domain.errors import ValidationError
+from app.ports.llm import LLMRequest
 from app.schemas.extract import RefineSummaryMode
-from app.services.llm_openrouter_client import chat
 
 
 def build_summary_prompt(text: str) -> str:
@@ -34,19 +34,22 @@ def summarize_text(
     stream: bool = False,
 ) -> str | Generator[str, None, None]:
     if not text.strip():
-        raise HTTPException(status_code=400, detail="Текст пустой")
+        raise ValidationError("Текст пустой")
 
     prompt = build_summary_prompt(text)
+    llm = get_llm_client()
 
-    return chat(
-        prompt=prompt,
-        model=settings.openrouter_model,
-        temperature=0.2,
-        stream=stream,
-        meta={
+    return llm.chat(
+        LLMRequest(
+            prompt=prompt,
+            model=settings.model_summary_refine,
+            temperature=0.2,
+            stream=stream,
+            meta={
             "tool": "summarizer",
             "text_chars": len(text),
-        },
+            },
+        )
     )
 
 
@@ -114,10 +117,10 @@ def refine_summary(
 ) -> str | Generator[str, None, None]:
 
     if not article_text.strip():
-        raise HTTPException(status_code=400, detail="Исходный текст пустой")
+        raise ValidationError("Исходный текст пустой")
 
     if not summary.strip():
-        raise HTTPException(status_code=400, detail="Аннотация пустая")
+        raise ValidationError("Аннотация пустая")
 
     prompt = build_refine_summary_prompt(
         article_text=article_text,
@@ -126,13 +129,16 @@ def refine_summary(
         mode=mode,
     )
 
-    return chat(
-        prompt=prompt,
-        model=settings.openrouter_model,
-        temperature=0.2,
-        stream=stream,
-        meta={
+    llm = get_llm_client()
+    return llm.chat(
+        LLMRequest(
+            prompt=prompt,
+            model=settings.model_summary,
+            temperature=0.2,
+            stream=stream,
+            meta={
             "tool": "summary_refiner",
             "mode": mode.value,
-        },
+            },
+        )
     )

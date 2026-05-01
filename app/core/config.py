@@ -11,10 +11,9 @@ class Settings(BaseSettings):
     request_timeout: int = 20
     max_html_length: int = 10_000_000
 
-    # --- ollama / local ---
-    ollama_base_url: str = "http://172.20.0.1:11434"
-    llm_openai_url: str = "http://172.20.0.1:11434/v1"
-    llm_openai_api_key: str = "ollama"
+    # --- openai-compatible provider ---
+    openai_compat_base_url: str = "http://172.20.0.1:11434/v1"
+    openai_compat_api_key: str = "ollama"
 
     # --- openrouter ---
     openrouter_api_key: str
@@ -22,18 +21,16 @@ class Settings(BaseSettings):
     openrouter_site_name: str = "ai-tools"
     openrouter_site_url: str | None = None
 
-    # --- endpoints ---
-    llm_url: str = "http://172.20.0.1:11434/v1/chat/completions"
-    ollama_url: str = "http://172.20.0.1:11434/api/chat"
-
     # --- runtime ---
     llm_timeout: int = 120
+    llm_provider: str = "openrouter"  # openrouter | openai_sdk
 
-    # --- models ---
-    llm_model: str = "qwen3:14b"
-    translate_model: str = "translategemma:12b"
-    light_model: str = "qwen2.5:3b-instruct"
-    openrouter_model: str = "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free"
+    # --- models by task ---
+    model_summary: str = "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free"
+    model_summary_refine: str = "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free"
+    model_translation: str = "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free"
+    model_tagging: str = "qwen2.5:3b-instruct"
+    model_entity_extraction: str = "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free"
 
     class Config:
         env_file = ".env"
