@@ -18,7 +18,8 @@ class Settings(BaseSettings):
     debug: bool = False
 
     # --- limits ---
-    request_timeout: int = 20
+    # HTTP-загрузка страницы и навигация Playwright при /extract (секунды)
+    request_timeout: int = 45
     max_html_length: int = 10_000_000
 
     # --- OpenAI-compatible API (default for all tasks unless overridden below) ---

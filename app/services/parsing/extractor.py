@@ -1,12 +1,23 @@
+import time
+
 import requests
 import trafilatura
+from bs4 import BeautifulSoup
 from fastapi import HTTPException
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
-from bs4 import BeautifulSoup
 
 from app.core.config import settings
 
+from .extract_errors import (
+    http_exception_extract_empty,
+    http_exception_for_http_error,
+    http_exception_playwright_failed,
+    http_exception_playwright_timeout,
+    map_request_exception,
+)
 from .image_extractor import extract_images, pick_main_image
+from .extract_logging import logger, url_host, url_preview
+from .playwright_overlays import settle_after_navigation
 
 
 BROWSER_HEADERS = {
@@ -36,30 +47,124 @@ def shrink_html(html: str) -> str:
 # REQUESTS
 # ======================
 def download_html(url: str) -> str:
-    try:
-        response = requests.get(
-            url,
-            timeout=settings.request_timeout,
-            headers=BROWSER_HEADERS,
-        )
-        response.raise_for_status()
-    except requests.RequestException as exc:
-        raise HTTPException(
-            status_code=502,
-            detail=f"Ошибка загрузки страницы: {exc}",
-        )
+    """Скачивает HTML с ретраями при обрыве сети и 502/503/504 у целевого сервера."""
+    attempts = 3
+    backoff = 0.6
 
-    html = response.text
+    logger.info(
+        {
+            "event": "extract_fetch_request",
+            "url_preview": url_preview(url),
+            "host": url_host(url),
+            "timeout_sec": settings.request_timeout,
+            "max_attempts": attempts,
+        }
+    )
 
-    print("REQUESTS HTML LENGTH:", len(html))
+    for attempt in range(attempts):
+        try:
+            response = requests.get(
+                url,
+                timeout=settings.request_timeout,
+                headers=BROWSER_HEADERS,
+            )
+            response.raise_for_status()
+            html = response.text
+            logger.info(
+                {
+                    "event": "extract_fetch_success",
+                    "url_preview": url_preview(url),
+                    "host": url_host(url),
+                    "html_chars": len(html),
+                    "attempt": attempt + 1,
+                }
+            )
+            return html
+        except requests.HTTPError as exc:
+            code = exc.response.status_code if exc.response is not None else None
+            if (
+                code in (502, 503, 504)
+                and attempt < attempts - 1
+            ):
+                logger.warning(
+                    {
+                        "event": "extract_fetch_retry",
+                        "url_preview": url_preview(url),
+                        "host": url_host(url),
+                        "attempt": attempt + 1,
+                        "reason": f"upstream_http_{code}",
+                    }
+                )
+                time.sleep(backoff * (attempt + 1))
+                continue
+            err = http_exception_for_http_error(exc)
+            logger.error(
+                {
+                    "event": "extract_fetch_error",
+                    "url_preview": url_preview(url),
+                    "host": url_host(url),
+                    "attempt": attempt + 1,
+                    "status_code": err.status_code,
+                    "detail": err.detail,
+                }
+            )
+            raise err from exc
+        except (requests.Timeout, requests.ConnectionError) as exc:
+            if attempt < attempts - 1:
+                logger.warning(
+                    {
+                        "event": "extract_fetch_retry",
+                        "url_preview": url_preview(url),
+                        "host": url_host(url),
+                        "attempt": attempt + 1,
+                        "reason": type(exc).__name__,
+                    }
+                )
+                time.sleep(backoff * (attempt + 1))
+                continue
+            err = map_request_exception(exc)
+            logger.error(
+                {
+                    "event": "extract_fetch_error",
+                    "url_preview": url_preview(url),
+                    "host": url_host(url),
+                    "attempt": attempt + 1,
+                    "status_code": err.status_code,
+                    "detail": err.detail,
+                }
+            )
+            raise err from exc
+        except requests.RequestException as exc:
+            err = map_request_exception(exc)
+            logger.error(
+                {
+                    "event": "extract_fetch_error",
+                    "url_preview": url_preview(url),
+                    "host": url_host(url),
+                    "attempt": attempt + 1,
+                    "status_code": err.status_code,
+                    "detail": err.detail,
+                }
+            )
+            raise err from exc
 
-    return html
+    raise AssertionError("download_html: исчерпаны попытки без возврата или исключения")
 
 
 # ======================
 # PLAYWRIGHT
 # ======================
 def render_html_with_playwright(url: str) -> str:
+    # "load" вместо "networkidle": меньше ложных таймаутов на SPA и сайтах с вечными запросами
+    t0 = time.perf_counter()
+    logger.info(
+        {
+            "event": "extract_playwright_request",
+            "url_preview": url_preview(url),
+            "host": url_host(url),
+            "timeout_sec": settings.request_timeout,
+        }
+    )
     try:
         with sync_playwright() as p:
             browser = p.chromium.launch(
@@ -70,38 +175,41 @@ def render_html_with_playwright(url: str) -> str:
                     "--disable-gpu",
                 ],
             )
+            try:
+                page = browser.new_page(
+                    user_agent=BROWSER_HEADERS["User-Agent"],
+                    locale="ru-RU",
+                )
 
-            page = browser.new_page(
-                user_agent=BROWSER_HEADERS["User-Agent"],
-                locale="ru-RU",
-            )
+                page.goto(
+                    url,
+                    wait_until="load",
+                    timeout=settings.request_timeout * 1000,
+                )
 
-            page.goto(
-                url,
-                wait_until="networkidle",
-                timeout=settings.request_timeout * 1000,
-            )
+                # Закрытие типовых cookie/CMP-баннеров, иначе trafilatura часто тянет текст оверлея
+                settle_after_navigation(page, total_ms=3000)
 
-            page.wait_for_timeout(3000)
+                html = page.content()
 
-            html = page.content()
+                logger.info(
+                    {
+                        "event": "extract_playwright_success",
+                        "url_preview": url_preview(url),
+                        "host": url_host(url),
+                        "duration_sec": round(time.perf_counter() - t0, 3),
+                        "html_chars": len(html),
+                    }
+                )
 
-            print("PLAYWRIGHT HTML LENGTH:", len(html))
+                return html
+            finally:
+                browser.close()
 
-            browser.close()
-
-            return html
-
-    except PlaywrightTimeoutError:
-        raise HTTPException(
-            status_code=504,
-            detail="Таймаут рендера страницы через Playwright",
-        )
+    except PlaywrightTimeoutError as exc:
+        raise http_exception_playwright_timeout() from exc
     except Exception as exc:
-        raise HTTPException(
-            status_code=502,
-            detail=f"Ошибка Playwright: {exc}",
-        )
+        raise http_exception_playwright_failed(exc) from exc
 
 
 # ======================
@@ -178,54 +286,95 @@ def estimate_quality(text: str) -> tuple[str, bool]:
 # MAIN
 # ======================
 def extract_article_text(html: str, url: str | None = None) -> dict:
-    method = "requests+trafilatura"
+    t0 = time.perf_counter()
+    logger.info(
+        {
+            "event": "extract_request",
+            "url_preview": url_preview(url),
+            "host": url_host(url),
+            "html_chars": len(html),
+            "has_url": bool(url),
+        }
+    )
 
-    # 1. сначала чистим HTML
-    html = shrink_html(html)
+    try:
+        method = "requests+trafilatura"
 
-    # 2. пробуем trafilatura
-    text = extract_text_from_html(html, url=url)
+        # 1. сначала чистим HTML
+        html = shrink_html(html)
 
-    # 3. fallback → playwright
-    if not text and url:
-        rendered_html = render_html_with_playwright(url)
-        rendered_html = shrink_html(rendered_html)
+        # 2. пробуем trafilatura
+        text = extract_text_from_html(html, url=url)
 
-        text = extract_text_from_html(rendered_html, url=url)
-        html = rendered_html
-        method = "playwright+trafilatura"
+        # 3. fallback → playwright
+        if not text and url:
+            rendered_html = render_html_with_playwright(url)
+            rendered_html = shrink_html(rendered_html)
 
-    # 4. fallback → bs4
-    if not text:
-        text = extract_text_with_bs4(html)
-        method = "beautifulsoup"
+            text = extract_text_from_html(rendered_html, url=url)
+            html = rendered_html
+            method = "playwright+trafilatura"
 
-    if not text:
-        raise HTTPException(
-            status_code=422,
-            detail="Не удалось извлечь содержательный текст статьи",
+        # 4. fallback → bs4
+        if not text:
+            text = extract_text_with_bs4(html)
+            method = "beautifulsoup"
+
+        if not text:
+            raise http_exception_extract_empty(had_url=bool(url))
+
+        # ограничиваем текст (а не HTML!)
+        if len(text) > 100_000:
+            text = text[:100_000]
+
+        metadata = trafilatura.extract_metadata(html)
+        quality, needs_review = estimate_quality(text)
+
+        images = extract_images(html, url) if url else []
+        main_image = pick_main_image(images, html=html, base_url=url) if url else None
+
+        result = {
+            "title": metadata.title if metadata else None,
+            "author": metadata.author if metadata else None,
+            "date": metadata.date if metadata else None,
+            "url": url,
+            "text": text,
+            "length": len(text),
+            "method": method,
+            "quality": quality,
+            "needs_review": needs_review,
+            "images": images,
+            "main_image": main_image,
+        }
+
+        logger.info(
+            {
+                "event": "extract_success",
+                "url_preview": url_preview(url),
+                "host": url_host(url),
+                "duration_sec": round(time.perf_counter() - t0, 3),
+                "method": result["method"],
+                "text_chars": result["length"],
+                "quality": quality,
+                "needs_review": needs_review,
+                "html_chars_after_shrink": len(html),
+                "images_count": len(images),
+                "has_main_image": main_image is not None,
+                "title_present": bool(metadata and metadata.title),
+            }
         )
 
-    # ограничиваем текст (а не HTML!)
-    if len(text) > 100_000:
-        text = text[:100_000]
+        return result
 
-    metadata = trafilatura.extract_metadata(html)
-    quality, needs_review = estimate_quality(text)
-
-    images = extract_images(html, url) if url else []
-    main_image = pick_main_image(images, html=html, base_url=url) if url else None
-
-    return {
-        "title": metadata.title if metadata else None,
-        "author": metadata.author if metadata else None,
-        "date": metadata.date if metadata else None,
-        "url": url,
-        "text": text,
-        "length": len(text),
-        "method": method,
-        "quality": quality,
-        "needs_review": needs_review,
-        "images": images,
-        "main_image": main_image,
-    }
+    except HTTPException as exc:
+        logger.error(
+            {
+                "event": "extract_error",
+                "url_preview": url_preview(url),
+                "host": url_host(url),
+                "duration_sec": round(time.perf_counter() - t0, 3),
+                "status_code": exc.status_code,
+                "detail": exc.detail,
+            }
+        )
+        raise
