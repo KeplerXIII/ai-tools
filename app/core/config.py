@@ -44,6 +44,14 @@ class Settings(BaseSettings):
     # --- runtime ---
     llm_timeout: int = 120
 
+    # --- database (async SQLAlchemy; URL вида postgresql+asyncpg://user:pass@host:5432/db) ---
+    database_url: str
+
+    # --- JWT ---
+    jwt_secret_key: str
+    jwt_algorithm: str = "HS256"
+    access_token_expire_minutes: int = 60 * 24
+
     # --- models by task ---
     model_summary: str = "deepseek-v4-pro"
     model_summary_refine: str = "deepseek-v4-pro"
