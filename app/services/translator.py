@@ -4,6 +4,7 @@ from langdetect import detect
 
 from app.bootstrap.container import get_llm_client
 from app.core.config import settings
+from app.core.llm_task import LLMTask
 from app.ports.llm import LLMRequest
 
 
@@ -48,7 +49,7 @@ def translate_text(
         target=target_lang,
     )
 
-    llm = get_llm_client()
+    llm = get_llm_client(LLMTask.TRANSLATION)
     return llm.chat(
         LLMRequest(
             prompt=prompt,

@@ -1,23 +1,14 @@
 from functools import lru_cache
 
 from app.core.config import settings
-from app.domain.errors import ValidationError
+from app.core.llm_task import LLMTask
+from app.infrastructure.llm.clients.openai_sdk_client import openai_client_for_endpoint
 from app.infrastructure.llm.openai_sdk_adapter import OpenAISDKLLMAdapter
-from app.infrastructure.llm.openrouter_adapter import OpenRouterLLMAdapter
 from app.ports.llm import LLMPort
 
 
-@lru_cache(maxsize=1)
-def get_llm_client() -> LLMPort:
-    provider = settings.llm_provider.strip().lower()
-
-    if provider == "openrouter":
-        return OpenRouterLLMAdapter()
-
-    if provider == "openai_sdk":
-        return OpenAISDKLLMAdapter()
-
-    raise ValidationError(
-        f"Неизвестный llm_provider='{settings.llm_provider}'. "
-        "Доступно: openrouter, openai_sdk."
-    )
+@lru_cache(maxsize=len(tuple(LLMTask)))
+def get_llm_client(task: LLMTask) -> LLMPort:
+    endpoint = settings.openai_endpoint_for(task)
+    client = openai_client_for_endpoint(endpoint)
+    return OpenAISDKLLMAdapter(client)

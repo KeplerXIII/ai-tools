@@ -1,21 +1,27 @@
 import logging
 import time
+from functools import lru_cache
 from typing import Generator
 
 from fastapi import HTTPException
 from openai import OpenAI, OpenAIError
 
-from app.core.config import settings
+from app.core.config import OpenAIEndpoint, settings
 
 logger = logging.getLogger("llm")
 
 
-def _get_client() -> OpenAI:
+@lru_cache(maxsize=32)
+def _cached_openai_client(base_url: str, api_key: str) -> OpenAI:
     return OpenAI(
-        base_url=settings.openai_compat_base_url,
-        api_key=settings.openai_compat_api_key,
+        base_url=base_url,
+        api_key=api_key,
         timeout=settings.llm_timeout,
     )
+
+
+def openai_client_for_endpoint(endpoint: OpenAIEndpoint) -> OpenAI:
+    return _cached_openai_client(endpoint.base_url, endpoint.api_key)
 
 
 def _build_extra_body(
@@ -89,49 +95,52 @@ def _build_metrics(
 
 
 def chat(
+    client: OpenAI,
     prompt: str,
     model: str,
     temperature: float = 0,
     meta: dict | None = None,
     stream: bool = False,
-    num_predict: int | None = None,
+    max_tokens: int | None = None,
     num_gpu: int | None = None,
     options: dict | None = None,
 ) -> str | Generator[str, None, None]:
     if stream:
         return _chat_stream(
+            client=client,
             prompt=prompt,
             model=model,
             temperature=temperature,
             meta=meta,
-            num_predict=num_predict,
+            max_tokens=max_tokens,
             num_gpu=num_gpu,
             options=options,
         )
 
     return _chat_full(
+        client=client,
         prompt=prompt,
         model=model,
         temperature=temperature,
         meta=meta,
-        num_predict=num_predict,
+        max_tokens=max_tokens,
         num_gpu=num_gpu,
         options=options,
     )
 
 
 def _chat_full(
+    client: OpenAI,
     prompt: str,
     model: str,
     temperature: float = 0,
     meta: dict | None = None,
-    num_predict: int | None = None,
+    max_tokens: int | None = None,
     num_gpu: int | None = None,
     options: dict | None = None,
 ) -> str:
     start_time = time.perf_counter()
-    client = _get_client()
-    extra_body = _build_extra_body(num_predict=num_predict, num_gpu=num_gpu, options=options)
+    extra_body = _build_extra_body(num_predict=max_tokens, num_gpu=num_gpu, options=options)
 
     logger.info(
         {
@@ -141,7 +150,7 @@ def _chat_full(
             "prompt_preview": "...",
             "prompt_chars": len(prompt),
             "temperature": temperature,
-            "num_predict": num_predict,
+            "max_tokens": max_tokens,
             "num_gpu": num_gpu,
             "stream": False,
             "meta": meta,
@@ -153,7 +162,7 @@ def _chat_full(
             model=model,
             messages=[{"role": "user", "content": prompt}],
             temperature=temperature,
-            max_tokens=num_predict,
+            max_tokens=max_tokens,
             stream=False,
             extra_body=extra_body or None,
         )
@@ -183,7 +192,7 @@ def _chat_full(
                 "duration_sec": round(duration, 3),
                 "prompt_chars": len(prompt),
                 "temperature": temperature,
-                "num_predict": num_predict,
+                "max_tokens": max_tokens,
                 "num_gpu": num_gpu,
                 "stream": False,
                 "meta": meta,
@@ -201,7 +210,7 @@ def _chat_full(
             "prompt_chars": len(prompt),
             "response_chars": len(content),
             "temperature": temperature,
-            "num_predict": num_predict,
+            "max_tokens": max_tokens,
             "num_gpu": num_gpu,
             "stream": False,
             "meta": meta,
@@ -211,11 +220,12 @@ def _chat_full(
 
 
 def _chat_stream(
+    client: OpenAI,
     prompt: str,
     model: str,
     temperature: float = 0,
     meta: dict | None = None,
-    num_predict: int | None = None,
+    max_tokens: int | None = None,
     num_gpu: int | None = None,
     options: dict | None = None,
 ) -> Generator[str, None, None]:
@@ -224,8 +234,7 @@ def _chat_stream(
     content_parts: list[str] = []
     completion_tokens: int | None = None
 
-    client = _get_client()
-    extra_body = _build_extra_body(num_predict=num_predict, num_gpu=num_gpu, options=options)
+    extra_body = _build_extra_body(num_predict=max_tokens, num_gpu=num_gpu, options=options)
 
     logger.info(
         {
@@ -235,7 +244,7 @@ def _chat_stream(
             "prompt_preview": "...",
             "prompt_chars": len(prompt),
             "temperature": temperature,
-            "num_predict": num_predict,
+            "max_tokens": max_tokens,
             "num_gpu": num_gpu,
             "stream": True,
             "meta": meta,
@@ -247,7 +256,7 @@ def _chat_stream(
             model=model,
             messages=[{"role": "user", "content": prompt}],
             temperature=temperature,
-            max_tokens=num_predict,
+            max_tokens=max_tokens,
             stream=True,
             stream_options={"include_usage": True},
             extra_body=extra_body or None,
@@ -277,7 +286,7 @@ def _chat_stream(
                         "ttft_sec": round(first_token_time - start_time, 3),
                         "prompt_chars": len(prompt),
                         "temperature": temperature,
-                        "num_predict": num_predict,
+                        "max_tokens": max_tokens,
                         "num_gpu": num_gpu,
                         "meta": meta,
                     }
@@ -305,7 +314,7 @@ def _chat_stream(
                 "prompt_chars": len(prompt),
                 "response_chars": len(content),
                 "temperature": temperature,
-                "num_predict": num_predict,
+                "max_tokens": max_tokens,
                 "num_gpu": num_gpu,
                 "stream": True,
                 "meta": meta,
@@ -323,7 +332,7 @@ def _chat_stream(
                 "ttft_sec": round(first_token_time - start_time, 3) if first_token_time else None,
                 "prompt_chars": len(prompt),
                 "temperature": temperature,
-                "num_predict": num_predict,
+                "max_tokens": max_tokens,
                 "num_gpu": num_gpu,
                 "stream": True,
                 "meta": meta,

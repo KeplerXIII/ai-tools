@@ -3,6 +3,7 @@ import re
 
 from app.bootstrap.container import get_llm_client
 from app.core.config import settings
+from app.core.llm_task import LLMTask
 from app.domain.errors import InvalidProviderResponseError, ValidationError
 from app.ports.llm import LLMRequest
 
@@ -62,7 +63,7 @@ def tag_text(text: str, max_tags: int = 12) -> dict:
 {text}
 """.strip()
 
-    llm = get_llm_client()
+    llm = get_llm_client(LLMTask.TAGGING)
     raw = llm.chat(
         LLMRequest(
             prompt=prompt,

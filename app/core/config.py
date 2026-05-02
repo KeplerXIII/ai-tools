@@ -1,4 +1,14 @@
+from dataclasses import dataclass
+
 from pydantic_settings import BaseSettings
+
+from app.core.llm_task import LLMTask
+
+
+@dataclass(frozen=True, slots=True)
+class OpenAIEndpoint:
+    base_url: str
+    api_key: str
 
 
 class Settings(BaseSettings):
@@ -11,26 +21,41 @@ class Settings(BaseSettings):
     request_timeout: int = 20
     max_html_length: int = 10_000_000
 
-    # --- openai-compatible provider ---
-    openai_compat_base_url: str = "http://172.20.0.1:11434/v1"
-    openai_compat_api_key: str = "ollama"
+    # --- OpenAI-compatible API (default for all tasks unless overridden below) ---
+    openai_compat_base_url: str = "https://api.deepseek.com"
+    openai_compat_api_key: str
 
-    # --- openrouter ---
-    openrouter_api_key: str
-    openrouter_base_url: str = "https://openrouter.ai/api/v1"
-    openrouter_site_name: str = "ai-tools"
-    openrouter_site_url: str | None = None
+    # --- per-task overrides (optional; unset inherits default above) ---
+    openai_compat_base_url_summary: str | None = None
+    openai_compat_api_key_summary: str | None = None
+
+    openai_compat_base_url_summary_refine: str | None = None
+    openai_compat_api_key_summary_refine: str | None = None
+
+    openai_compat_base_url_translation: str | None = None
+    openai_compat_api_key_translation: str | None = None
+
+    openai_compat_base_url_tagging: str | None = None
+    openai_compat_api_key_tagging: str | None = None
+
+    openai_compat_base_url_entity_extraction: str | None = None
+    openai_compat_api_key_entity_extraction: str | None = None
 
     # --- runtime ---
     llm_timeout: int = 120
-    llm_provider: str = "openrouter"  # openrouter | openai_sdk
 
     # --- models by task ---
-    model_summary: str = "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free"
-    model_summary_refine: str = "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free"
-    model_translation: str = "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free"
-    model_tagging: str = "qwen2.5:3b-instruct"
-    model_entity_extraction: str = "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free"
+    model_summary: str = "deepseek-v4-pro"
+    model_summary_refine: str = "deepseek-v4-pro"
+    model_translation: str = "deepseek-v4-pro"
+    model_tagging: str = "deepseek-v4-pro"
+    model_entity_extraction: str = "deepseek-v4-pro"
+
+    def openai_endpoint_for(self, task: LLMTask) -> OpenAIEndpoint:
+        suffix = task.value
+        base = getattr(self, f"openai_compat_base_url_{suffix}", None) or self.openai_compat_base_url
+        key = getattr(self, f"openai_compat_api_key_{suffix}", None) or self.openai_compat_api_key
+        return OpenAIEndpoint(base_url=base, api_key=key)
 
     class Config:
         env_file = ".env"

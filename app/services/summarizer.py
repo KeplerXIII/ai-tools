@@ -2,6 +2,7 @@ from typing import Generator
 
 from app.bootstrap.container import get_llm_client
 from app.core.config import settings
+from app.core.llm_task import LLMTask
 from app.domain.errors import ValidationError
 from app.ports.llm import LLMRequest
 from app.schemas.extract import RefineSummaryMode
@@ -37,7 +38,7 @@ def summarize_text(
         raise ValidationError("Текст пустой")
 
     prompt = build_summary_prompt(text)
-    llm = get_llm_client()
+    llm = get_llm_client(LLMTask.SUMMARY_REFINE)
 
     return llm.chat(
         LLMRequest(
@@ -129,7 +130,7 @@ def refine_summary(
         mode=mode,
     )
 
-    llm = get_llm_client()
+    llm = get_llm_client(LLMTask.SUMMARY)
     return llm.chat(
         LLMRequest(
             prompt=prompt,
