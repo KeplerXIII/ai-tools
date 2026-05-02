@@ -5,7 +5,8 @@ from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeo
 from bs4 import BeautifulSoup
 
 from app.core.config import settings
-from app.services.image_extractor import extract_images, pick_main_image
+
+from .image_extractor import extract_images, pick_main_image
 
 
 BROWSER_HEADERS = {

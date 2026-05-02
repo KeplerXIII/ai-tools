@@ -16,10 +16,10 @@ from app.schemas.extract import (
     TagRequest,
     TagResponse,
 )
-from app.services.entity_extractor import extract_entities
-from app.services.extractor import download_html, extract_article_text
-from app.services.summarizer import summarize_text, refine_summary
-from app.services.tagger import tag_text
+from app.services.llm.entity_extractor import extract_entities
+from app.services.llm.summarizer import summarize_text, refine_summary
+from app.services.llm.tagger import tag_text
+from app.services.parsing.extractor import download_html, extract_article_text
 
 router = APIRouter(prefix="/extract", tags=["extract"])
 

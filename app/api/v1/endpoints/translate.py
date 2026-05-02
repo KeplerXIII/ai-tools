@@ -4,7 +4,7 @@ from fastapi.responses import StreamingResponse
 from app.api.error_mapping import map_app_error
 from app.domain.errors import AppError
 from app.schemas.translate import TranslateRequest, TranslateResponse
-from app.services.translator import detect_language, translate_text
+from app.services.llm.translator import detect_language, translate_text
 
 router = APIRouter(prefix="/translate", tags=["translate"])
 
