@@ -19,7 +19,7 @@ services:
     environment:
       POSTGRES_DB: aitools
       POSTGRES_USER: aitools
-      POSTGRES_PASSWORD: aitools_password
+      POSTGRES_PASSWORD: Nbkbvbkbnhzv1!
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:

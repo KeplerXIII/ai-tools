@@ -52,6 +52,9 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 24
 
+    # --- SQLAdmin session (если не задан — используется jwt_secret_key) ---
+    admin_session_secret: str | None = None
+
     # --- models by task ---
     model_summary: str = "deepseek-v4-pro"
     model_summary_refine: str = "deepseek-v4-pro"

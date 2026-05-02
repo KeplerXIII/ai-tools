@@ -20,8 +20,10 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 @router.post("/register", response_model=TokenWithUser, status_code=status.HTTP_201_CREATED)
 async def register(payload: UserCreate, db: AsyncSession = Depends(get_db)):
+    email_norm = payload.email.lower() if payload.email else None
     user = User(
-        email=payload.email.lower(),
+        username=payload.username,
+        email=email_norm,
         hashed_password=hash_password(payload.password),
     )
     db.add(user)
@@ -31,7 +33,7 @@ async def register(payload: UserCreate, db: AsyncSession = Depends(get_db)):
         await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="User with this email already exists",
+            detail="Пользователь с таким username или email уже существует",
         ) from None
     await db.refresh(user)
     token = create_access_token(subject=str(user.id))
@@ -43,17 +45,17 @@ async def register(payload: UserCreate, db: AsyncSession = Depends(get_db)):
 
 @router.post("/login", response_model=TokenResponse)
 async def login(payload: LoginRequest, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(User).where(User.email == payload.email.lower()))
+    result = await db.execute(select(User).where(User.username == payload.username))
     user = result.scalar_one_or_none()
     if user is None or not verify_password(payload.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
+            detail="Неверный username или пароль",
         )
     if not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Inactive user",
+            detail="Пользователь отключён",
         )
     token = create_access_token(subject=str(user.id))
     return TokenResponse(access_token=token)

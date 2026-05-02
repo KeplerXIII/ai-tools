@@ -44,6 +44,8 @@ RUN uv sync --frozen --no-dev
 RUN uv run playwright install chromium
 
 COPY app ./app
+COPY alembic ./alembic
+COPY alembic.ini ./alembic.ini
 
 EXPOSE 8000
 

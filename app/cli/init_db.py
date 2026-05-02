@@ -1,58 +1,59 @@
-"""Создаёт таблицы в PostgreSQL по моделям SQLAlchemy (без Alembic).
+"""Применяет схему БД через Alembic (``alembic upgrade head``).
 
-Запуск из корня репозитория (при DATABASE_URL с хостом ai-tools-postgres это
-работает только внутри Docker-сети; с хоста см. ниже):
+Один поддерживаемый путь: миграции. Эта команда — удобная обёртка (то же, что
+``uv run alembic upgrade head`` из корня репозитория, где лежит ``alembic.ini``).
 
-  uv run python -m app.cli.init_db
+С хоста, если в ``DATABASE_URL`` указан docker-hostname БД (например
+``ai-tools-postgres``), а Postgres доступен на ``127.0.0.1:5432``:
 
-В контейнере приложения (тот же хост БД, что и у API):
+  DATABASE_URL_FOR_CLI='postgresql+asyncpg://USER:PASS@127.0.0.1:5432/DB' \\
+    uv run python -m app.cli.init_db
+
+Переменная ``DATABASE_URL_FOR_CLI`` учитывается и здесь, и в ``alembic/env.py``.
+
+В контейнере приложения:
 
   docker compose exec ai-tools uv run python -m app.cli.init_db
-
-С хоста, если порт Postgres проброшен на 127.0.0.1:5432 — одноразово подставьте URL:
-
-  DATABASE_URL_FOR_CLI='postgresql+asyncpg://USER:PASS@127.0.0.1:5432/DB' uv run python -m app.cli.init_db
-
-Если задана переменная DATABASE_URL_FOR_CLI, она используется вместо DATABASE_URL
-(удобно, чтобы не менять основной URL для Docker).
 """
 
-import asyncio
+from __future__ import annotations
+
 import os
-import socket
+import subprocess
 import sys
-
-from sqlalchemy.ext.asyncio import create_async_engine
-
-from app.core.config import settings
-from app.infrastructure.db.base import Base
-from app.infrastructure.db.models import User  # noqa: F401 — регистрация модели в metadata
+from pathlib import Path
 
 
-def _database_url() -> str:
-    return os.environ.get("DATABASE_URL_FOR_CLI", "").strip() or settings.database_url
+def _project_root() -> Path:
+    return Path(__file__).resolve().parents[2]
 
 
-async def main() -> None:
-    url = _database_url()
-    engine = create_async_engine(url, echo=settings.debug)
+def main() -> None:
+    root = _project_root()
+    ini = root / "alembic.ini"
+    if not ini.is_file():
+        sys.stderr.write(f"init_db: не найден {ini}\n")
+        raise SystemExit(1)
+
+    env = os.environ.copy()
+    # pydantic-settings уже подхватил .env; DATABASE_URL_FOR_CLI задаётся в shell при необходимости
     try:
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-    except socket.gaierror as exc:
+        subprocess.run(
+            [sys.executable, "-m", "alembic", "upgrade", "head"],
+            cwd=root,
+            env=env,
+            check=True,
+        )
+    except subprocess.CalledProcessError as exc:
         sys.stderr.write(
-            "\ninit_db: не удалось разрешить имя хоста в URL БД "
-            f"({exc}).\n"
-            "  • Запустите из контейнера: "
-            "docker compose exec ai-tools uv run python -m app.cli.init_db\n"
-            "  • Или с хоста укажите localhost, например:\n"
+            "\ninit_db: ``alembic upgrade head`` завершился с ошибкой.\n"
+            "  • Запустите из контейнера ``ai-tools``, если БД доступна только по docker DNS.\n"
+            "  • С хоста попробуйте:\n"
             "    DATABASE_URL_FOR_CLI='postgresql+asyncpg://USER:PASS@127.0.0.1:5432/aitools' "
             "uv run python -m app.cli.init_db\n\n"
         )
-        raise SystemExit(1) from exc
-    finally:
-        await engine.dispose()
+        raise SystemExit(exc.returncode) from exc
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
