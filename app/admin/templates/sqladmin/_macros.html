@@ -1,29 +1,32 @@
-{% macro menu_category(menu, request) %}
+{% macro menu_category(menu, request, cat_idx=0) %}
+{# Collapse вместо Bootstrap Dropdown: в вертикальном navbar dropdown ловит лишние клики и открывает все группы. #}
 {% if menu.is_visible(request) and menu.is_accessible(request) %}
-<li class="nav-item dropdown">
-  <a class="nav-link dropdown-toggle {% if menu.is_active(request) %}active{% endif %}" data-bs-toggle="dropdown"
-    href="#">
+{% set cat_id = "admin-sidebar-cat-" ~ cat_idx %}
+<li class="nav-item">
+  <a class="nav-link {% if menu.is_active(request) %}active{% endif %}" data-bs-toggle="collapse"
+    data-bs-target="#{{ cat_id }}" href="#{{ cat_id }}" role="button"
+    aria-expanded="{{ 'true' if menu.is_active(request) else 'false' }}" aria-controls="{{ cat_id }}">
     <span class="nav-link-icon d-md-none d-lg-inline-block">
       {% if menu.icon %}<i class="{{ menu.icon }}"></i>{% endif %}
     </span>
     <span class="nav-link-title">{{ menu.display_name }}</span>
   </a>
-  <div class="dropdown-menu show">
-    <div class="dropdown-menu-columns">
-      <div class="dropdown-menu-column">
-        {% for sub_menu in menu.children %}
-        {% if sub_menu.is_visible(request) and sub_menu.is_accessible(request) %}
-        <a class="nav-link ps-lg-3 {% if sub_menu.is_active(request) %}active{% endif %}"
+  <div id="{{ cat_id }}" class="collapse {% if menu.is_active(request) %}show{% endif %}">
+    <ul class="nav flex-column ms-3">
+      {% for sub_menu in menu.children %}
+      {% if sub_menu.is_visible(request) and sub_menu.is_accessible(request) %}
+      <li class="nav-item">
+        <a class="nav-link py-1 {% if sub_menu.is_active(request) %}active{% endif %}"
           href="{{ sub_menu.url(request) }}">
           <span class="nav-link-icon d-md-none d-lg-inline-block">
             {% if sub_menu.icon %}<i class="{{ sub_menu.icon }}"></i>{% endif %}
           </span>
           <span class="nav-link-title">{{ sub_menu.display_name }}</span>
         </a>
-        {% endif %}
-        {% endfor %}
-      </div>
-    </div>
+      </li>
+      {% endif %}
+      {% endfor %}
+    </ul>
   </div>
 </li>
 {% endif %}
@@ -48,7 +51,7 @@
   {% if item.type_ == "View" %}
   {{ menu_item(item, request) }}
   {% elif item.type_ == "Category" %}
-  {{ menu_category(item, request) }}
+  {{ menu_category(item, request, loop.index0) }}
   {% endif %}
   {% endfor %}
 </div>

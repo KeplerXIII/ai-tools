@@ -1,6 +1,12 @@
 """SQLAdmin ModelView для доменных таблиц."""
 
 from sqladmin import ModelView
+
+# Группы бокового меню: явно отделяем чистые связи M2M и служебные данные пайплайна.
+_ADMIN_CATEGORY_JUNCTION = "Служебные — связи"
+_ADMIN_CATEGORY_JUNCTION_ICON = "fa-solid fa-link"
+_ADMIN_CATEGORY_PIPELINE = "Служебные — индексы и журнал"
+_ADMIN_CATEGORY_PIPELINE_ICON = "fa-solid fa-gears"
 from wtforms import PasswordField
 from wtforms.validators import Length, Optional
 
@@ -99,8 +105,10 @@ class RoleAdmin(ModelView, model=Role):
 
 
 class UserRoleAdmin(ModelView, model=UserRole):
-    name = "Роль пользователя"
-    name_plural = "Роли пользователей"
+    category = _ADMIN_CATEGORY_JUNCTION
+    category_icon = _ADMIN_CATEGORY_JUNCTION_ICON
+    name = "Пользователь ↔ роль"
+    name_plural = "Связи пользователь — роль"
     icon = "fa-solid fa-user-tag"
     column_list = [UserRole.user_id, UserRole.role_id]
 
@@ -178,8 +186,10 @@ class DocumentAdmin(ModelView, model=Document):
 
 
 class DocumentCategoryAdmin(ModelView, model=DocumentCategory):
-    name = "Категория документа"
-    name_plural = "Категории документов"
+    category = _ADMIN_CATEGORY_JUNCTION
+    category_icon = _ADMIN_CATEGORY_JUNCTION_ICON
+    name = "Документ ↔ категория"
+    name_plural = "Связи документ — категория"
     column_list = [
         DocumentCategory.document_id,
         DocumentCategory.category_id,
@@ -195,8 +205,10 @@ class TagAdmin(ModelView, model=Tag):
 
 
 class DocumentTagAdmin(ModelView, model=DocumentTag):
-    name = "Тег документа"
-    name_plural = "Теги документов"
+    category = _ADMIN_CATEGORY_JUNCTION
+    category_icon = _ADMIN_CATEGORY_JUNCTION_ICON
+    name = "Документ ↔ тег"
+    name_plural = "Связи документ — тег"
     column_list = [DocumentTag.document_id, DocumentTag.tag_id, DocumentTag.prediction_source_id]
 
 
@@ -213,8 +225,10 @@ class EntityAdmin(ModelView, model=Entity):
 
 
 class DocumentEntityAdmin(ModelView, model=DocumentEntity):
-    name = "Сущность документа"
-    name_plural = "Сущности документов"
+    category = _ADMIN_CATEGORY_JUNCTION
+    category_icon = _ADMIN_CATEGORY_JUNCTION_ICON
+    name = "Документ ↔ сущность"
+    name_plural = "Связи документ — сущность"
     column_list = [
         DocumentEntity.document_id,
         DocumentEntity.entity_id,
@@ -223,8 +237,10 @@ class DocumentEntityAdmin(ModelView, model=DocumentEntity):
 
 
 class DocumentChunkAdmin(ModelView, model=DocumentChunk):
-    name = "Фрагмент (чанк)"
-    name_plural = "Фрагменты"
+    category = _ADMIN_CATEGORY_PIPELINE
+    category_icon = _ADMIN_CATEGORY_PIPELINE_ICON
+    name = "Чанк текста (для поиска)"
+    name_plural = "Чанки документов"
     column_list = [
         DocumentChunk.id,
         DocumentChunk.document_id,
@@ -240,16 +256,20 @@ class EmbeddingModelAdmin(ModelView, model=EmbeddingModel):
 
 
 class DocumentEmbeddingAdmin(ModelView, model=DocumentEmbedding):
-    name = "Эмбеддинг"
-    name_plural = "Эмбеддинги"
+    category = _ADMIN_CATEGORY_PIPELINE
+    category_icon = _ADMIN_CATEGORY_PIPELINE_ICON
+    name = "Вектор эмбеддинга"
+    name_plural = "Векторы эмбеддингов"
     column_list = [DocumentEmbedding.id, DocumentEmbedding.chunk_id, DocumentEmbedding.embedding_model_id]
     form_columns = [DocumentEmbedding.chunk_id, DocumentEmbedding.embedding_model_id]
     can_create = False
 
 
 class ProcessingJobAdmin(ModelView, model=ProcessingJob):
-    name = "Задача обработки"
-    name_plural = "Задачи обработки"
+    category = _ADMIN_CATEGORY_PIPELINE
+    category_icon = _ADMIN_CATEGORY_PIPELINE_ICON
+    name = "Журнал: задача обработки"
+    name_plural = "Журнал задач обработки"
     column_list = [
         ProcessingJob.id,
         ProcessingJob.document_id,
