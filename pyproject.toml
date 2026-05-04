@@ -17,6 +17,7 @@ dependencies = [
     "pgvector>=0.3.6",
     "playwright>=1.58.0",
     "psycopg[binary]>=3.3.4",
+    "pycountry>=24.6.1",
     "pydantic-settings>=2.14.0",
     "pyjwt>=2.8",
     "requests>=2.33.1",

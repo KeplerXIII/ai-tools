@@ -9,8 +9,9 @@
   DATABASE_URL_FOR_CLI='postgresql+asyncpg://USER:PASS@127.0.0.1:5432/DB' \\
     uv run python -m app.cli.seed_reference_data
 
-Включает: roles, languages, prediction_sources, entity_types, embedding_models,
-categories, document_types, а также связь ``user_roles`` для пользователей с ``is_admin``.
+Включает: roles, languages, countries (ISO 3166-1 через pycountry), prediction_sources,
+entity_types, embedding_models, environments, funds, categories, document_types,
+а также связь ``user_roles`` для пользователей с ``is_admin``.
 """
 
 from __future__ import annotations
