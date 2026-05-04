@@ -448,9 +448,12 @@ async def run_categorize_document(
         raise ValidationError("Пустой исходный текст")
 
     q = await session.execute(
-        select(Category.code, Category.name).where(Category.is_active.is_(True)),
+        select(Category.code, Category.name, Category.name_ru).where(Category.is_active.is_(True)),
     )
-    pairs = [(r[0], r[1]) for r in q.all()]
+    pairs = []
+    for code, name, name_ru in q.all():
+        label = f"{name_ru} — {name}" if name_ru else name
+        pairs.append((code, label))
     llm_ps = await _llm_ps_id(session)
 
     async with processing_job(

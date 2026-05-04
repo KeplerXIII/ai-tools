@@ -144,7 +144,15 @@ class FundAdmin(ModelView, model=Fund):
 class CategoryAdmin(ModelView, model=Category):
     name = "Категория"
     name_plural = "Категории"
-    column_list = [Category.id, Category.code, Category.name, Category.level, Category.is_active]
+    column_list = [
+        Category.id,
+        Category.code,
+        Category.name,
+        Category.name_ru,
+        Category.level,
+        Category.is_active,
+        Category.description_ru,
+    ]
 
 
 class SourceAdmin(ModelView, model=Source):

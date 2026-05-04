@@ -1,77 +1,54 @@
-"""Корневые категории документов."""
+"""Категории оборонной тематики (Jane's-style taxonomy, см. ``defense_taxonomy``)."""
 
 from __future__ import annotations
 
-from typing import Any
+import uuid
 
+from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.infrastructure.db.models import Category
-from app.seeds.util import rows_with_fresh_uuids
-
-STANDARD_CATEGORIES: list[dict[str, Any]] = [
-    {
-        "parent_id": None,
-        "code": "defense",
-        "name": "Оборона и ВПК",
-        "description": None,
-        "level": 0,
-        "sort_order": 0,
-        "is_active": True,
-    },
-    {
-        "parent_id": None,
-        "code": "procurement",
-        "name": "Закупки и контракты",
-        "description": None,
-        "level": 0,
-        "sort_order": 10,
-        "is_active": True,
-    },
-    {
-        "parent_id": None,
-        "code": "technology",
-        "name": "Технологии",
-        "description": None,
-        "level": 0,
-        "sort_order": 20,
-        "is_active": True,
-    },
-    {
-        "parent_id": None,
-        "code": "politics",
-        "name": "Политика",
-        "description": None,
-        "level": 0,
-        "sort_order": 30,
-        "is_active": True,
-    },
-    {
-        "parent_id": None,
-        "code": "economy",
-        "name": "Экономика",
-        "description": None,
-        "level": 0,
-        "sort_order": 40,
-        "is_active": True,
-    },
-]
+from app.seeds.defense_taxonomy import DEFENSE_CATEGORY_TAXONOMY
 
 
 async def apply_categories_seed(session: AsyncSession) -> int:
-    rows = rows_with_fresh_uuids(STANDARD_CATEGORIES)
-    stmt = insert(Category).values(rows)
-    stmt = stmt.on_conflict_do_update(
-        index_elements=[Category.code],
-        set_={
-            "name": stmt.excluded.name,
-            "description": stmt.excluded.description,
-            "level": stmt.excluded.level,
-            "sort_order": stmt.excluded.sort_order,
-            "is_active": stmt.excluded.is_active,
-            "parent_id": stmt.excluded.parent_id,
-        },
-    )
-    await session.execute(stmt)
-    return len(STANDARD_CATEGORIES)
+    tax = sorted(DEFENSE_CATEGORY_TAXONOMY, key=lambda x: (x["level"], x["code"]))
+    res = await session.execute(select(Category.code, Category.id))
+    id_by_code: dict[str, uuid.UUID] = {row[0]: row[1] for row in res.all()}
+
+    for i, item in enumerate(tax):
+        parent_code = item.get("parent_code")
+        parent_id = id_by_code.get(parent_code) if parent_code else None
+        row = {
+            "id": uuid.uuid4(),
+            "code": item["code"],
+            "name": item["name"],
+            "name_ru": item["name_ru"],
+            "description": item.get("description"),
+            "description_ru": item.get("description_ru"),
+            "level": item["level"],
+            "sort_order": i * 10,
+            "is_active": True,
+            "parent_id": parent_id,
+        }
+        stmt = insert(Category).values([row])
+        stmt = stmt.on_conflict_do_update(
+            index_elements=[Category.code],
+            set_={
+                "name": stmt.excluded.name,
+                "name_ru": stmt.excluded.name_ru,
+                "description": stmt.excluded.description,
+                "description_ru": stmt.excluded.description_ru,
+                "level": stmt.excluded.level,
+                "sort_order": stmt.excluded.sort_order,
+                "is_active": stmt.excluded.is_active,
+                "parent_id": stmt.excluded.parent_id,
+            },
+        )
+        await session.execute(stmt)
+        cid = await session.scalar(select(Category.id).where(Category.code == item["code"]))
+        if cid is not None:
+            id_by_code[item["code"]] = cid
+
+    return len(tax)
