@@ -65,7 +65,7 @@ def normalize_list(value) -> list[str]:
     return result
 
 
-def extract_entities(text: str) -> dict:
+async def extract_entities(text: str) -> dict:
     if not text.strip():
         raise ValidationError("Текст пустой")
 
@@ -93,13 +93,15 @@ def extract_entities(text: str) -> dict:
 """
 
     llm = get_llm_client(LLMTask.ENTITY_EXTRACTION)
-    content = llm.chat(
+    content = await llm.chat(
         LLMRequest(
             prompt=prompt,
             model=settings.model_entity_extraction,
             temperature=0,
         )
     )
+    if not isinstance(content, str):
+        raise InvalidProviderResponseError("Ожидалась строка JSON от LLM")
 
     data = extract_json_object(content)
 

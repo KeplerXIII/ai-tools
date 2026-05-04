@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 from typing import Any
@@ -87,8 +88,8 @@ async def extract_url_persist(
         return document_to_extract_response(existing, from_cache=True)
 
     t0 = time.perf_counter()
-    html = download_html(url_str)
-    data = extract_article_text(html, url_str)
+    html = await download_html(url_str)
+    data = await extract_article_text(html, url_str)
     duration_ms = int((time.perf_counter() - t0) * 1000)
 
     created_by_id = user.id if user else None
@@ -153,20 +154,21 @@ async def document_translate_stream(
         if not doc.original_content.strip():
             raise HTTPException(status_code=400, detail="Пустой исходный текст")
         source_text = doc.original_content
-    source_lang = detect_language(source_text)
+    source_lang = await asyncio.to_thread(detect_language, source_text)
 
     async def body():
         try:
-            stream = translate_text(source_text, target_lang=target_lang, stream=True)
+            stream = await translate_text(source_text, target_lang=target_lang, stream=True)
         except AppError as exc:
             yield f"\n[stream_error] {exc}\n".encode("utf-8")
             return
         parts: list[str] = []
         try:
-            for chunk in stream:
+            async for chunk in stream:
                 s = chunk if isinstance(chunk, str) else str(chunk)
                 parts.append(s)
                 yield s.encode("utf-8")
+                await asyncio.sleep(0)
         except Exception as exc:
             yield f"\n[stream_error] {exc}\n".encode("utf-8")
             return
@@ -334,7 +336,7 @@ async def document_summary_refine_stream(
 
     async def body():
         try:
-            stream = refine_summary(
+            stream = await refine_summary(
                 article_text=article,
                 summary=summary,
                 user_instruction=user_instruction,
@@ -346,10 +348,11 @@ async def document_summary_refine_stream(
             return
         parts: list[str] = []
         try:
-            for chunk in stream:
+            async for chunk in stream:
                 s = chunk if isinstance(chunk, str) else str(chunk)
                 parts.append(s)
                 yield s.encode("utf-8")
+                await asyncio.sleep(0)
         except Exception as exc:
             yield f"\n[stream_error] {exc}\n".encode("utf-8")
             return
@@ -420,16 +423,17 @@ async def document_summary_stream(
 
     async def body():
         try:
-            stream = summarize_text(source_text, stream=True)
+            stream = await summarize_text(source_text, stream=True)
         except AppError as exc:
             yield f"\n[stream_error] {exc}\n".encode("utf-8")
             return
         parts: list[str] = []
         try:
-            for chunk in stream:
+            async for chunk in stream:
                 s = chunk if isinstance(chunk, str) else str(chunk)
                 parts.append(s)
                 yield s.encode("utf-8")
+                await asyncio.sleep(0)
         except Exception as exc:
             yield f"\n[stream_error] {exc}\n".encode("utf-8")
             return

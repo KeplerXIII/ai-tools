@@ -2,7 +2,8 @@ from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 
 from app.api.error_mapping import map_app_error
-from app.domain.errors import AppError
+from app.api.streaming_utils import bytes_from_text_stream
+from app.domain.errors import AppError, ValidationError
 from app.schemas.extract import (
     RefineSummaryRequest,
     RefineSummaryResponse,
@@ -24,47 +25,48 @@ from app.services.parsing.extractor import download_html, extract_article_text
 router = APIRouter(prefix="/extract", tags=["extract"])
 
 
-def _safe_stream(generator):
+async def _safe_stream_bytes(stream):
     try:
-        for chunk in generator:
-            yield chunk
+        async for part in bytes_from_text_stream(stream):
+            yield part
     except Exception as exc:
-        # Streaming response is already started; return inline error chunk instead of crashing ASGI.
-        yield f"\n[stream_error] {exc}"
+        yield f"\n[stream_error] {exc}\n".encode("utf-8")
 
 
 @router.post("/url", response_model=ExtractResponse)
-def extract_from_url(payload: ExtractUrlRequest):
-    html = download_html(str(payload.url))
-    return extract_article_text(html, str(payload.url))
+async def extract_from_url(payload: ExtractUrlRequest):
+    html = await download_html(str(payload.url))
+    return await extract_article_text(html, str(payload.url))
 
 
 @router.post("/html", response_model=ExtractResponse)
-def extract_from_html(payload: ExtractHtmlRequest):
-    return extract_article_text(payload.html, payload.url)
+async def extract_from_html(payload: ExtractHtmlRequest):
+    return await extract_article_text(payload.html, payload.url)
 
 
 @router.post("/entities", response_model=EntityExtractResponse)
-def extract_article_entities(payload: EntityExtractRequest):
+async def extract_article_entities(payload: EntityExtractRequest):
     try:
-        return extract_entities(payload.text)
+        return await extract_entities(payload.text)
     except AppError as exc:
         raise map_app_error(exc) from exc
 
 
 @router.post("/summary", response_model=SummaryResponse)
-def summarize_article(payload: SummaryRequest):
+async def summarize_article(payload: SummaryRequest):
     try:
-        annotation = summarize_text(payload.text)
+        annotation = await summarize_text(payload.text)
     except AppError as exc:
         raise map_app_error(exc) from exc
+    if not isinstance(annotation, str):
+        raise map_app_error(ValidationError("Некорректный ответ суммаризатора"))
     return SummaryResponse(annotation=annotation)
 
 
 @router.post("/summary/stream")
-def summarize_article_stream(payload: SummaryRequest):
+async def summarize_article_stream(payload: SummaryRequest):
     try:
-        generator = summarize_text(
+        stream = await summarize_text(
             text=payload.text,
             stream=True,
         )
@@ -72,23 +74,24 @@ def summarize_article_stream(payload: SummaryRequest):
         raise map_app_error(exc) from exc
 
     return StreamingResponse(
-        _safe_stream(generator),
+        _safe_stream_bytes(stream),
         media_type="text/plain; charset=utf-8",
     )
 
 
 @router.post("/tags", response_model=TagResponse)
-def tag_article_text(payload: TagRequest):
+async def tag_article_text(payload: TagRequest):
     try:
-        return tag_text(payload.text, payload.max_tags)
+        result = await tag_text(payload.text, payload.max_tags)
     except AppError as exc:
         raise map_app_error(exc) from exc
+    return TagResponse(tags=result.get("tags", []))
 
 
 @router.post("/summary/refine", response_model=RefineSummaryResponse)
-def refine_article_summary(payload: RefineSummaryRequest):
+async def refine_article_summary(payload: RefineSummaryRequest):
     try:
-        refined_summary = refine_summary(
+        refined_summary = await refine_summary(
             article_text=payload.article_text,
             summary=payload.summary,
             user_instruction=payload.user_instruction,
@@ -98,13 +101,15 @@ def refine_article_summary(payload: RefineSummaryRequest):
     except AppError as exc:
         raise map_app_error(exc) from exc
 
+    if not isinstance(refined_summary, str):
+        raise map_app_error(ValidationError("Некорректный ответ уточнения аннотации"))
     return RefineSummaryResponse(refined_summary=refined_summary)
 
 
 @router.post("/summary/refine/stream")
-def refine_article_summary_stream(payload: RefineSummaryRequest):
+async def refine_article_summary_stream(payload: RefineSummaryRequest):
     try:
-        generator = refine_summary(
+        stream = await refine_summary(
             article_text=payload.article_text,
             summary=payload.summary,
             user_instruction=payload.user_instruction,
@@ -115,6 +120,6 @@ def refine_article_summary_stream(payload: RefineSummaryRequest):
         raise map_app_error(exc) from exc
 
     return StreamingResponse(
-        _safe_stream(generator),
+        _safe_stream_bytes(stream),
         media_type="text/plain; charset=utf-8",
     )

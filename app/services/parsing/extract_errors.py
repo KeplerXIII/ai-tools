@@ -4,20 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+import httpx
 from fastapi import HTTPException, status
-from requests import Response
-from requests.exceptions import (
-    ChunkedEncodingError,
-    ConnectionError,
-    ContentDecodingError,
-    HTTPError,
-    InvalidSchema,
-    InvalidURL,
-    RequestException,
-    SSLError,
-    Timeout,
-    TooManyRedirects,
-)
 
 
 def extract_error_detail(
@@ -43,20 +31,15 @@ def extract_error_detail(
     return d
 
 
-def _upstream_line(resp: Response | None) -> str:
-    if resp is None:
-        return ""
-    reason = (getattr(resp, "reason", None) or "").strip()
-    if reason:
-        return f"HTTP {resp.status_code} {reason}"
-    return f"HTTP {resp.status_code}"
-
-
-def http_exception_for_http_error(exc: HTTPError, *, stage: str = "http_fetch") -> HTTPException:
-    """Ответ целевого сайта с кодом 4xx/5xx после исчерпания ретраев."""
-    resp = exc.response
-    u = resp.status_code if resp is not None else None
-    line = _upstream_line(resp)
+def _http_exception_for_upstream_status(
+    *,
+    status_code: int | None,
+    line: str,
+    exc_text: str,
+    stage: str = "http_fetch",
+) -> HTTPException:
+    """HTTP-ответ целевого сайта с кодом 4xx/5xx (после ретраев)."""
+    u = status_code
 
     if u is None:
         return HTTPException(
@@ -65,7 +48,7 @@ def http_exception_for_http_error(exc: HTTPError, *, stage: str = "http_fetch") 
                 code="FETCH_HTTP_ERROR",
                 stage=stage,
                 message="Сайт вернул ответ с ошибкой, но без кода состояния.",
-                technical=str(exc),
+                technical=exc_text,
             ),
         )
 
@@ -78,7 +61,7 @@ def http_exception_for_http_error(exc: HTTPError, *, stage: str = "http_fetch") 
                 message=f"Сервер сайта ответил ошибкой ({line}). Попробуйте позже.",
                 upstream_http_status=u,
                 hint="Это ответ удалённого сервера, не вашего API.",
-                technical=str(exc),
+                technical=exc_text,
             ),
         )
 
@@ -102,102 +85,32 @@ def http_exception_for_http_error(exc: HTTPError, *, stage: str = "http_fetch") 
             message=base,
             upstream_http_status=u,
             hint="Проверьте URL в браузере. Для закрытых страниц экстракт может быть недоступен.",
-            technical=str(exc),
+            technical=exc_text,
         ),
     )
 
 
-def http_exception_for_timeout(exc: Timeout, *, stage: str = "http_fetch") -> HTTPException:
-    return HTTPException(
-        status_code=status.HTTP_504_GATEWAY_TIMEOUT,
-        detail=extract_error_detail(
-            code="FETCH_TIMEOUT",
-            stage=stage,
-            message="Превышено время ожидания ответа от сайта.",
-            hint="Сайт долго не отвечает или ответ слишком большой. Увеличьте REQUEST_TIMEOUT или повторите позже.",
-            technical=str(exc),
-        ),
+def http_exception_for_httpx_status_error(
+    exc: httpx.HTTPStatusError,
+    *,
+    stage: str = "http_fetch",
+) -> HTTPException:
+    resp = exc.response
+    u = resp.status_code
+    reason = (resp.reason_phrase or "").strip()
+    line = f"HTTP {u} {reason}".strip() if reason else f"HTTP {u}"
+    return _http_exception_for_upstream_status(
+        status_code=u,
+        line=line,
+        exc_text=str(exc),
+        stage=stage,
     )
 
 
-def http_exception_for_ssl(exc: SSLError, *, stage: str = "http_fetch") -> HTTPException:
-    return HTTPException(
-        status_code=status.HTTP_502_BAD_GATEWAY,
-        detail=extract_error_detail(
-            code="FETCH_SSL_ERROR",
-            stage=stage,
-            message="Не удалось установить защищённое соединение (SSL/TLS) с сайтом.",
-            hint="На стороне сайта может быть просроченный сертификат или нестандартная цепочка доверия.",
-            technical=str(exc),
-        ),
-    )
-
-
-def http_exception_for_connection(exc: ConnectionError, *, stage: str = "http_fetch") -> HTTPException:
-    return HTTPException(
-        status_code=status.HTTP_502_BAD_GATEWAY,
-        detail=extract_error_detail(
-            code="FETCH_CONNECTION_ERROR",
-            stage=stage,
-            message="Не удалось подключиться к сайту (сеть, DNS или сервер не принимает соединение).",
-            hint="Проверьте, что хост существует и доступен из сети, где запущен сервис.",
-            technical=str(exc),
-        ),
-    )
-
-
-def http_exception_for_chunked(exc: ChunkedEncodingError, *, stage: str = "http_fetch") -> HTTPException:
-    return HTTPException(
-        status_code=status.HTTP_502_BAD_GATEWAY,
-        detail=extract_error_detail(
-            code="FETCH_INCOMPLETE_RESPONSE",
-            stage=stage,
-            message="Ответ сайта оборвался при передаче (некорректный chunked/stream).",
-            technical=str(exc),
-        ),
-    )
-
-
-def http_exception_for_decode(exc: ContentDecodingError, *, stage: str = "http_fetch") -> HTTPException:
-    return HTTPException(
-        status_code=status.HTTP_502_BAD_GATEWAY,
-        detail=extract_error_detail(
-            code="FETCH_DECODE_ERROR",
-            stage=stage,
-            message="Не удалось разобрать сжатый или закодированный ответ сайта.",
-            technical=str(exc),
-        ),
-    )
-
-
-def http_exception_for_invalid_url(exc: InvalidURL | InvalidSchema, *, stage: str = "http_fetch") -> HTTPException:
-    return HTTPException(
-        status_code=status.HTTP_400_BAD_REQUEST,
-        detail=extract_error_detail(
-            code="FETCH_INVALID_URL",
-            stage=stage,
-            message="Некорректный или неподдерживаемый URL для загрузки.",
-            technical=str(exc),
-        ),
-    )
-
-
-def http_exception_for_request(exc: RequestException, *, stage: str = "http_fetch") -> HTTPException:
-    return HTTPException(
-        status_code=status.HTTP_502_BAD_GATEWAY,
-        detail=extract_error_detail(
-            code="FETCH_ERROR",
-            stage=stage,
-            message="Ошибка при загрузке страницы.",
-            technical=str(exc),
-        ),
-    )
-
-
-def map_request_exception(exc: BaseException, *, stage: str = "http_fetch") -> HTTPException:
-    if isinstance(exc, HTTPError):
-        return http_exception_for_http_error(exc, stage=stage)
-    if isinstance(exc, TooManyRedirects):
+def map_httpx_exception(exc: BaseException, *, stage: str = "http_fetch") -> HTTPException:
+    if isinstance(exc, httpx.HTTPStatusError):
+        return http_exception_for_httpx_status_error(exc, stage=stage)
+    if isinstance(exc, httpx.TooManyRedirects):
         return HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=extract_error_detail(
@@ -207,20 +120,72 @@ def map_request_exception(exc: BaseException, *, stage: str = "http_fetch") -> H
                 technical=str(exc),
             ),
         )
-    if isinstance(exc, Timeout):
-        return http_exception_for_timeout(exc, stage=stage)
-    if isinstance(exc, SSLError):
-        return http_exception_for_ssl(exc, stage=stage)
-    if isinstance(exc, ChunkedEncodingError):
-        return http_exception_for_chunked(exc, stage=stage)
-    if isinstance(exc, ContentDecodingError):
-        return http_exception_for_decode(exc, stage=stage)
-    if isinstance(exc, (InvalidURL, InvalidSchema)):
-        return http_exception_for_invalid_url(exc, stage=stage)
-    if isinstance(exc, ConnectionError):
-        return http_exception_for_connection(exc, stage=stage)
-    if isinstance(exc, RequestException):
-        return http_exception_for_request(exc, stage=stage)
+    if isinstance(exc, httpx.TimeoutException):
+        return HTTPException(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            detail=extract_error_detail(
+                code="FETCH_TIMEOUT",
+                stage=stage,
+                message="Превышено время ожидания ответа от сайта.",
+                hint="Сайт долго не отвечает или ответ слишком большой. Увеличьте REQUEST_TIMEOUT или повторите позже.",
+                technical=str(exc),
+            ),
+        )
+    if isinstance(exc, httpx.UnsupportedProtocol):
+        return HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=extract_error_detail(
+                code="FETCH_INVALID_URL",
+                stage=stage,
+                message="Некорректный или неподдерживаемый URL для загрузки.",
+                technical=str(exc),
+            ),
+        )
+    exc_l = str(exc).lower()
+    if isinstance(exc, httpx.RequestError) and (
+        "ssl" in exc_l or "certificate" in exc_l or "tls" in exc_l
+    ):
+        return HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=extract_error_detail(
+                code="FETCH_SSL_ERROR",
+                stage=stage,
+                message="Не удалось установить защищённое соединение (SSL/TLS) с сайтом.",
+                hint="На стороне сайта может быть просроченный сертификат или нестандартная цепочка доверия.",
+                technical=str(exc),
+            ),
+        )
+    if isinstance(exc, httpx.ConnectError):
+        return HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=extract_error_detail(
+                code="FETCH_CONNECTION_ERROR",
+                stage=stage,
+                message="Не удалось подключиться к сайту (сеть, DNS или сервер не принимает соединение).",
+                hint="Проверьте, что хост существует и доступен из сети, где запущен сервис.",
+                technical=str(exc),
+            ),
+        )
+    if isinstance(exc, httpx.DecodingError):
+        return HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=extract_error_detail(
+                code="FETCH_DECODE_ERROR",
+                stage=stage,
+                message="Не удалось разобрать сжатый или закодированный ответ сайта.",
+                technical=str(exc),
+            ),
+        )
+    if isinstance(exc, httpx.RequestError):
+        return HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=extract_error_detail(
+                code="FETCH_ERROR",
+                stage=stage,
+                message="Ошибка при загрузке страницы.",
+                technical=str(exc),
+            ),
+        )
     return HTTPException(
         status_code=status.HTTP_502_BAD_GATEWAY,
         detail=extract_error_detail(

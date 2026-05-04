@@ -1,27 +1,27 @@
-from typing import Generator
+from collections.abc import AsyncIterator
 
 from fastapi import HTTPException
-from openai import OpenAI
+from openai import AsyncOpenAI
 
 from app.domain.errors import ExternalServiceError
-from app.infrastructure.llm.clients.openai_sdk_client import chat
+from app.infrastructure.llm.clients.openai_sdk_client import achat
 from app.ports.llm import LLMPort, LLMRequest
 
 
 class OpenAISDKLLMAdapter(LLMPort):
-    def __init__(self, client: OpenAI) -> None:
+    def __init__(self, client: AsyncOpenAI) -> None:
         self._client = client
 
-    def chat(self, request: LLMRequest) -> str | Generator[str, None, None]:
+    async def chat(self, request: LLMRequest) -> str | AsyncIterator[str]:
         try:
-            return chat(
+            return await achat(
                 self._client,
                 prompt=request.prompt,
                 model=request.model,
                 temperature=request.temperature,
+                meta=request.meta or None,
                 stream=request.stream,
                 max_tokens=request.max_tokens,
-                meta=request.meta or None,
             )
         except HTTPException as exc:
             raise ExternalServiceError(str(exc.detail)) from exc

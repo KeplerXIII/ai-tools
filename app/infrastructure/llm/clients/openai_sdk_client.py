@@ -1,10 +1,10 @@
+import asyncio
 import logging
 import time
+from collections.abc import AsyncIterator
 from functools import lru_cache
-from typing import Generator
-
 from fastapi import HTTPException
-from openai import OpenAI, OpenAIError
+from openai import AsyncOpenAI, OpenAIError
 
 from app.core.config import OpenAIEndpoint, settings
 
@@ -12,16 +12,16 @@ logger = logging.getLogger("llm")
 
 
 @lru_cache(maxsize=32)
-def _cached_openai_client(base_url: str, api_key: str) -> OpenAI:
-    return OpenAI(
+def _cached_async_openai_client(base_url: str, api_key: str) -> AsyncOpenAI:
+    return AsyncOpenAI(
         base_url=base_url,
         api_key=api_key,
         timeout=settings.llm_timeout,
     )
 
 
-def openai_client_for_endpoint(endpoint: OpenAIEndpoint) -> OpenAI:
-    return _cached_openai_client(endpoint.base_url, endpoint.api_key)
+def async_openai_client_for_endpoint(endpoint: OpenAIEndpoint) -> AsyncOpenAI:
+    return _cached_async_openai_client(endpoint.base_url, endpoint.api_key)
 
 
 def _build_extra_body(
@@ -94,8 +94,8 @@ def _build_metrics(
     }
 
 
-def chat(
-    client: OpenAI,
+async def achat(
+    client: AsyncOpenAI,
     prompt: str,
     model: str,
     temperature: float = 0,
@@ -104,9 +104,9 @@ def chat(
     max_tokens: int | None = None,
     num_gpu: int | None = None,
     options: dict | None = None,
-) -> str | Generator[str, None, None]:
+) -> str | AsyncIterator[str]:
     if stream:
-        return _chat_stream(
+        return _achat_stream(
             client=client,
             prompt=prompt,
             model=model,
@@ -117,7 +117,7 @@ def chat(
             options=options,
         )
 
-    return _chat_full(
+    return await _achat_full(
         client=client,
         prompt=prompt,
         model=model,
@@ -129,8 +129,8 @@ def chat(
     )
 
 
-def _chat_full(
-    client: OpenAI,
+async def _achat_full(
+    client: AsyncOpenAI,
     prompt: str,
     model: str,
     temperature: float = 0,
@@ -145,7 +145,7 @@ def _chat_full(
     logger.info(
         {
             "event": "llm_request",
-            "transport": "openai_sdk",
+            "transport": "openai_sdk_async",
             "model": model,
             "prompt_preview": "...",
             "prompt_chars": len(prompt),
@@ -158,7 +158,7 @@ def _chat_full(
     )
 
     try:
-        completion = client.chat.completions.create(
+        completion = await client.chat.completions.create(
             model=model,
             messages=[{"role": "user", "content": prompt}],
             temperature=temperature,
@@ -187,7 +187,7 @@ def _chat_full(
         logger.error(
             {
                 "event": "llm_error",
-                "transport": "openai_sdk",
+                "transport": "openai_sdk_async",
                 "model": model,
                 "duration_sec": round(duration, 3),
                 "prompt_chars": len(prompt),
@@ -204,7 +204,7 @@ def _chat_full(
     logger.info(
         {
             "event": "llm_success",
-            "transport": "openai_sdk",
+            "transport": "openai_sdk_async",
             "model": model,
             **metrics,
             "prompt_chars": len(prompt),
@@ -219,8 +219,8 @@ def _chat_full(
     return content
 
 
-def _chat_stream(
-    client: OpenAI,
+async def _achat_stream(
+    client: AsyncOpenAI,
     prompt: str,
     model: str,
     temperature: float = 0,
@@ -228,7 +228,7 @@ def _chat_stream(
     max_tokens: int | None = None,
     num_gpu: int | None = None,
     options: dict | None = None,
-) -> Generator[str, None, None]:
+) -> AsyncIterator[str]:
     start_time = time.perf_counter()
     first_token_time = None
     content_parts: list[str] = []
@@ -239,7 +239,7 @@ def _chat_stream(
     logger.info(
         {
             "event": "llm_stream_request",
-            "transport": "openai_sdk",
+            "transport": "openai_sdk_async",
             "model": model,
             "prompt_preview": "...",
             "prompt_chars": len(prompt),
@@ -252,7 +252,7 @@ def _chat_stream(
     )
 
     try:
-        stream_response = client.chat.completions.create(
+        stream_response = await client.chat.completions.create(
             model=model,
             messages=[{"role": "user", "content": prompt}],
             temperature=temperature,
@@ -262,7 +262,7 @@ def _chat_stream(
             extra_body=extra_body or None,
         )
 
-        for chunk in stream_response:
+        async for chunk in stream_response:
             chunk_usage = getattr(chunk, "usage", None)
             if chunk_usage:
                 usage_tokens = _get_completion_tokens_from_usage(chunk_usage)
@@ -281,7 +281,7 @@ def _chat_stream(
                 logger.info(
                     {
                         "event": "llm_stream_first_token",
-                        "transport": "openai_sdk",
+                        "transport": "openai_sdk_async",
                         "model": model,
                         "ttft_sec": round(first_token_time - start_time, 3),
                         "prompt_chars": len(prompt),
@@ -294,6 +294,7 @@ def _chat_stream(
 
             content_parts.append(delta)
             yield delta
+            await asyncio.sleep(0)
 
         end_time = time.perf_counter()
         content = "".join(content_parts).strip()
@@ -308,7 +309,7 @@ def _chat_stream(
         logger.info(
             {
                 "event": "llm_stream_success",
-                "transport": "openai_sdk",
+                "transport": "openai_sdk_async",
                 "model": model,
                 **metrics,
                 "prompt_chars": len(prompt),
@@ -326,7 +327,7 @@ def _chat_stream(
         logger.error(
             {
                 "event": "llm_stream_error",
-                "transport": "openai_sdk",
+                "transport": "openai_sdk_async",
                 "model": model,
                 "duration_sec": round(duration, 3),
                 "ttft_sec": round(first_token_time - start_time, 3) if first_token_time else None,

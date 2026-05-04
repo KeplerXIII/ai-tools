@@ -1,4 +1,4 @@
-from typing import Generator
+from collections.abc import AsyncIterator
 
 from app.bootstrap.container import get_llm_client
 from app.core.config import settings
@@ -30,25 +30,25 @@ def build_summary_prompt(text: str) -> str:
 """.strip()
 
 
-def summarize_text(
+async def summarize_text(
     text: str,
     stream: bool = False,
-) -> str | Generator[str, None, None]:
+) -> str | AsyncIterator[str]:
     if not text.strip():
         raise ValidationError("Текст пустой")
 
     prompt = build_summary_prompt(text)
     llm = get_llm_client(LLMTask.SUMMARY)
 
-    return llm.chat(
+    return await llm.chat(
         LLMRequest(
             prompt=prompt,
             model=settings.model_summary,
             temperature=0.2,
             stream=stream,
             meta={
-            "tool": "summarizer",
-            "text_chars": len(text),
+                "tool": "summarizer",
+                "text_chars": len(text),
             },
         )
     )
@@ -109,13 +109,13 @@ def build_refine_summary_prompt(
 """.strip()
 
 
-def refine_summary(
+async def refine_summary(
     article_text: str,
     summary: str,
     user_instruction: str,
     mode: RefineSummaryMode,
     stream: bool = False,
-) -> str | Generator[str, None, None]:
+) -> str | AsyncIterator[str]:
 
     if not article_text.strip():
         raise ValidationError("Исходный текст пустой")
@@ -131,15 +131,15 @@ def refine_summary(
     )
 
     llm = get_llm_client(LLMTask.SUMMARY_REFINE)
-    return llm.chat(
+    return await llm.chat(
         LLMRequest(
             prompt=prompt,
             model=settings.model_summary_refine,
             temperature=0.2,
             stream=stream,
             meta={
-            "tool": "summary_refiner",
-            "mode": mode.value,
+                "tool": "summary_refiner",
+                "mode": mode.value,
             },
         )
     )

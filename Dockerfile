@@ -49,4 +49,5 @@ COPY alembic.ini ./alembic.ini
 
 EXPOSE 8000
 
-CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Несколько воркеров: долгий LLM-стрим на одном процессе не блокирует /docs и /admin на другом.
+CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]

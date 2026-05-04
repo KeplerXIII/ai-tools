@@ -6,7 +6,7 @@ from app.ports.llm import LLMRequest
 from app.services.llm.tagger import extract_json_object
 
 
-def categorize_text(text: str, categories: list[tuple[str, str]]) -> list[dict]:
+async def categorize_text(text: str, categories: list[tuple[str, str]]) -> list[dict]:
     """
     categories: список (code, name) активных категорий из БД.
     Возвращает [{"code": str, "confidence": float}, ...] (только известные code).
@@ -45,7 +45,7 @@ def categorize_text(text: str, categories: list[tuple[str, str]]) -> list[dict]:
 """.strip()
 
     llm = get_llm_client(LLMTask.CATEGORIZATION)
-    raw = llm.chat(
+    raw = await llm.chat(
         LLMRequest(
             prompt=prompt,
             model=settings.model_categorization,
@@ -53,6 +53,8 @@ def categorize_text(text: str, categories: list[tuple[str, str]]) -> list[dict]:
             meta={"op": "categorization"},
         )
     )
+    if not isinstance(raw, str):
+        return []
 
     data = extract_json_object(raw)
     raw_items = data.get("categories", [])

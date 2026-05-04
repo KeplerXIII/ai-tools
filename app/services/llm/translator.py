@@ -1,4 +1,4 @@
-from typing import Generator
+from collections.abc import AsyncIterator
 
 from langdetect import detect
 
@@ -37,11 +37,11 @@ def detect_language(text: str) -> str:
     return lang if lang in LANG_MAP else "en"
 
 
-def translate_text(
+async def translate_text(
     text: str,
     target_lang: str = "ru",
     stream: bool = False,
-) -> str | Generator[str, None, None]:
+) -> str | AsyncIterator[str]:
     source_lang = detect_language(text)
     prompt = build_prompt(
         text=text,
@@ -50,17 +50,17 @@ def translate_text(
     )
 
     llm = get_llm_client(LLMTask.TRANSLATION)
-    return llm.chat(
+    return await llm.chat(
         LLMRequest(
             prompt=prompt,
             model=settings.model_translation,
             temperature=0,
             stream=stream,
             meta={
-            "tool": "translator",
-            "source_lang": source_lang,
-            "target_lang": target_lang,
-            "text_chars": len(text),
+                "tool": "translator",
+                "source_lang": source_lang,
+                "target_lang": target_lang,
+                "text_chars": len(text),
             },
         )
     )

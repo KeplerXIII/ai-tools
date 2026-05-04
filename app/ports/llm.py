@@ -1,5 +1,6 @@
+from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
-from typing import Generator, Protocol
+from typing import Protocol
 
 
 @dataclass(slots=True)
@@ -13,5 +14,5 @@ class LLMRequest:
 
 
 class LLMPort(Protocol):
-    def chat(self, request: LLMRequest) -> str | Generator[str, None, None]:
+    async def chat(self, request: LLMRequest) -> str | AsyncIterator[str]:
         ...

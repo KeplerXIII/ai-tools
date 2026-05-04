@@ -34,7 +34,7 @@ def extract_json_object(raw: str) -> dict:
         raise InvalidProviderResponseError(f"Некорректный JSON от LLM: {exc}") from exc
 
 
-def tag_text(text: str, max_tags: int = 12) -> dict:
+async def tag_text(text: str, max_tags: int = 12) -> dict:
     if not text or not text.strip():
         raise ValidationError("Текст пустой")
 
@@ -64,7 +64,7 @@ def tag_text(text: str, max_tags: int = 12) -> dict:
 """.strip()
 
     llm = get_llm_client(LLMTask.TAGGING)
-    raw = llm.chat(
+    raw = await llm.chat(
         LLMRequest(
             prompt=prompt,
             model=settings.model_tagging,
@@ -72,6 +72,8 @@ def tag_text(text: str, max_tags: int = 12) -> dict:
             meta={"op": "tagging"},
         )
     )
+    if not isinstance(raw, str):
+        raise InvalidProviderResponseError("Ожидалась строка JSON от LLM")
 
     data = extract_json_object(raw)
 

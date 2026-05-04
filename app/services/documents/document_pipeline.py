@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import uuid
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -78,7 +79,7 @@ async def create_document_after_extract(
     document_type_code: str = "article",
 ) -> Document:
     text = extract_payload["text"]
-    lang_code = _map_lang_for_db(detect_language(text))
+    lang_code = _map_lang_for_db(await asyncio.to_thread(detect_language, text))
     ol_id = await language_id_by_code(session, lang_code)
     dt_id = await document_type_id_by_code(session, document_type_code)
     title = (extract_payload.get("title") or "").strip() or "Без названия"
@@ -317,7 +318,7 @@ async def run_translate_document(
     if doc is None:
         raise NotFoundError("Документ не найден")
 
-    text = translate_text(doc.original_content, target_lang=target_lang, stream=False)
+    text = await translate_text(doc.original_content, target_lang=target_lang, stream=False)
     if not isinstance(text, str):
         raise ValidationError("Ожидалась строка перевода")
     return await persist_document_translation(
@@ -361,7 +362,7 @@ async def run_tag_document(
         llm_task_for_provider=LLMTask.TAGGING,
     ):
         await delete_auto_document_tags(session, document_id)
-        tags_payload = tag_text(src, max_tags=max_tags)
+        tags_payload = await tag_text(src, max_tags=max_tags)
         for tag_name in tags_payload.get("tags", []):
             tid = await _get_or_create_tag(session, tag_name, lang_id)
             session.add(
@@ -403,7 +404,7 @@ async def run_entity_extract_document(
         llm_task_for_provider=LLMTask.ENTITY_EXTRACTION,
     ):
         await delete_auto_document_entities(session, document_id)
-        raw = extract_entities(src)
+        raw = await extract_entities(src)
         for name in dict.fromkeys(raw.get("military_equipment", [])):
             eid = await _get_or_create_entity(session, name, et_mil, lang_id)
             session.add(
@@ -466,7 +467,7 @@ async def run_categorize_document(
         llm_task_for_provider=LLMTask.CATEGORIZATION,
     ):
         await delete_auto_document_categories(session, document_id)
-        items = categorize_text(src, pairs)
+        items = await categorize_text(src, pairs)
         for it in items:
             code = it["code"]
             cid = await session.scalar(select(Category.id).where(Category.code == code))
@@ -555,7 +556,7 @@ async def run_summary_document(
     if not text.strip():
         raise ValidationError("Нет текста для аннотации")
 
-    ann = summarize_text(text, stream=False)
+    ann = await summarize_text(text, stream=False)
     if not isinstance(ann, str):
         raise ValidationError("Некорректный ответ суммаризатора")
     doc = await persist_document_summary(
@@ -590,7 +591,7 @@ async def run_refine_document(
     if not summary.strip():
         raise ValidationError("Нет аннотации для уточнения — сначала сгенерируйте summary")
 
-    refined = refine_summary(
+    refined = await refine_summary(
         article_text=article,
         summary=summary,
         user_instruction=user_instruction,
