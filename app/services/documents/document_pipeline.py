@@ -502,12 +502,9 @@ async def persist_document_refined_summary(
         started_by_id=started_by_id,
         llm_task_for_provider=LLMTask.SUMMARY_REFINE,
     ):
-        if source == SummarySource.original:
-            doc.original_summary = refined_annotation
-            doc.original_summary_stale = False
-        else:
-            doc.translated_summary = refined_annotation
-            doc.translated_summary_stale = False
+        # Summarizer/refiner prompts produce Russian; store in translated_summary only.
+        doc.translated_summary = refined_annotation
+        doc.translated_summary_stale = False
     return doc
 
 
@@ -532,12 +529,9 @@ async def persist_document_summary(
         started_by_id=started_by_id,
         llm_task_for_provider=LLMTask.SUMMARY,
     ):
-        if source == SummarySource.original:
-            doc.original_summary = annotation
-            doc.original_summary_stale = False
-        else:
-            doc.translated_summary = annotation
-            doc.translated_summary_stale = False
+        # Summarizer prompts produce Russian; store in translated_summary only.
+        doc.translated_summary = annotation
+        doc.translated_summary_stale = False
     return doc
 
 
@@ -585,10 +579,9 @@ async def run_refine_document(
         raise NotFoundError("Документ не найден")
     if source == SummarySource.original:
         article = doc.original_content
-        summary = doc.original_summary or ""
     else:
         article = doc.translated_content or ""
-        summary = doc.translated_summary or ""
+    summary = doc.translated_summary or doc.original_summary or ""
     if not article.strip():
         raise ValidationError("Нет текста статьи")
     if not summary.strip():

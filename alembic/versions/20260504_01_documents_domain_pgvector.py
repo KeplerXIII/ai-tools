@@ -1,4 +1,4 @@
-"""documents domain, pgvector, reference data seeds
+"""documents domain, pgvector
 
 Revision ID: 20260504_01
 Revises: 20260205_01
@@ -281,91 +281,6 @@ def upgrade() -> None:
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
     )
     op.create_index(op.f("ix_processing_jobs_document_id"), "processing_jobs", ["document_id"], unique=False)
-
-    _seed_reference_data(conn)
-
-
-def _seed_reference_data(conn) -> None:
-    """Фиксированные UUID для сидов — удобно для отладки; в коде предпочтительно искать по code."""
-
-    def ex(sql: str, params: dict | None = None) -> None:
-        conn.execute(sa.text(sql), params or {})
-
-    ex(
-        """
-        INSERT INTO roles (id, code, name, description) VALUES
-        ('a1000001-0000-4000-8000-000000000001', 'admin', 'Администратор', 'Доступ к админ-панели и служебным операциям'),
-        ('a1000001-0000-4000-8000-000000000002', 'user', 'Пользователь', NULL)
-        ON CONFLICT (id) DO NOTHING
-        """
-    )
-    ex(
-        """
-        INSERT INTO languages (id, code, name) VALUES
-        ('a2000001-0000-4000-8000-000000000001', 'en', 'English'),
-        ('a2000001-0000-4000-8000-000000000002', 'ru', 'Russian'),
-        ('a2000001-0000-4000-8000-000000000003', 'de', 'German')
-        ON CONFLICT (id) DO NOTHING
-        """
-    )
-    ex(
-        """
-        INSERT INTO prediction_sources (id, code, name, description) VALUES
-        ('a3000001-0000-4000-8000-000000000001', 'manual', 'Ручной ввод', NULL),
-        ('a3000001-0000-4000-8000-000000000002', 'llm', 'Языковая модель', NULL),
-        ('a3000001-0000-4000-8000-000000000003', 'rule', 'Правило', NULL),
-        ('a3000001-0000-4000-8000-000000000004', 'import', 'Импорт', NULL),
-        ('a3000001-0000-4000-8000-000000000005', 'ensemble', 'Ансамбль', NULL),
-        ('a3000001-0000-4000-8000-000000000006', 'ocr', 'OCR', NULL),
-        ('a3000001-0000-4000-8000-000000000007', 'api', 'Внешний API', NULL)
-        ON CONFLICT (id) DO NOTHING
-        """
-    )
-    ex(
-        """
-        INSERT INTO document_types (id, code, name) VALUES
-        ('a4000001-0000-4000-8000-000000000001', 'article', 'Статья')
-        ON CONFLICT (id) DO NOTHING
-        """
-    )
-    ex(
-        """
-        INSERT INTO entity_types (id, code, name, description) VALUES
-        ('a5000001-0000-4000-8000-000000000001', 'military_equipment', 'Вооружение и техника', NULL),
-        ('a5000001-0000-4000-8000-000000000002', 'manufacturer', 'Производитель', NULL),
-        ('a5000001-0000-4000-8000-000000000003', 'contract', 'Контракт / сделка', NULL)
-        ON CONFLICT (id) DO NOTHING
-        """
-    )
-    ex(
-        """
-        INSERT INTO embedding_models (id, name, dimension, provider, description) VALUES
-        ('a6000001-0000-4000-8000-000000000001', 'default-1536', 1536, 'app', 'Размерность столбца document_embeddings.embedding')
-        ON CONFLICT (id) DO NOTHING
-        """
-    )
-    ex(
-        """
-        INSERT INTO categories (id, parent_id, code, name, description, level, sort_order, is_active) VALUES
-        ('a7000001-0000-4000-8000-000000000001', NULL, 'defense', 'Оборона и ВПК', NULL, 0, 0, true),
-        ('a7000001-0000-4000-8000-000000000002', NULL, 'procurement', 'Закупки и контракты', NULL, 0, 10, true),
-        ('a7000001-0000-4000-8000-000000000003', NULL, 'technology', 'Технологии', NULL, 0, 20, true),
-        ('a7000001-0000-4000-8000-000000000004', NULL, 'politics', 'Политика', NULL, 0, 30, true),
-        ('a7000001-0000-4000-8000-000000000005', NULL, 'economy', 'Экономика', NULL, 0, 40, true)
-        ON CONFLICT (id) DO NOTHING
-        """
-    )
-
-    # Назначить роль admin пользователям с is_admin (однократно при миграции)
-    ex(
-        """
-        INSERT INTO user_roles (user_id, role_id)
-        SELECT u.id, 'a1000001-0000-4000-8000-000000000001'::uuid
-        FROM users u
-        WHERE u.is_admin = true
-        ON CONFLICT (user_id, role_id) DO NOTHING
-        """
-    )
 
 
 def downgrade() -> None:

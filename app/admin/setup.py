@@ -91,12 +91,15 @@ class AdminRu(Admin):
         return RedirectResponse(request.url_for("admin:index"), status_code=302)
 
 
+_ADMIN_PANEL_ROLE_CODES = frozenset({"admin", "superuser"})
+
+
 def _user_can_access_admin(user: User | None) -> bool:
     if user is None or not user.is_active:
         return False
     if user.is_admin:
         return True
-    return any(getattr(r, "code", None) == "admin" for r in user.roles)
+    return any(getattr(r, "code", None) in _ADMIN_PANEL_ROLE_CODES for r in user.roles)
 
 
 class AdminAuth(AuthenticationBackend):

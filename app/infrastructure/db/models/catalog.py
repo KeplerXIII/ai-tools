@@ -73,6 +73,7 @@ class DocumentType(Base):
     )
     code: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     name: Mapped[str] = mapped_column(String(128), unique=True, nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 class Environment(Base):

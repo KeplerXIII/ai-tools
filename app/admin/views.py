@@ -126,7 +126,7 @@ class PredictionSourceAdmin(ModelView, model=PredictionSource):
 class DocumentTypeAdmin(ModelView, model=DocumentType):
     name = "Тип документа"
     name_plural = "Типы документов"
-    column_list = [DocumentType.id, DocumentType.code, DocumentType.name]
+    column_list = [DocumentType.id, DocumentType.code, DocumentType.name, DocumentType.description]
 
 
 class EnvironmentAdmin(ModelView, model=Environment):

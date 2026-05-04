@@ -14,6 +14,9 @@
 В контейнере приложения:
 
   docker compose exec ai-tools uv run python -m app.cli.init_db
+
+Справочники (роли, языки, типы документов и т.д.) миграции **не** заполняют —
+после инита выполните ``python -m app.cli.seed_reference_data``.
 """
 
 from __future__ import annotations

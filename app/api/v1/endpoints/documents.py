@@ -321,10 +321,9 @@ async def document_summary_refine_stream(
             raise HTTPException(status_code=404, detail="Документ не найден")
         if source == SummarySource.original:
             article = doc.original_content
-            summary = doc.original_summary or ""
         else:
             article = doc.translated_content or ""
-            summary = doc.translated_summary or ""
+        summary = doc.translated_summary or doc.original_summary or ""
         if not article.strip():
             raise HTTPException(status_code=400, detail="Нет текста статьи")
         if not summary.strip():
