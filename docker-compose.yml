@@ -16,10 +16,12 @@ services:
   postgres:
     image: postgres:16
     container_name: ai-tools-postgres
+    env_file:
+      - .env
     environment:
-      POSTGRES_DB: aitools
-      POSTGRES_USER: aitools
-      POSTGRES_PASSWORD: aitools
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
