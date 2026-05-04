@@ -7,3 +7,4 @@ class LLMTask(StrEnum):
     TRANSLATION = "translation"
     TAGGING = "tagging"
     ENTITY_EXTRACTION = "entity_extraction"
+    CATEGORIZATION = "categorization"

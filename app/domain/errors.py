@@ -12,3 +12,15 @@ class ExternalServiceError(AppError):
 
 class InvalidProviderResponseError(AppError):
     """Raised when provider returns malformed response."""
+
+
+class NotFoundError(AppError):
+    """Ресурс не найден."""
+
+
+class ConflictError(AppError):
+    """Конфликт состояния (например, блокировка)."""
+
+
+class ForbiddenError(AppError):
+    """Действие запрещено для текущего пользователя."""

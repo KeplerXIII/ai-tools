@@ -1,3 +1,50 @@
+from app.infrastructure.db.models.catalog import (
+    Category,
+    Country,
+    DocumentType,
+    EmbeddingModel,
+    Entity,
+    EntityType,
+    Environment,
+    Fund,
+    Language,
+    PredictionSource,
+    Source,
+    Tag,
+)
+from app.infrastructure.db.models.document import (
+    Document,
+    DocumentCategory,
+    DocumentChunk,
+    DocumentEmbedding,
+    DocumentEntity,
+    DocumentTag,
+    ProcessingJob,
+)
+from app.infrastructure.db.models.role import Role, UserRole
 from app.infrastructure.db.models.user import User
 
-__all__ = ["User"]
+__all__ = [
+    "Category",
+    "Country",
+    "Document",
+    "DocumentCategory",
+    "DocumentChunk",
+    "DocumentEmbedding",
+    "DocumentEntity",
+    "DocumentTag",
+    "DocumentType",
+    "EmbeddingModel",
+    "Entity",
+    "EntityType",
+    "Environment",
+    "Fund",
+    "Language",
+    "PredictionSource",
+    "ProcessingJob",
+    "Role",
+    "Source",
+    "Tag",
+    "User",
+    "UserRole",
+]

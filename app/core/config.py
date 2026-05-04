@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app.core.llm_task import LLMTask
 
@@ -12,6 +12,12 @@ class OpenAIEndpoint:
 
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
     # --- app ---
     app_name: str = "AI Tools Service"
     app_version: str = "0.1.0"
@@ -42,8 +48,14 @@ class Settings(BaseSettings):
     openai_compat_base_url_entity_extraction: str | None = None
     openai_compat_api_key_entity_extraction: str | None = None
 
+    openai_compat_base_url_categorization: str | None = None
+    openai_compat_api_key_categorization: str | None = None
+
     # --- runtime ---
     llm_timeout: int = 120
+
+    # --- documents ---
+    document_lock_expire_minutes: int = 15
 
     # --- database (async SQLAlchemy; URL вида postgresql+asyncpg://user:pass@host:5432/db) ---
     database_url: str
@@ -62,16 +74,13 @@ class Settings(BaseSettings):
     model_translation: str = "deepseek-v4-pro"
     model_tagging: str = "deepseek-v4-pro"
     model_entity_extraction: str = "deepseek-v4-pro"
+    model_categorization: str = "deepseek-v4-pro"
 
     def openai_endpoint_for(self, task: LLMTask) -> OpenAIEndpoint:
         suffix = task.value
         base = getattr(self, f"openai_compat_base_url_{suffix}", None) or self.openai_compat_base_url
         key = getattr(self, f"openai_compat_api_key_{suffix}", None) or self.openai_compat_api_key
         return OpenAIEndpoint(base_url=base, api_key=key)
-
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
 
 
 settings = Settings()

@@ -13,6 +13,38 @@ from app.infrastructure.db.session import get_db
 security = HTTPBearer(auto_error=False)
 
 
+def get_optional_started_by_id(
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
+) -> uuid.UUID | None:
+    """Только JWT, без обращения к БД — для streaming-эндпоинтов (processing_jobs.started_by_id)."""
+    if credentials is None or credentials.scheme.lower() != "bearer":
+        return None
+    try:
+        sub = decode_access_token(credentials.credentials)
+        return uuid.UUID(sub)
+    except (ValueError, jwt.PyJWTError):
+        return None
+
+
+async def get_current_user_optional(
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
+    db: AsyncSession = Depends(get_db),
+) -> User | None:
+    if credentials is None or credentials.scheme.lower() != "bearer":
+        return None
+    try:
+        sub = decode_access_token(credentials.credentials)
+        user_id = uuid.UUID(sub)
+    except (ValueError, jwt.PyJWTError):
+        return None
+
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if user is None or not user.is_active:
+        return None
+    return user
+
+
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(security),
     db: AsyncSession = Depends(get_db),

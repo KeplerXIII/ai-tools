@@ -38,12 +38,12 @@ def summarize_text(
         raise ValidationError("Текст пустой")
 
     prompt = build_summary_prompt(text)
-    llm = get_llm_client(LLMTask.SUMMARY_REFINE)
+    llm = get_llm_client(LLMTask.SUMMARY)
 
     return llm.chat(
         LLMRequest(
             prompt=prompt,
-            model=settings.model_summary_refine,
+            model=settings.model_summary,
             temperature=0.2,
             stream=stream,
             meta={
@@ -130,11 +130,11 @@ def refine_summary(
         mode=mode,
     )
 
-    llm = get_llm_client(LLMTask.SUMMARY)
+    llm = get_llm_client(LLMTask.SUMMARY_REFINE)
     return llm.chat(
         LLMRequest(
             prompt=prompt,
-            model=settings.model_summary,
+            model=settings.model_summary_refine,
             temperature=0.2,
             stream=stream,
             meta={

@@ -3,20 +3,68 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from sqladmin import Admin, ModelView
 from sqladmin.authentication import AuthenticationBackend
 from starlette.exceptions import HTTPException
 from starlette.requests import Request
 from starlette.responses import RedirectResponse, Response
-from wtforms import PasswordField
-from wtforms.validators import Length, Optional
 
+from app.admin.views import (
+    CategoryAdmin,
+    CountryAdmin,
+    DocumentAdmin,
+    DocumentCategoryAdmin,
+    DocumentChunkAdmin,
+    DocumentEmbeddingAdmin,
+    DocumentEntityAdmin,
+    DocumentTagAdmin,
+    DocumentTypeAdmin,
+    EmbeddingModelAdmin,
+    EntityAdmin,
+    EntityTypeAdmin,
+    EnvironmentAdmin,
+    FundAdmin,
+    LanguageAdmin,
+    PredictionSourceAdmin,
+    ProcessingJobAdmin,
+    RoleAdmin,
+    SourceAdmin,
+    TagAdmin,
+    UserAdmin,
+    UserRoleAdmin,
+)
 from app.core.config import settings
-from app.core.security import hash_password, verify_password
+from app.core.security import verify_password
 from app.infrastructure.db.models import User
 from app.infrastructure.db.session import AsyncSessionLocal, engine
 
 _TEMPLATES_DIR = str(Path(__file__).resolve().parent / "templates")
+
+_ADMIN_VIEWS: list[type[ModelView]] = [
+    UserAdmin,
+    RoleAdmin,
+    UserRoleAdmin,
+    LanguageAdmin,
+    CountryAdmin,
+    PredictionSourceAdmin,
+    DocumentTypeAdmin,
+    EnvironmentAdmin,
+    FundAdmin,
+    CategoryAdmin,
+    SourceAdmin,
+    DocumentAdmin,
+    DocumentCategoryAdmin,
+    TagAdmin,
+    DocumentTagAdmin,
+    EntityTypeAdmin,
+    EntityAdmin,
+    DocumentEntityAdmin,
+    DocumentChunkAdmin,
+    EmbeddingModelAdmin,
+    DocumentEmbeddingAdmin,
+    ProcessingJobAdmin,
+]
 
 
 class AdminRu(Admin):
@@ -43,6 +91,14 @@ class AdminRu(Admin):
         return RedirectResponse(request.url_for("admin:index"), status_code=302)
 
 
+def _user_can_access_admin(user: User | None) -> bool:
+    if user is None or not user.is_active:
+        return False
+    if user.is_admin:
+        return True
+    return any(getattr(r, "code", None) == "admin" for r in user.roles)
+
+
 class AdminAuth(AuthenticationBackend):
     async def login(self, request: Request) -> bool:
         form = await request.form()
@@ -53,9 +109,13 @@ class AdminAuth(AuthenticationBackend):
         if not username or not password:
             return False
         async with AsyncSessionLocal() as session:
-            result = await session.execute(select(User).where(User.username == username))
+            result = await session.execute(
+                select(User)
+                .where(User.username == username)
+                .options(selectinload(User.roles)),
+            )
             user = result.scalar_one_or_none()
-        if user is None or not user.is_active or not user.is_admin:
+        if user is None or not _user_can_access_admin(user):
             return False
         if not verify_password(password, user.hashed_password):
             return False
@@ -75,68 +135,11 @@ class AdminAuth(AuthenticationBackend):
         except (ValueError, TypeError):
             return False
         async with AsyncSessionLocal() as session:
-            result = await session.execute(select(User).where(User.id == uid))
+            result = await session.execute(
+                select(User).where(User.id == uid).options(selectinload(User.roles)),
+            )
             user = result.scalar_one_or_none()
-        return bool(user and user.is_active and user.is_admin)
-
-
-class UserAdmin(ModelView, model=User):
-    name = "Пользователь"
-    name_plural = "Пользователи"
-    icon = "fa-solid fa-user"
-    column_labels = {
-        User.id: "ID",
-        User.username: "Логин",
-        User.email: "Email",
-        User.hashed_password: "Пароль (хэш)",
-        User.is_active: "Активен",
-        User.is_admin: "Администратор",
-        User.created_at: "Создан",
-    }
-    column_list = [User.id, User.username, User.email, User.is_active, User.is_admin, User.created_at]
-    column_searchable_list = [User.username, User.email]
-    column_sortable_list = [User.username, User.created_at]
-    form_columns = [User.username, User.email, User.hashed_password, User.is_active, User.is_admin]
-    form_overrides = {"hashed_password": PasswordField}
-    form_args = {
-        "username": {"label": "Логин"},
-        "email": {"label": "Email"},
-        "is_active": {"label": "Активен"},
-        "is_admin": {"label": "Администратор"},
-        "hashed_password": {
-            "label": "Пароль",
-            "description": "При создании — обязательно (от 8 символов). При редактировании оставьте пустым, чтобы не менять.",
-            "validators": [Optional(), Length(min=8, max=128)],
-        }
-    }
-    can_create = True
-    can_delete = True
-
-    async def on_model_change(
-        self,
-        data: dict,
-        model: User,
-        is_created: bool,
-        request: Request,
-    ) -> None:
-        if "username" in data and isinstance(data["username"], str):
-            data["username"] = data["username"].strip().lower()
-
-        if data.get("email") == "":
-            data["email"] = None
-
-        raw_pw = data.get("hashed_password")
-        if isinstance(raw_pw, str):
-            raw_pw = raw_pw.strip()
-        else:
-            raw_pw = ""
-
-        if raw_pw:
-            data["hashed_password"] = hash_password(raw_pw)
-        else:
-            data.pop("hashed_password", None)
-            if is_created:
-                raise ValueError("При создании пользователя укажите пароль (не короче 8 символов).")
+        return _user_can_access_admin(user)
 
 
 def mount_admin(app: FastAPI) -> Admin:
@@ -150,5 +153,6 @@ def mount_admin(app: FastAPI) -> Admin:
         title=f"{settings.app_name} — админка",
         templates_dir=_TEMPLATES_DIR,
     )
-    admin.add_view(UserAdmin)
+    for view in _ADMIN_VIEWS:
+        admin.add_view(view)
     return admin

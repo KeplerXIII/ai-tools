@@ -1,4 +1,4 @@
-"""Назначить пользователю is_admin (вход в SQLAdmin по /admin).
+"""Назначить пользователю is_admin и роль admin (вход в SQLAdmin по /admin).
 
   uv run python -m app.cli.promote_admin USERNAME
 
@@ -10,9 +10,10 @@
 import asyncio
 import sys
 
-from sqlalchemy import update
+from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
-from app.infrastructure.db.models import User
+from app.infrastructure.db.models import Role, User, UserRole
 from app.infrastructure.db.session import AsyncSessionLocal
 
 
@@ -26,14 +27,26 @@ async def main() -> None:
     username = sys.argv[1].strip().lower()
     async with AsyncSessionLocal() as session:
         result = await session.execute(
-            update(User).where(User.username == username).values(is_admin=True),
+            select(User).where(User.username == username).options(selectinload(User.roles)),
         )
+        user = result.scalar_one_or_none()
+        if user is None:
+            print(f"Пользователь «{username}» не найден", file=sys.stderr)
+            sys.exit(1)
+        user.is_admin = True
+        role_row = await session.execute(select(Role).where(Role.code == "admin"))
+        role = role_row.scalar_one_or_none()
+        if role is not None:
+            link = await session.execute(
+                select(UserRole).where(
+                    UserRole.user_id == user.id,
+                    UserRole.role_id == role.id,
+                ),
+            )
+            if link.scalar_one_or_none() is None:
+                session.add(UserRole(user_id=user.id, role_id=role.id))
         await session.commit()
-        n = result.rowcount
-    if not n:
-        print(f"Пользователь «{username}» не найден", file=sys.stderr)
-        sys.exit(1)
-    print(f"OK: «{username}» теперь администратор (SQLAdmin /admin)")
+    print(f"OK: «{username}» теперь администратор (SQLAdmin /admin) и роль admin в user_roles")
 
 
 if __name__ == "__main__":
