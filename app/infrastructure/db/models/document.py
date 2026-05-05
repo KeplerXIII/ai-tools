@@ -10,6 +10,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Integer,
+    JSON,
     Numeric,
     String,
     Text,
@@ -51,6 +52,8 @@ class Document(Base):
 
     source_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("sources.id"), nullable=True)
     source_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    extracted_images: Mapped[list[dict] | None] = mapped_column(JSON, nullable=True)
+    extracted_main_image: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 

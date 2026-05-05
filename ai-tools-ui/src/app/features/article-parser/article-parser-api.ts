@@ -68,19 +68,19 @@ export class ArticleParserApi {
   }
 
   extractByUrl(url: string) {
-    return this.http.post<ExtractResponse>('/api/v1/parse', {
+    return this.http.post<ExtractResponse>('/api/v1/documents/extract-url', {
       url,
     });
   }
 
   extractEntities(text: string) {
-    return this.http.post<EntitiesResponse>('/api/v1/extract/entities', {
+    return this.http.post<EntitiesResponse>('/api/v1/documents/{id}/entities', {
       text,
     });
   }
 
   translateToRussian(text: string) {
-    return this.http.post<TranslateResponse>('/api/v1/translate', {
+    return this.http.post<TranslateResponse>('/api/v1/documents/{id}/translate', {
       text,
       target_lang: 'ru',
     });

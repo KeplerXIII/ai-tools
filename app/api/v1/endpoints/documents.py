@@ -92,6 +92,20 @@ async def extract_url_persist(
     norm = normalize_source_url(url_str)
     existing = await get_document_by_source_url(db, url_str)
     if existing:
+        # Backfill image metadata for old cached documents created before image persistence.
+        if existing.source_url and not existing.extracted_images and not existing.extracted_main_image:
+            try:
+                html = await download_html(url_str)
+                refreshed = await extract_article_text(html, url_str)
+                extracted_images = refreshed.get("images") or []
+                extracted_main_image = refreshed.get("main_image")
+                if extracted_images or extracted_main_image:
+                    await _prepare_write_session(db)
+                    async with db.begin():
+                        existing.extracted_images = extracted_images
+                        existing.extracted_main_image = extracted_main_image
+            except Exception:
+                logger.exception("failed to backfill extract images for cached document", extra={"url": url_str})
         return document_to_extract_response(existing, from_cache=True)
 
     t0 = time.perf_counter()

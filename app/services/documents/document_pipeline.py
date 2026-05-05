@@ -23,6 +23,7 @@ from app.infrastructure.db.models import (
     Tag,
 )
 from app.schemas.documents import DocumentExtractResponse, DocumentUpdateRequest, SummarySource
+from app.schemas.extract import ImageInfo
 from app.schemas.extract import RefineSummaryMode
 from app.services.documents.db_refs import (
     document_type_id_by_code,
@@ -52,6 +53,20 @@ async def get_document_by_source_url(session: AsyncSession, url: str) -> Documen
 
 
 def document_to_extract_response(doc: Document, *, from_cache: bool) -> DocumentExtractResponse:
+    images: list[ImageInfo] = []
+    for item in doc.extracted_images or []:
+        if not isinstance(item, dict):
+            continue
+        url = item.get("url")
+        if not url:
+            continue
+        images.append(
+            ImageInfo(
+                url=str(url),
+                alt=item.get("alt"),
+                title=item.get("title"),
+            )
+        )
     return DocumentExtractResponse(
         title=doc.title or None,
         author=None,
@@ -62,8 +77,8 @@ def document_to_extract_response(doc: Document, *, from_cache: bool) -> Document
         method="cached" if from_cache else "live",
         quality="unknown" if from_cache else "ok",
         needs_review=False,
-        images=[],
-        main_image=None,
+        images=images,
+        main_image=doc.extracted_main_image,
         document_id=doc.id,
         from_cache=from_cache,
         version=doc.version,
@@ -90,6 +105,8 @@ async def create_document_after_extract(
         original_language_id=ol_id,
         document_type_id=dt_id,
         source_url=norm_url,
+        extracted_images=extract_payload.get("images") or [],
+        extracted_main_image=extract_payload.get("main_image"),
         created_by_id=created_by_id,
         original_summary_stale=True,
         translated_summary_stale=True,
