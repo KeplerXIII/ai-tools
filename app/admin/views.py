@@ -181,10 +181,15 @@ class DocumentAdmin(ModelView, model=Document):
     name = "Документ"
     name_plural = "Документы"
     icon = "fa-solid fa-file-lines"
+    column_labels = {
+        Document.extracted_images: "Images",
+        Document.extracted_main_image: "Main image",
+    }
     column_list = [
         Document.id,
         Document.title,
         Document.source_url,
+        Document.extracted_images,
         Document.version,
         Document.locked_by_id,
         Document.created_at,
