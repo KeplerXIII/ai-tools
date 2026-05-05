@@ -1,0 +1,21 @@
+<aside class="sidebar" [class.sidebar_expanded]="isExpanded">
+  <div class="sidebar__toolbar">
+    <button class="sidebar__menu-btn" (click)="toggle()">
+      <i class="pi pi-bars"></i>
+    </button>
+     <span class="sidebar__menu-text">Меню</span>
+  </div>
+
+  <nav class="sidebar__nav">
+    <a class="sidebar__link" routerLink="/translate" routerLinkActive="sidebar__link_active">
+      <img src="/assets/icons/translate.svg" alt="Мозготрон" class="siderbar_icon_btn" />
+      <span class="sidebar__link-text">Переводчик</span>
+    </a>
+    <div class="divider"></div>
+    <a class="sidebar__link" routerLink="/article-parser" routerLinkActive="sidebar__link_active">
+      <img src="/assets/icons/parser.svg" alt="Мозготрон" class="siderbar_icon_btn" />
+       <span class="sidebar__link-text">Парсер статьи</span>
+    </a>
+    <div class="divider"></div>
+  </nav>
+</aside>

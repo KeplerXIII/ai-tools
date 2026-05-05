@@ -1,0 +1,490 @@
+.p-inputtext {
+  border: 1px solid var(--light-grey-text-color);
+  border-radius: 0 !important;
+  box-shadow: none;
+  background: var(--light-text-color) !important;
+  font-family: var(--font-family-base);
+  font-weight: var(--font-weight-light);
+  height: 40px;
+  transition:
+    border-color 0.3s ease,
+    box-shadow 0.3s ease;
+
+  &:hover {
+    border-color: var(--grey-text-color) !important;
+  }
+
+  &:active {
+    border-color: var(--primary-text-color);
+    box-shadow: 0 0 0 2px rgb(var(--primary-color-rgb), 0.2);
+    outline: none;
+  }
+}
+
+.p-inputgroup .p-inputtext,
+.p-inputgroup .p-inputwrapper {
+  width: 100% !important;
+}
+
+.search-input.p-inputtext:enabled:focus {
+  border-color: var(--primary-text-color-light);
+}
+
+.p-datepicker .p-inputtext {
+  border-radius: 0;
+}
+
+.p-inputtext:enabled:focus {
+  border-color: var(--primary-text-color) !important;
+}
+
+.p-datepicker-day-selected {
+  background-color: var(--bg-light-grey) !important;
+  color: var(--primary-text-color-rgb) !important;
+}
+
+.date-input-group .p-datepicker .p-inputtext {
+  padding-inline-end: 20px !important;
+}
+
+.p-element .p-select-label .p-inputtext {
+  overflow: hidden;
+}
+
+.p-datepicker .p-inputtext:enabled:focus {
+  border-color: var(--primary-text-color-light);
+}
+
+.p-datepicker-panel {
+  border: none !important;
+}
+
+.p-toggleswitch.p-toggleswitch-checked .p-toggleswitch-slider {
+  background: var(--bg-gradient-base) !important;
+}
+
+.p-select-list .p-select-option,
+.p-cascadeselect-option-content {
+  font-weight: var(--font-weight-light);
+  height: 40px;
+}
+
+.p-select-option.p-select-option-selected,
+.p-cascadeselect-option-selected > .p-cascadeselect-option-content {
+  background-color: var(--bg-light-grey) !important;
+  color: var(--primary-text-color-rgb) !important;
+}
+
+.p-select-overlay {
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+.p-select-label {
+  border: none;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100px;
+}
+
+.selected-country,
+.selected-region,
+.selected-manufacturer {
+  align-items: center;
+  display: flex;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.selected-country-text,
+.selected-region-text,
+.selected-manufacturer-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.p-select .selected-country {
+  align-items: center;
+  display: inline-flex;
+  gap: 0.5rem;
+  line-height: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.p-select .selected-region {
+  align-items: center;
+  display: inline-flex;
+  gap: 0.5rem;
+  line-height: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.p-select .p-select-label {
+  align-items: center;
+  display: flex;
+  gap: 0.5rem;
+  line-height: 1.7;
+  min-width: 0;
+
+  &:focus {
+    border-color: var(--primary-text-color-light);
+  }
+}
+
+.news-subjects-dropdown.p-select {
+  width: 170px;
+}
+
+.p-select {
+  border-radius: 0 !important;
+  box-shadow: none;
+  width: fit-content;
+
+  &:hover {
+    border-color: var(--grey-text-color);
+  }
+}
+
+.p-select:not(.p-disabled).p-focus {
+  border-color: var(--primary-text-color-light) !important;
+}
+
+.p-iconfield .p-inputtext:enabled:focus {
+  border-color: var(--primary-text-color-light);
+}
+
+.news-search-form .input-wrapper {
+  .p-icon-field {
+    width: 100%;
+  }
+
+  &.p-inputtext {
+    font-size: 15px;
+    height: 45px;
+  }
+
+  .p-inputgroup {
+    align-items: flex-end;
+    display: flex;
+    flex-wrap: wrap;
+    height: 100%;
+  }
+
+  .input-group {
+    .p-datepicker,
+    .p-select {
+      height: 45px;
+    }
+
+    .p-datepicker .p-inputtext,
+    .p-select .p-inputtext {
+      padding: 0 1rem;
+    }
+
+    .p-datepicker .p-inputtext {
+      font-size: 1rem;
+    }
+  }
+}
+
+.custom-select:not(.p-disabled).p-focus {
+  border-color: var(--primary-text-color-light) !important;
+}
+
+.p-cascadeselect {
+  border-radius: 0;
+  min-width: 0 !important;
+}
+
+.p-cascadeselect:not(.p-disabled).p-focus {
+  border-color: var(--primary-text-color-light) !important;
+}
+
+.p-component {
+  border-radius: 0;
+  box-shadow: none;
+  font-family: var(--font-family-base);
+  font-weight: var(--font-weight-light);
+}
+
+.p-cascadeselect .p-cascadeselect-label {
+  font-size: 15px;
+  line-height: 29px;
+}
+
+.p-cascadeselect-item-content {
+  font-family: var(--font-family-base);
+  font-size: 14px;
+  font-weight: var(--font-weight-light);
+}
+
+.p-cascadeselect-item-content.p-highlight {
+  font-weight: var(--font-weight-bold);
+}
+
+.p-select-panel .p-select-items .p-select-item {
+  background-color: var(--light-text-color);
+  font-family: var(--font-family-base);
+  font-size: 14px;
+  font-weight: var(--font-weight-light);
+  text-transform: none;
+
+  &:hover {
+    background-color: var(--hover-select-color);
+  }
+}
+
+.p-cascadeselect-panel {
+  border-radius: 0;
+}
+
+.p-select-panel .p-select-items.p-highlight {
+  font-family: var(--font-family-base);
+  font-weight: var(--font-weight-light);
+}
+
+.p-select-panel .p-select-items .p-select-item.p-highlight {
+  background: var(--active-select-color);
+  color: var(--dark-text-color);
+}
+
+.p-cascadeselect-panel .p-cascadeselect-item.p-highlight {
+  background: var(--active-select-color);
+  color: var(--dark-text-color);
+}
+
+.custom-calendar {
+  width: 234px;
+
+  .p-datepicker-input {
+    width: 100%;
+  }
+}
+
+.af-filters-unions,
+.af-filters-unions .p-element {
+  min-width: fit-content;
+}
+
+.fme-datepicker.p-datepicker {
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgb(0 0 0 / 8%);
+  height: fit-content;
+  overflow: hidden;
+}
+
+.fme-datepicker .p-datepicker-header {
+  border-radius: 0;
+  padding: 8px 12px;
+}
+
+.fme-datepicker .p-datepicker-title {
+  font-family: var(--font-family-base);
+  font-size: 18px;
+  font-weight: var(--font-weight-medium);
+}
+
+.fme-datepicker .p-datepicker-prev,
+.fme-datepicker .p-datepicker-next {
+  color: var(--light-grey-text-color);
+  height: 28px;
+  width: 28px;
+}
+
+.fme-datepicker .p-datepicker-group .p-datepicker-weekday {
+  color: var(--grey-text-color);
+  font-size: 12px;
+  padding: 6px 0;
+}
+
+.fme-datepicker table td > span {
+  align-items: center;
+  border-radius: 50%;
+  display: inline-flex;
+  height: 2.25rem;
+  justify-content: center;
+  line-height: 2.25rem;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+  width: 2.25rem;
+}
+
+.fme-datepicker table td > span:hover {
+  background-color: var(--active-select-color);
+}
+
+.fme-datepicker table td.p-datepicker-today > span {
+  background-color: var(--primary-text-color);
+  border-radius: 50%;
+  color: var(--light-text-color);
+  font-weight: var(--font-weight-medium);
+  outline-offset: -2px;
+}
+
+.fme-datepicker table td.p-highlight > span {
+  background: var(--active-select-color);
+  color: var(--dark-text-color);
+}
+
+.fme-datepicker table td.p-datepicker-other-month > span {
+  color: var(--light-grey-text-color);
+}
+
+.fme-datepicker .p-timepicker span.p-inputtext {
+  text-align: center;
+  width: 3rem;
+}
+
+.p-datepicker .p-datepicker-header .p-datepicker-title .p-datepicker-month {
+  margin-right: 0.5rem;
+}
+
+.p-breadcrumb {
+  background: none !important;
+  border: none;
+  overflow: hidden;
+  padding-left: 0 !important;
+}
+
+.custom-drawer.p-drawer-left {
+  height: 100%;
+  width: 550px;
+}
+
+.p-drawer-header {
+  display: flex;
+  flex-direction: row-reverse;
+}
+
+.custom-checkbox.p-checkbox.p-checkbox-checked .p-checkbox-box {
+  background-color: var(--primary-text-color) !important;
+  border-color: var(--primary-text-color) !important;
+}
+
+.p-hidden-accessible {
+  box-shadow: none !important;
+}
+
+.p-skeleton {
+  background: var(--bg-gradient-base) !important;
+  opacity: 0.5 !important;
+}
+
+.p-togglebutton {
+  background-color: var(--super-light-grey-text-color) !important;
+  font-family: var(--font-family-base) !important;
+  font-weight: var(--font-weight-regular) !important;
+}
+
+.p-dialog-title {
+  color: var(--dark-text-color);
+  font-weight: var(--font-weight-medium) !important;
+}
+
+.p-dialog-footer {
+  flex-direction: row-reverse !important;
+  gap: 15px !important;
+}
+
+.p-toast-detail {
+  white-space: pre-line;
+}
+
+.user-folders-dialog .p-dialog-header {
+  padding: 12px !important;
+}
+
+.p-textarea {
+  border-radius: 0 !important;
+  resize: none;
+}
+
+.p-textarea:enabled:focus {
+  border-color: var(--primary-text-color) !important;
+}
+
+.p-speeddial-list {
+  .p-button-rounded {
+    background: var(--super-light-grey-text-color) !important;
+    height: 25px !important;
+    margin-bottom: 10px;
+    width: 25px !important;
+  }
+}
+
+.p-speeddial .p-speeddial-button.p-button-rounded {
+  background: var(--primary-text-color) !important;
+  border: none !important;
+  height: 25px !important;
+  margin-bottom: 10px;
+  width: 25px !important;
+
+  .p-icon {
+    height: 13px;
+    width: 13px;
+  }
+
+  &:hover {
+    background: var(--light-grey-text-color);
+  }
+}
+
+.p-organizationchart-node {
+  padding: 0 !important;
+}
+
+.p-button-text {
+  color: var(--primary-text-color) !important;
+
+  &:hover {
+    background-color: var(--hover-select-color) !important;
+  }
+}
+.p-inputtext,
+.p-inputtextarea {
+  font-weight: var(--font-weight-medium);
+  font-size: var(--font-size-detail) !important;
+  color: var(--primary-text-color) !important;
+  border-color: #cbd5e1 !important;
+}
+
+.p-inputtext:disabled,
+.p-inputtextarea:disabled {
+  opacity: 0.8 !important;
+  background: none !important;
+  color: var(--primary-text-color) !important;
+  border: 1px solid transparent !important;
+}
+
+.p-floatlabel label {
+  font-weight: var(--font-weight-light) !important;
+  font-size: var(--font-size-prewiew) !important;
+  color: var(--primary-text-color) !important;
+  background: var(--light-text-color) !important;
+}
+
+.p-chip-remove-icon {
+  color: var(--dark-text-color) !important;
+}
+
+.p-skeleton {
+  background: #d6d6d6 !important;
+}
+
+.p-skeleton::after {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.25),
+    transparent
+  ) !important;
+}

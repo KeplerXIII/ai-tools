@@ -72,6 +72,19 @@ docker compose exec ai-tools uv run python -m app.cli.promote_admin admin
 
 С хоста, если в `.env` для Docker указан `ai-tools-postgres`, а CLI нужно гонять локально — см. **`DATABASE_URL_FOR_CLI`** в [`.env.example`](.env.example) (URL на `127.0.0.1:5432` с тем же пользователем, БД и паролем).
 
+## Frontend `ai-tools-ui`
+
+UI перенесен в подпапку [`ai-tools-ui`](ai-tools-ui).
+
+- Полный стек backend + UI поднимается одной командой из корня:
+
+```bash
+docker compose up -d --build
+```
+
+- UI доступен на `http://127.0.0.1:8088` и проксирует `/api` на сервис `ai-tools`.
+- Для локальной сборки UI вне Docker требуется Node.js не ниже `20.19` (или `22.12+`).
+
 ---
 
 ## 1. Сеть Docker (если нужна)

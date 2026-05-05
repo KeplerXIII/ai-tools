@@ -1,0 +1,37 @@
+<form class="url-row" (ngSubmit)="onSubmit()">
+  <div class="input-wrapper">
+    <p-floatlabel variant="on" class="url-field">
+      <input
+        pInputText
+        id="article_url"
+        name="url"
+        [(ngModel)]="url"
+        autocomplete="off"
+        placeholder="https://example.com/article"
+        (blur)="touched = true"
+      />
+      <label for="article_url">Ссылка на статью</label>
+    </p-floatlabel>
+    @if (showUrlError()) {
+      <div class="url-error">Введите корректную ссылку (например: https://example.com)</div>
+    }
+  </div>
+
+  <div class="parser_btn-wrapper">
+    <app-primary-button
+      type="submit"
+      text="Получить статью"
+      [disabled]="loading || !isValidUrl(url)"
+      size="extra-large"
+      variant="rounded"
+    />
+
+    <app-outline-button
+      text="Очистить"
+      size="large"
+      [variant]="ButtonVariant.Rounded"
+      [disabled]="loading || !url.trim()"
+      (clicked)="onClear()"
+    />
+  </div>
+</form>

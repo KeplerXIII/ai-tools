@@ -1,0 +1,13 @@
+<button
+  class="outline-button"
+  [ngClass]="[variantClass, sizeClass, themeClass]"
+  [disabled]="disabled"
+  type="button"
+  (click)="onClick($event)"
+>
+  <span class="button-text">{{ text }}</span>
+
+  @if (iconName) {
+    <i class="button-icon" [class]="iconName"></i>
+  }
+</button>

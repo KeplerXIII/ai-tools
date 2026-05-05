@@ -1,0 +1,13 @@
+services:
+  ai-tools-ui:
+    build: .
+    container_name: ai-tools-ui
+    ports:
+      - "8088:80"
+    networks:
+      - ai_stack
+    restart: unless-stopped
+
+networks:
+  ai_stack:
+    external: true

@@ -1,0 +1,15 @@
+<button
+  [type]="type"
+  class="primary-btn"
+  [ngClass]="['size-' + size, variant]"
+  [disabled]="disabled"
+  (click)="onClick($event)"
+  [class.is-rotating]="isRotate"
+>
+  @if (icon) {
+    <div class="primary-btn-icon-wrapper">
+      <app-svg-icon [name]="icon" />
+    </div>
+  }
+  <span class="primary-btn-text" [ngClass]="['primary-btn-font-' + font]">{{ text }}</span>
+</button>

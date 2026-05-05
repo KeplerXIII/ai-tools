@@ -1,0 +1,128 @@
+.sidebar {
+  width: 110px;
+  min-height: 100%;
+  background: var(--super-light-grey-text-color);
+  border-right: 1px solid #e2e8f0;
+  overflow: hidden;
+
+  transition: width 0.3s ease;
+}
+
+.sidebar_expanded {
+  width: 300px;
+}
+
+.sidebar__menu-btn {
+  width: 50px;
+  height: 50px;
+  border: none;
+  background: transparent;
+  color: var(--light-text-color);
+  font-size: 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  flex-grow: 0;
+  border-radius: 50%;
+  transition:
+    background 0.3s ease,
+    transform 0.2s ease;
+}
+
+.sidebar__menu-btn i {
+  font-size: 28px;
+}
+
+.sidebar__menu-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.sidebar__toolbar {
+  min-height: 72px;
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  padding: 0 28px;
+  height: 100px;
+  background: var(--primary-text-color-rgb);
+  color: var(--light-text-color);
+  font-weight: 600;
+}
+
+.sidebar__nav {
+  display: flex;
+  flex-direction: column;
+  align-items: start;
+}
+
+.sidebar__link {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  min-height: 48px;
+  color: #1e293b;
+  text-decoration: none;
+  font-weight: 400;
+  width: 300px;
+  height: 80px;
+  padding-left: 35px;
+  fill: #2d4051;
+  transition: background 0.3s ease;
+}
+
+.sidebar__link:hover {
+  background: var(--light-grey-text-color);
+}
+
+.sidebar__link_active {
+  background: var(--bg-light-grey);
+}
+
+.siderbar_icon_btn {
+  height: 40px;
+  width: auto;
+}
+
+.divider {
+  width: 100%;
+  border-bottom: 1px solid var(--light-grey-text-color);
+}
+
+.sidebar__link-text {
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-light);
+  opacity: 0;
+  transform: translateX(-10px);
+  white-space: nowrap;
+  transition:
+    opacity 0.3s ease,
+    transform 0.3s ease;
+}
+
+.sidebar_expanded .sidebar__link-text {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.sidebar__menu-text {
+  color: var(--light-text-color);
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  opacity: 0;
+  transform: translateX(-10px);
+  white-space: nowrap;
+
+  transition:
+    opacity 0.3s ease,
+    transform 0.3s ease;
+}
+
+.sidebar_expanded .sidebar__menu-text {
+  opacity: 1;
+  transform: translateX(0);
+}

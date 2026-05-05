@@ -1,0 +1,96 @@
+<div class="tool-card">
+  <div class="translater_header">
+    <h1 class="translater_title">Переводчик</h1>
+    <p class="translater_subtitle">Автоопределение входного языка, перевод на русский язык</p>
+  </div>
+
+  <div class="translate-grid">
+    <section class="panel">
+      <div class="panel-title">
+        <p-chip label="AUTO" class="chip-item" />
+      </div>
+
+      <p-floatlabel variant="on" class="prime-field full-width textarea-field">
+        <textarea
+          pTextarea
+          id="source_text"
+          name="source_text"
+          class="full-width custom-textarea-scroll"
+          rows="14"
+          [(ngModel)]="text"
+          placeholder="Вставьте текст для перевода"
+          style="resize: none"
+        ></textarea>
+
+        <label for="source_text">Исходный текст</label>
+      </p-floatlabel>
+    </section>
+
+    <section class="panel">
+      <div class="panel-title">
+        <i
+          class="copy-icon pi pi-clone"
+          [class.success]="copied"
+          [class.disabled]="!result"
+          (click)="copyResult()"
+        ></i>
+        <p-chip [label]="targetLang || 'RU' | uppercase" class="chip-item" />
+      </div>
+
+      <p-floatlabel variant="on" class="prime-field full-width textarea-field">
+        <textarea
+          pTextarea
+          id="result_text"
+          name="result_text"
+          class="full-width custom-textarea-scroll"
+          rows="14"
+          [ngModel]="result"
+          readonly
+          placeholder="Здесь появится перевод"
+          style="resize: none"
+        ></textarea>
+
+        <label for="result_text">Результат</label>
+      </p-floatlabel>
+    </section>
+  </div>
+
+  <div class="meta-row">
+    <span
+      ><span class="detected-language">Определённый язык: </span>
+      <span class="language-name">{{ sourceLang || '—' }}</span></span
+    >
+    <span
+      ><span class="target-language"
+        >Целевой язык: <span class="language-name">{{ targetLang || 'ru' | uppercase }}</span></span
+      ></span
+    >
+  </div>
+
+  <div class="actions">
+    <app-primary-button
+      text="Перевести"
+      size="large"
+      [disabled]="loading || !text.trim()"
+      (clicked)="translate()"
+    />
+
+    <app-outline-button
+      text="Очистить"
+      size="large"
+      [variant]="ButtonVariant.Rounded"
+      [disabled]="loading"
+      (clicked)="clear()"
+    />
+
+    @if (loading) {
+      <mat-spinner diameter="28"></mat-spinner>
+    }
+  </div>
+
+  @if (error) {
+    <div class="error">
+      {{ error }}
+    </div>
+  }
+</div>

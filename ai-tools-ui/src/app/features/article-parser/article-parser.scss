@@ -1,0 +1,548 @@
+:host ::ng-deep .translated-chip {
+  background-color: rgb(180, 235, 181);
+  color: var(--dark-text-color);
+}
+
+:host ::ng-deep .original-chip {
+  background-color: rgb(180, 220, 235);
+  color: var(--dark-text-color);
+}
+
+:host ::ng-deep .chip-item {
+  background-color: var(--default-chips-color);
+  color: var(--dark-text-color);
+}
+
+:host ::ng-deep .textarea-field label,
+:host ::ng-deep .textarea-field:has(textarea:focus) label,
+:host ::ng-deep .textarea-field:has(textarea:not(:placeholder-shown)) label,
+:host ::ng-deep .textarea-field textarea:focus ~ label {
+  left: 8px !important;
+  inset-inline-start: 8px !important;
+  top: 0 !important;
+
+  transform: translateY(-50%) !important;
+  transform-origin: left center !important;
+  transition: none !important;
+
+  background: #ffffff;
+  padding: 0 4px;
+
+  font-size: 15px !important;
+}
+
+:host ::ng-deep .textarea-field textarea {
+  width: 100% !important;
+  box-sizing: border-box !important;
+
+  font-family: var(--font-family-base) !important;
+  font-weight: var(--font-weight-medium) !important;
+  font-size: var(--font-size-detail) !important;
+  line-height: 1.5 !important;
+
+  padding: 17px !important;
+  background: none !important;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 0 !important;
+  color: var(--primary-text-color) !important;
+}
+
+:host ::ng-deep .textarea-field textarea:focus {
+  outline: none !important;
+  box-shadow: none !important;
+  border: 1px solid #cbd5e1 !important;
+}
+
+:host ::ng-deep .textarea-field textarea:disabled {
+  opacity: 0.8 !important;
+  background: none !important;
+  color: var(--primary-text-color) !important;
+  border: 1px solid transparent !important;
+}
+
+:host ::ng-deep #article_text,
+#translated_text,
+#annotation {
+  font-family: var(--font-family-base) !important;
+  font-weight: var(--font-weight-light) !important;
+  font-size: var(--font-size-detail) !important;
+}
+
+#article_text,
+#translated_text,
+#annotation {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 #f1f5f9;
+}
+
+#article_text::-webkit-scrollbar,
+#translated_text::-webkit-scrollbar,
+#annotation::-webkit-scrollbar {
+  width: 6px;
+}
+
+#article_text::-webkit-scrollbar-track,
+#translated_text::-webkit-scrollbar-track,
+#annotation::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 10px;
+}
+
+#article_text::-webkit-scrollbar-thumb,
+#translated_text::-webkit-scrollbar-thumb,
+#annotation::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 10px;
+}
+
+#article_text::-webkit-scrollbar-button,
+#translated_text::-webkit-scrollbar-button,
+#annotation::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+  background: transparent;
+}
+
+#article_text::-webkit-scrollbar-button:single-button,
+#translated_text::-webkit-scrollbar-button:single-button,
+#annotation::-webkit-scrollbar-button:single-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.prime-field {
+  display: block;
+  width: 100%;
+}
+
+:host ::ng-deep .prime-field textarea.p-inputtextarea {
+  width: 100%;
+  display: block;
+}
+
+.tool-card {
+  max-width: 1400px;
+  font-family: var(--font-family-base);
+}
+.url-form-wrapper {
+  display: flex;
+}
+
+.btn-wrapper {
+  display: flex;
+  gap: 10px;
+  padding-top: 20px;
+}
+
+.parser_header {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.parser_title {
+  margin: 0;
+  color: var(--primary-text-color);
+}
+
+.parser_subtitle {
+  font-weight: var(--font-weight-light);
+  color: var(--grey-text-color);
+}
+
+.article-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  margin-top: 24px;
+  align-items: start;
+  width: 100%;
+}
+
+.title-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.panel {
+  background: var(--table-row-color);
+  width: 100%;
+  border: 1px solid var(--super-light-grey-text-color);
+  border-radius: 10px;
+  padding: 16px;
+  align-self: start;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.02),
+    0 4px 8px rgba(0, 0, 0, 0.02);
+}
+
+.meta-panel {
+  display: flex;
+  gap: 20px;
+}
+
+.prew-image-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.image-prew-title {
+  color: var(--primary-text-color);
+  font-weight: var(--font-weight-medium);
+}
+
+.full {
+  margin-top: 24px;
+}
+
+.panel-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--font-size-xxl);
+  font-weight: 600;
+  color: var(--primary-text-color);
+  margin-bottom: 10px;
+}
+
+.meta-list {
+  display: grid;
+  gap: 8px;
+  color: #334155;
+  font-size: 14px;
+  margin-bottom: 20px;
+}
+
+.field-error {
+  min-height: 18px;
+  margin-top: 8px;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--error-text-color);
+}
+
+.entity-block {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 12px;
+  width: 100%;
+
+  textarea {
+    min-height: 70px;
+    resize: vertical;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    padding: 10px;
+    font-family: inherit;
+    background: #f8fafc;
+  }
+}
+
+.full-width {
+  width: 100%;
+}
+
+.error {
+  margin-top: 12px;
+  color: #c62828;
+}
+
+.meta-tags {
+  margin-top: 12px;
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.tag {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid transparent;
+}
+
+.tags.original .tag {
+  border: 1px solid var(--light-grey-text-color);
+  padding: 10px;
+  border-radius: 0px;
+  background: #f1f5f9;
+  color: #334155;
+  border-color: #e2e8f0;
+  font-size: var(--font-size-table);
+}
+
+.tags.translated .tag {
+  border: 1px solid var(--light-grey-text-color);
+  padding: 10px;
+  border-radius: 0px;
+  background: #dcfce7;
+  color: var(--accent-color-success);
+  border-color: #bbf7d0;
+  font-size: var(--font-size-table);
+}
+
+@media (max-width: 1000px) {
+  .article-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+:host ::ng-deep .main-image-preview {
+  display: inline-block;
+}
+
+:host ::ng-deep .main-image-preview .p-image {
+  display: inline-block;
+}
+
+:host ::ng-deep .p-image-preview-indicator {
+  inset: 0;
+}
+
+:host ::ng-deep .main-image-preview img {
+  max-height: 260px;
+  border-radius: 12px;
+}
+
+:host ::ng-deep .p-image {
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+}
+
+:host ::ng-deep .p-image-preview-indicator {
+  background: rgba(0, 0, 0, 0);
+  opacity: 0;
+  transition: all 0.25s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+:host ::ng-deep .p-image:hover .p-image-preview-indicator {
+  background: rgba(0, 0, 0, 0.4);
+  opacity: 1;
+}
+
+:host ::ng-deep .p-image-preview-indicator i {
+  transform: scale(0.8);
+  opacity: 0;
+  transition: all 0.25s ease;
+}
+
+:host ::ng-deep .p-image:hover .p-image-preview-indicator i {
+  transform: scale(1);
+  opacity: 1;
+}
+
+.main-image {
+  display: block;
+  max-height: 280px;
+  width: auto;
+  max-width: 100%;
+  object-fit: cover;
+  border-radius: 12px;
+  margin-top: 8px;
+}
+
+.main-image.clickable {
+  cursor: zoom-in;
+  transition: transform 0.2s ease;
+}
+
+.main-image.clickable:hover {
+  transform: scale(1.02);
+}
+
+/* overlay */
+
+.image-overlay {
+  position: fixed;
+  top: 0;
+  left: 72px; /* отступ под сайдбар */
+  width: calc(100vw - 72px);
+  height: 100vh;
+
+  background: rgba(0, 0, 0, 0.88);
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  z-index: 9999;
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+.image-full {
+  max-width: calc(100vw - 640px);
+  max-height: 90vh;
+  object-fit: contain;
+  border-radius: 12px;
+}
+
+.main-image.clickable {
+  cursor: zoom-in;
+}
+
+.meta-block-one {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+.meta-wrapper {
+  width: 100%;
+}
+
+.meta-block-one-title {
+  display: inline-block;
+  color: var(--light-grey-text-color);
+}
+
+.meta-block-one-text {
+  color: var(--light-grey-text-color);
+}
+
+.chips-wrapper {
+  display: flex;
+  gap: 10px;
+}
+
+.chips-item {
+  border: 1px solid var(--light-grey-text-color);
+  padding: 7px;
+  border-radius: 20px;
+}
+
+.prew-image-title {
+  font-size: var(--font-size-prewiew);
+  font-weight: var(--font-weight-medium);
+}
+
+.prime-field {
+  display: block;
+  width: 100%;
+  --p-floatlabel-focus-color: var(--primary-text-color-light);
+}
+
+.prime-field input {
+  width: 100%;
+}
+
+.title-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.translate-teg-btn {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.teg-btn-wrapper,
+.translate-btn-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  min-height: 56px;
+}
+
+.entities-sceleton-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sceleton-translate-text {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.loading-original-tag-wrapper-btn {
+  margin-top: 10px;
+  display: flex;
+  gap: 10px;
+}
+
+.empty-entities-message {
+  margin-top: 10px;
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-medium);
+  color: var(--light-grey-text-color);
+  text-transform: uppercase;
+}
+
+.highlighted-article-text {
+  min-height: 220px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 17px;
+  font-family: var(--font-family-base);
+  font-weight: var(--font-weight-light);
+  font-size: var(--font-size-detail);
+  line-height: 1.5;
+  color: var(--primary-text-color);
+  white-space: pre-wrap;
+}
+
+:host ::ng-deep .highlighted-entity {
+  font-weight: var(--font-weight-medium);
+  color: var(--primary-text-color-light);
+  background: var(--active-select-color);
+  padding: 2px 3px;
+  border-radius: 2px;
+}
+
+.custom-textarea-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 #f1f5f9;
+}
+
+.custom-textarea-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+  -webkit-appearance: none;
+}
+
+.custom-textarea-scroll::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 10px;
+}
+
+.custom-textarea-scroll::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 10px;
+}
+
+.custom-textarea-scroll::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+.custom-textarea-scroll::-webkit-scrollbar-button,
+.custom-textarea-scroll::-webkit-scrollbar-button:single-button {
+  display: none;
+  width: 0;
+  height: 0;
+  background: transparent;
+}
+
+.image-preview-icon {
+  font-size: 2rem;
+  color: var(---light-grey-text-color);
+}

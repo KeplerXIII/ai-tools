@@ -216,3 +216,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Frontend artefacts
+ai-tools-ui/node_modules/
+ai-tools-ui/.angular/
+ai-tools-ui/dist/
+ai-tools-ui/coverage/

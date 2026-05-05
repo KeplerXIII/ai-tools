@@ -1,0 +1,65 @@
+.url-row {
+  display: flex;
+  align-items: start;
+  gap: 10px;
+  width: 100%;
+}
+.input-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.url-field {
+  width: 800px;
+  display: block;
+  --p-floatlabel-focus-color: var(--primary-text-color-light);
+}
+
+.url-field input {
+  width: 100%;
+}
+
+.parser_btn-wrapper {
+  display: flex;
+  gap: 10px;
+}
+
+.url-error {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--error-text-color);
+}
+
+@media (max-width: 1000px) {
+  .url-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+.btn-sceletin-wrapper {
+  margin-top: 20px;
+  display: flex;
+  gap: 10px;
+  width: 41%;
+}
+
+.meta-btn-sceletin-wrapper {
+  margin-top: 20px;
+  display: flex;
+  gap: 10px;
+  width: 50%;
+}
+
+.sceleton-meta-block {
+  width: 100%;
+  margin-top: 20px;
+}
+
+.sceleton-title-wrapper {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}

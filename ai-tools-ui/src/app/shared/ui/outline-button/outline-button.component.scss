@@ -1,0 +1,149 @@
+.outline-button {
+  align-items: center;
+  background-color: transparent;
+  border: 1px solid var(--primary-text-color);
+  border-radius: 50px;
+  color: var(--primary-text-color);
+  cursor: pointer;
+  display: flex;
+  font-weight: var(--font-weight-regular);
+  height: 40px;
+  justify-content: center;
+  line-height: 1;
+  overflow: hidden;
+  padding: 0.75rem 1.2rem;
+  position: relative;
+  transition: background-color 0.5s ease;
+  z-index: 2;
+
+  &.size-small {
+    font-size: 12px;
+    height: 32px;
+    min-width: 80px;
+    padding: 0.4rem 0.8rem;
+  }
+
+  &.size-medium {
+    font-size: 14px;
+    height: 44px;
+    min-width: 120px;
+    padding: 0.75rem 1.2rem;
+  }
+
+  &.size-large {
+    font-size: 16px;
+    min-width: 140px;
+    padding: 0.9rem 1.6rem;
+  }
+
+  &.size-large-plus {
+    font-size: 18px;
+    height: 60px;
+    min-width: 200px;
+    padding: 1.1rem 2rem;
+  }
+
+  &.size-extra-large {
+    font-size: 20px;
+    height: 68px;
+    min-width: 240px;
+    padding: 1.3rem 2.4rem;
+  }
+
+  .button-text {
+    font-weight: var(--font-weight-medium);
+    margin-right: 0.5rem;
+    position: relative;
+    z-index: 2;
+  }
+
+  .button-icon {
+    height: 16px;
+    position: relative;
+    width: 10px;
+    z-index: 2;
+  }
+
+  &.theme-light {
+    border: 1px solid #fff;
+    color: #fff;
+
+    .button-text {
+      color: #fff;
+    }
+
+    .button-icon {
+      color: #fff;
+      fill: #fff;
+    }
+
+    &::before {
+      display: none;
+    }
+
+    &:hover {
+      background-color: rgb(255 255 255 / 10%);
+    }
+  }
+
+  &::before {
+    background: linear-gradient(
+      120deg,
+      rgb(200 200 200 / 10%) 0%,
+      rgb(255 255 255 / 30%) 50%,
+      rgb(200 200 200 / 10%) 100%
+    );
+    content: '';
+    height: 100%;
+    left: -100%;
+    position: absolute;
+    top: 0;
+    transition: all 0.5s ease;
+    width: 200%;
+    z-index: 1;
+  }
+
+  &:hover {
+    background-color: #f5f5f5;
+
+    &::before {
+      left: 100%;
+    }
+  }
+
+  &:active {
+    transform: scale(0.97);
+    transition: transform 0.1s ease;
+  }
+
+  &:focus-visible {
+    outline: 1px solid var(--light-grey-text-color);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+
+  &.rounded {
+    border-radius: 50px;
+  }
+
+  &.sharp {
+    border-radius: 8px;
+  }
+
+  &.square {
+    border-radius: 0;
+  }
+}
+
+:host(.is-disabled) .outline-button {
+  cursor: not-allowed;
+  filter: grayscale(40%);
+  opacity: 0.5;
+}
+
+:host(.is-disabled) .outline-button:active {
+  transform: none;
+}
