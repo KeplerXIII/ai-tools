@@ -19,6 +19,8 @@ from app.infrastructure.db.models import (
     DocumentChunk,
     DocumentEmbedding,
     DocumentEntity,
+    DocumentStatus,
+    DocumentStatusAssignment,
     DocumentTag,
     DocumentType,
     EmbeddingModel,
@@ -137,6 +139,12 @@ class DocumentTypeAdmin(ModelView, model=DocumentType):
     column_list = [DocumentType.id, DocumentType.code, DocumentType.name, DocumentType.description]
 
 
+class DocumentStatusAdmin(ModelView, model=DocumentStatus):
+    name = "Статус документа"
+    name_plural = "Статусы документов"
+    column_list = [DocumentStatus.id, DocumentStatus.code, DocumentStatus.name_ru, DocumentStatus.description]
+
+
 class EnvironmentAdmin(ModelView, model=Environment):
     name = "Окружение"
     name_plural = "Окружения"
@@ -233,6 +241,19 @@ class DocumentEntityAdmin(ModelView, model=DocumentEntity):
         DocumentEntity.document_id,
         DocumentEntity.entity_id,
         DocumentEntity.prediction_source_id,
+    ]
+
+
+class DocumentStatusAssignmentAdmin(ModelView, model=DocumentStatusAssignment):
+    category = _ADMIN_CATEGORY_JUNCTION
+    category_icon = _ADMIN_CATEGORY_JUNCTION_ICON
+    name = "Документ ↔ статус"
+    name_plural = "Связи документ — статус"
+    column_list = [
+        DocumentStatusAssignment.document_id,
+        DocumentStatusAssignment.status_id,
+        DocumentStatusAssignment.assigned_at,
+        DocumentStatusAssignment.assigned_by_id,
     ]
 
 

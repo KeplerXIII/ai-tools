@@ -132,6 +132,28 @@ class DocumentEntity(Base):
     source_fragment: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
+class DocumentStatusAssignment(Base):
+    __tablename__ = "document_status_assignments"
+
+    document_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("documents.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    status_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("document_statuses.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    assigned_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    assigned_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
+
 class DocumentChunk(Base):
     __tablename__ = "document_chunks"
 

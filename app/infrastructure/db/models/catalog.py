@@ -76,6 +76,19 @@ class DocumentType(Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
+class DocumentStatus(Base):
+    __tablename__ = "document_statuses"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    code: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    name_ru: Mapped[str] = mapped_column(String(128), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
 class Environment(Base):
     __tablename__ = "environments"
 

@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.seeds.categories import apply_categories_seed
 from app.seeds.countries import apply_countries_seed
 from app.seeds.document_types import apply_document_types_seed
+from app.seeds.document_statuses import apply_document_statuses_seed
 from app.seeds.embedding_models import apply_embedding_models_seed
 from app.seeds.entity_types import apply_entity_types_seed
 from app.seeds.environments import apply_environments_seed
@@ -36,5 +37,6 @@ async def seed_reference_catalog(session: AsyncSession) -> dict[str, int]:
     out["funds"] = await apply_funds_seed(session)
     out["categories"] = await apply_categories_seed(session)
     out["document_types"] = await apply_document_types_seed(session)
+    out["document_statuses"] = await apply_document_statuses_seed(session)
     await apply_user_admin_roles(session)
     return out

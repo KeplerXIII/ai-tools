@@ -1,6 +1,7 @@
 from app.infrastructure.db.models.catalog import (
     Category,
     Country,
+    DocumentStatus,
     DocumentType,
     EmbeddingModel,
     Entity,
@@ -18,6 +19,7 @@ from app.infrastructure.db.models.document import (
     DocumentChunk,
     DocumentEmbedding,
     DocumentEntity,
+    DocumentStatusAssignment,
     DocumentTag,
     ProcessingJob,
 )
@@ -32,6 +34,8 @@ __all__ = [
     "DocumentChunk",
     "DocumentEmbedding",
     "DocumentEntity",
+    "DocumentStatus",
+    "DocumentStatusAssignment",
     "DocumentTag",
     "DocumentType",
     "EmbeddingModel",
