@@ -436,20 +436,6 @@
         <h3 class="panel-title">Исходный текст</h3>
 
         <div class="translate-teg-btn">
-          <div class="translate-btn-wrapper">
-            <app-outline-button
-              text="Перевести на русский"
-              size="large"
-              [variant]="ButtonVariant.Rounded"
-              [disabled]="isDisabled"
-              (clicked)="translateArticle()"
-            />
-
-            @if (translationError) {
-              <div class="field-error">{{ translationError }}</div>
-            }
-          </div>
-
           <div class="teg-btn-wrapper">
             <app-outline-button
               text="Тегировать оригинал"
@@ -461,6 +447,20 @@
 
             @if (originalTagsError) {
               <div class="field-error">{{ originalTagsError }}</div>
+            }
+          </div>
+
+          <div class="translate-btn-wrapper">
+            <app-outline-button
+              text="Перевести на русский"
+              size="large"
+              [variant]="ButtonVariant.Rounded"
+              [disabled]="isDisabled"
+              (clicked)="translateArticle()"
+            />
+
+            @if (translationError) {
+              <div class="field-error">{{ translationError }}</div>
             }
           </div>
         </div>
