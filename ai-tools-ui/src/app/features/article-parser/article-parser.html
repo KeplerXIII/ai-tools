@@ -360,33 +360,60 @@
               <h4 class="entity-row-title">Упоминания образцов ВВТ:</h4>
 
               <div class="tags entity-tags-military">
-                @for (item of state.entities!.military_equipment; track $index) {
+                @if (isEditingEntitiesBlock) {
+                  <div class="entity-add-wrapper">
+                    <button
+                      type="button"
+                      class="entity-add-chip"
+                      [disabled]="loadingDocumentEntitiesMutation"
+                      (click)="toggleEntityPicker('military_equipment')"
+                    >
+                      +
+                    </button>
+
+                    @if (entityPickerOpen === 'military_equipment') {
+                      <div class="entity-picker-popover">
+                        <input
+                          type="search"
+                          class="entity-picker-search"
+                          name="entity-picker-search-military"
+                          [(ngModel)]="entityPickerSearch"
+                          placeholder="Поиск..."
+                          autocomplete="off"
+                        />
+                        @if (loadingEntityPickerCatalog) {
+                          <div class="entity-picker-loading">Загрузка…</div>
+                        } @else {
+                          <div class="entity-picker-list">
+                            @for (item of filteredEntityPickerItems; track item.id) {
+                              <button
+                                type="button"
+                                class="entity-picker-item"
+                                [disabled]="loadingDocumentEntitiesMutation"
+                                (click)="onEntityPickerSelect(item)"
+                              >
+                                {{ item.name }}
+                              </button>
+                            }
+                          </div>
+                          @if (!filteredEntityPickerItems.length) {
+                            <div class="entity-picker-empty">Нет вариантов</div>
+                          }
+                        }
+                      </div>
+                    }
+                  </div>
+                }
+
+                @for (item of state.entities!.military_equipment; track item.id) {
                   <p-chip
-                    [label]="item"
+                    [label]="item.name"
                     class="entity-chip-military chip-compact"
-                    [removable]="isEditingEntitiesBlock"
-                    (onRemove)="removeEntityItem('military_equipment', item)"
+                    [removable]="isEditingEntitiesBlock && !loadingDocumentEntitiesMutation"
+                    (onRemove)="removeEntityItem(item)"
                   />
                 }
               </div>
-
-              @if (isEditingEntitiesBlock) {
-                <div class="entity-block entity-block--edit">
-                  <p-floatlabel variant="on" class="prime-field full-width textarea-field">
-                    <textarea
-                      pTextarea
-                      id="military_equipment"
-                      name="military_equipment"
-                      [ngModel]="state.entities?.military_equipment?.join('\n') || ''"
-                      (ngModelChange)="updateEntityList('military_equipment', $event)"
-                      rows="3"
-                      class="full-width"
-                      style="resize: none"
-                    ></textarea>
-                    <label for="military_equipment">Редактировать списком</label>
-                  </p-floatlabel>
-                </div>
-              }
             </div>
           }
 
@@ -395,33 +422,60 @@
               <h4 class="entity-row-title">Производители:</h4>
 
               <div class="tags entity-tags-manufacturer">
-                @for (item of state.entities!.manufacturers; track $index) {
+                @if (isEditingEntitiesBlock) {
+                  <div class="entity-add-wrapper">
+                    <button
+                      type="button"
+                      class="entity-add-chip"
+                      [disabled]="loadingDocumentEntitiesMutation"
+                      (click)="toggleEntityPicker('manufacturers')"
+                    >
+                      +
+                    </button>
+
+                    @if (entityPickerOpen === 'manufacturers') {
+                      <div class="entity-picker-popover">
+                        <input
+                          type="search"
+                          class="entity-picker-search"
+                          name="entity-picker-search-manufacturers"
+                          [(ngModel)]="entityPickerSearch"
+                          placeholder="Поиск..."
+                          autocomplete="off"
+                        />
+                        @if (loadingEntityPickerCatalog) {
+                          <div class="entity-picker-loading">Загрузка…</div>
+                        } @else {
+                          <div class="entity-picker-list">
+                            @for (item of filteredEntityPickerItems; track item.id) {
+                              <button
+                                type="button"
+                                class="entity-picker-item"
+                                [disabled]="loadingDocumentEntitiesMutation"
+                                (click)="onEntityPickerSelect(item)"
+                              >
+                                {{ item.name }}
+                              </button>
+                            }
+                          </div>
+                          @if (!filteredEntityPickerItems.length) {
+                            <div class="entity-picker-empty">Нет вариантов</div>
+                          }
+                        }
+                      </div>
+                    }
+                  </div>
+                }
+
+                @for (item of state.entities!.manufacturers; track item.id) {
                   <p-chip
-                    [label]="item"
+                    [label]="item.name"
                     class="entity-chip-manufacturer chip-compact"
-                    [removable]="isEditingEntitiesBlock"
-                    (onRemove)="removeEntityItem('manufacturers', item)"
+                    [removable]="isEditingEntitiesBlock && !loadingDocumentEntitiesMutation"
+                    (onRemove)="removeEntityItem(item)"
                   />
                 }
               </div>
-
-              @if (isEditingEntitiesBlock) {
-                <div class="entity-block entity-block--edit">
-                  <p-floatlabel variant="on" class="prime-field full-width textarea-field">
-                    <textarea
-                      pTextarea
-                      id="manufacturers"
-                      name="manufacturers"
-                      [ngModel]="state.entities?.manufacturers?.join('\n') || ''"
-                      (ngModelChange)="updateEntityList('manufacturers', $event)"
-                      rows="3"
-                      class="full-width"
-                      style="resize: none"
-                    ></textarea>
-                    <label for="manufacturers">Редактировать списком</label>
-                  </p-floatlabel>
-                </div>
-              }
             </div>
           }
 
@@ -430,33 +484,60 @@
               <h4 class="entity-row-title">Контракты:</h4>
 
               <div class="tags entity-tags-contract">
-                @for (item of state.entities!.contracts; track $index) {
+                @if (isEditingEntitiesBlock) {
+                  <div class="entity-add-wrapper">
+                    <button
+                      type="button"
+                      class="entity-add-chip"
+                      [disabled]="loadingDocumentEntitiesMutation"
+                      (click)="toggleEntityPicker('contracts')"
+                    >
+                      +
+                    </button>
+
+                    @if (entityPickerOpen === 'contracts') {
+                      <div class="entity-picker-popover">
+                        <input
+                          type="search"
+                          class="entity-picker-search"
+                          name="entity-picker-search-contracts"
+                          [(ngModel)]="entityPickerSearch"
+                          placeholder="Поиск..."
+                          autocomplete="off"
+                        />
+                        @if (loadingEntityPickerCatalog) {
+                          <div class="entity-picker-loading">Загрузка…</div>
+                        } @else {
+                          <div class="entity-picker-list">
+                            @for (item of filteredEntityPickerItems; track item.id) {
+                              <button
+                                type="button"
+                                class="entity-picker-item"
+                                [disabled]="loadingDocumentEntitiesMutation"
+                                (click)="onEntityPickerSelect(item)"
+                              >
+                                {{ item.name }}
+                              </button>
+                            }
+                          </div>
+                          @if (!filteredEntityPickerItems.length) {
+                            <div class="entity-picker-empty">Нет вариантов</div>
+                          }
+                        }
+                      </div>
+                    }
+                  </div>
+                }
+
+                @for (item of state.entities!.contracts; track item.id) {
                   <p-chip
-                    [label]="item"
+                    [label]="item.name"
                     class="entity-chip-contract chip-compact"
-                    [removable]="isEditingEntitiesBlock"
-                    (onRemove)="removeEntityItem('contracts', item)"
+                    [removable]="isEditingEntitiesBlock && !loadingDocumentEntitiesMutation"
+                    (onRemove)="removeEntityItem(item)"
                   />
                 }
               </div>
-
-              @if (isEditingEntitiesBlock) {
-                <div class="entity-block entity-block--edit">
-                  <p-floatlabel variant="on" class="prime-field full-width textarea-field">
-                    <textarea
-                      pTextarea
-                      id="contracts"
-                      name="contracts"
-                      [ngModel]="state.entities?.contracts?.join('\n') || ''"
-                      (ngModelChange)="updateEntityList('contracts', $event)"
-                      rows="3"
-                      class="full-width"
-                      style="resize: none"
-                    ></textarea>
-                    <label for="contracts">Редактировать списком</label>
-                  </p-floatlabel>
-                </div>
-              }
             </div>
           }
 

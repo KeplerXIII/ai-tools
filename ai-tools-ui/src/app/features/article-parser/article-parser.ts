@@ -11,7 +11,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { ChipModule } from 'primeng/chip';
 import { ImageModule } from 'primeng/image';
 import { TextareaModule } from 'primeng/textarea';
-import { ArticleParserApi } from './article-parser-api';
+import { ArticleParserApi, DocumentEntityRef, EntitiesResponse } from './article-parser-api';
 import { ArticleParserState } from './article-parser-state';
 import {
   ButtonVariant,
@@ -26,6 +26,8 @@ export type ArticleParserBlock =
   | 'original'
   | 'translation'
   | 'annotation';
+
+export type EntitySection = 'military_equipment' | 'manufacturers' | 'contracts';
 
 @Component({
   selector: 'app-article-parser',
@@ -73,6 +75,12 @@ export class ArticleParser {
   loadingDocumentStatuses = false;
   documentStatusError = '';
   isStatusPickerOpen = false;
+
+  entityPickerOpen: EntitySection | null = null;
+  entityPickerSearch = '';
+  entityPickerCatalogItems: DocumentEntityRef[] = [];
+  loadingEntityPickerCatalog = false;
+  loadingDocumentEntitiesMutation = false;
 
   isEditingStatusBlock = false;
   isEditingMetaBlock = false;
@@ -155,7 +163,7 @@ export class ArticleParser {
     this.entitiesError = '';
     this.state.entities = null;
 
-    this.api.extractEntities(this.state.article.document_id, this.state.article.text).subscribe({
+    this.api.extractEntities(this.state.article.document_id).subscribe({
       next: (response) => {
         this.state.entities = {
           military_equipment: response.military_equipment || [],
@@ -294,6 +302,7 @@ export class ArticleParser {
   toggleEditMode(): void {
     this.state.editMode = !this.state.editMode;
     this.isStatusPickerOpen = false;
+    this.closeEntityPicker();
 
     if (this.state.editMode) {
       this.syncTagsToText();
@@ -317,6 +326,9 @@ export class ArticleParser {
         break;
       case 'entities':
         this.isEditingEntitiesBlock = !this.isEditingEntitiesBlock;
+        if (!this.isEditingEntitiesBlock) {
+          this.closeEntityPicker();
+        }
         break;
       case 'original':
         if (!this.isEditingOriginalBlock) {
@@ -346,6 +358,100 @@ export class ArticleParser {
     this.isEditingTranslationBlock = false;
     this.isEditingAnnotationBlock = false;
     this.isStatusPickerOpen = false;
+    this.closeEntityPicker();
+  }
+
+  private closeEntityPicker(): void {
+    this.entityPickerOpen = null;
+    this.entityPickerSearch = '';
+    this.entityPickerCatalogItems = [];
+    this.loadingEntityPickerCatalog = false;
+  }
+
+  entityTypeCodeForSection(section: EntitySection): string {
+    if (section === 'manufacturers') {
+      return 'manufacturer';
+    }
+    if (section === 'contracts') {
+      return 'contract';
+    }
+    return 'military_equipment';
+  }
+
+  toggleEntityPicker(section: EntitySection): void {
+    if (!this.isEditingEntitiesBlock || !this.state.article?.document_id) {
+      return;
+    }
+
+    if (this.entityPickerOpen === section) {
+      this.closeEntityPicker();
+      return;
+    }
+
+    this.entityPickerOpen = section;
+    this.entityPickerSearch = '';
+    this.entityPickerCatalogItems = [];
+    const docId = this.state.article.document_id;
+    const typeCode = this.entityTypeCodeForSection(section);
+    this.loadingEntityPickerCatalog = true;
+
+    this.api.getEntityCatalog(docId, typeCode).subscribe({
+      next: (items: DocumentEntityRef[]) => {
+        this.entityPickerCatalogItems = items;
+        this.loadingEntityPickerCatalog = false;
+      },
+      error: () => {
+        this.entitiesError = 'Не удалось загрузить список сущностей';
+        this.loadingEntityPickerCatalog = false;
+        this.closeEntityPicker();
+      },
+    });
+  }
+
+  get filteredEntityPickerItems(): DocumentEntityRef[] {
+    const q = this.entityPickerSearch.trim().toLowerCase();
+    if (!q) {
+      return this.entityPickerCatalogItems;
+    }
+    return this.entityPickerCatalogItems.filter((item) => item.name.toLowerCase().includes(q));
+  }
+
+  onEntityPickerSelect(item: DocumentEntityRef): void {
+    const docId = this.state.article?.document_id;
+    if (!docId || this.loadingDocumentEntitiesMutation) {
+      return;
+    }
+
+    this.loadingDocumentEntitiesMutation = true;
+    this.entitiesError = '';
+
+    this.api.assignDocumentEntity(docId, item.id).subscribe({
+      next: () => {
+        this.closeEntityPicker();
+        this.refreshDocumentEntitiesFromServer(docId);
+      },
+      error: () => {
+        this.entitiesError = 'Не удалось добавить сущность';
+        this.loadingDocumentEntitiesMutation = false;
+      },
+    });
+  }
+
+  private refreshDocumentEntitiesFromServer(documentId: string): void {
+    this.api.getDocumentEntities(documentId).subscribe({
+      next: (res: EntitiesResponse) => {
+        this.state.entities = {
+          military_equipment: res.military_equipment || [],
+          manufacturers: res.manufacturers || [],
+          contracts: res.contracts || [],
+        };
+        this.loadingDocumentEntitiesMutation = false;
+      },
+      error: () => {
+        this.entitiesError = 'Не удалось обновить список сущностей';
+        this.loadingDocumentEntitiesMutation = false;
+      },
+    });
   }
 
   applyEditedTags(): void {
@@ -405,33 +511,24 @@ export class ArticleParser {
   // СУЩНОСТИ
   // =========================
 
-  updateEntityList(
-    field: 'military_equipment' | 'manufacturers' | 'contracts',
-    value: string,
-  ): void {
-    if (!this.state.entities) {
-      this.state.entities = {
-        military_equipment: [],
-        manufacturers: [],
-        contracts: [],
-      };
-    }
-
-    this.state.entities[field] = value
-      .split('\n')
-      .map((x) => x.trim())
-      .filter(Boolean);
-  }
-
-  removeEntityItem(
-    field: 'military_equipment' | 'manufacturers' | 'contracts',
-    item: string,
-  ): void {
-    if (!this.state.entities) {
+  removeEntityItem(item: DocumentEntityRef): void {
+    const docId = this.state.article?.document_id;
+    if (!docId || this.loadingDocumentEntitiesMutation) {
       return;
     }
 
-    this.state.entities[field] = this.state.entities[field].filter((x) => x !== item);
+    this.loadingDocumentEntitiesMutation = true;
+    this.entitiesError = '';
+
+    this.api.removeDocumentEntity(docId, item.id).subscribe({
+      next: () => {
+        this.refreshDocumentEntitiesFromServer(docId);
+      },
+      error: () => {
+        this.entitiesError = 'Не удалось удалить сущность';
+        this.loadingDocumentEntitiesMutation = false;
+      },
+    });
   }
 
   // =========================
@@ -639,9 +736,18 @@ export class ArticleParser {
     const ent = this.state.entities;
 
     const sortDesc = (a: string, b: string) => b.length - a.length;
-    const military = [...(ent?.military_equipment || [])].filter(Boolean).sort(sortDesc);
-    const manufacturers = [...(ent?.manufacturers || [])].filter(Boolean).sort(sortDesc);
-    const contracts = [...(ent?.contracts || [])].filter(Boolean).sort(sortDesc);
+    const military = [...(ent?.military_equipment || [])]
+      .map((e) => e.name)
+      .filter(Boolean)
+      .sort(sortDesc);
+    const manufacturers = [...(ent?.manufacturers || [])]
+      .map((e) => e.name)
+      .filter(Boolean)
+      .sort(sortDesc);
+    const contracts = [...(ent?.contracts || [])]
+      .map((e) => e.name)
+      .filter(Boolean)
+      .sort(sortDesc);
 
     if (!military.length && !manufacturers.length && !contracts.length) {
       return this.escapeHtml(text).replace(/\n/g, '<br>');

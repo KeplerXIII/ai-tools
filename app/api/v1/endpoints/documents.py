@@ -5,7 +5,7 @@ import logging
 import time
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy import delete, select
 from sqlalchemy.dialects.postgresql import insert
@@ -23,6 +23,8 @@ from app.infrastructure.db.models import Document, DocumentStatus, DocumentStatu
 from app.infrastructure.db.models import DocumentEntity, DocumentTag, Entity, EntityType, Tag
 from app.infrastructure.db.session import AsyncSessionLocal, get_db
 from app.schemas.documents import (
+    DocumentEntityAssignRequest,
+    DocumentEntityItem,
     DocumentStatusCatalogItem,
     DocumentExtractResponse,
     DocumentEntitiesExtractResponse,
@@ -39,6 +41,7 @@ from app.schemas.documents import (
     ExtractUrlPersistRequest,
     SummarySource,
 )
+from app.services.documents.db_refs import entity_type_id_by_code, prediction_source_id
 from app.services.documents.document_pipeline import (
     acquire_edit_lock,
     create_document_after_extract,
@@ -62,6 +65,8 @@ from app.services.llm.translator import detect_language, translate_text
 from app.services.parsing.extractor import download_html, extract_article_text
 router = APIRouter(prefix="/documents", tags=["documents"])
 logger = logging.getLogger(__name__)
+
+DOCUMENT_ENTITY_TYPE_CODES = frozenset({"military_equipment", "manufacturer", "contract"})
 
 
 async def _prepare_write_session(db: AsyncSession) -> None:
@@ -134,29 +139,30 @@ async def _get_document_tags(
 async def _get_document_entities(
     db: AsyncSession,
     document_id: UUID,
-) -> tuple[list[str], list[str], list[str]]:
+) -> tuple[list[DocumentEntityItem], list[DocumentEntityItem], list[DocumentEntityItem]]:
     rows = await db.execute(
-        select(EntityType.code, Entity.name)
+        select(EntityType.code, Entity.id, Entity.name)
         .select_from(DocumentEntity)
         .join(Entity, Entity.id == DocumentEntity.entity_id)
         .join(EntityType, EntityType.id == Entity.entity_type_id)
         .where(DocumentEntity.document_id == document_id)
         .order_by(EntityType.code.asc(), Entity.name.asc())
     )
-    military_equipment: list[str] = []
-    manufacturers: list[str] = []
-    contracts: list[str] = []
+    military_equipment: list[DocumentEntityItem] = []
+    manufacturers: list[DocumentEntityItem] = []
+    contracts: list[DocumentEntityItem] = []
     for row in rows:
         name = row.name
         if not name:
             continue
         code = row.code
+        item = DocumentEntityItem(id=row.id, name=name)
         if code == "military_equipment":
-            military_equipment.append(name)
+            military_equipment.append(item)
         elif code == "manufacturer":
-            manufacturers.append(name)
+            manufacturers.append(item)
         elif code == "contract":
-            contracts.append(name)
+            contracts.append(item)
     return military_equipment, manufacturers, contracts
 
 
@@ -453,6 +459,121 @@ async def document_tags(
     except AppError as exc:
         _handle(exc)
     return {"ok": True, "document_id": str(document_id)}
+
+
+@router.get("/{document_id}/entities/catalog", response_model=list[DocumentEntityItem])
+async def document_entities_catalog(
+    document_id: UUID,
+    entity_type_code: str = Query(..., min_length=1, max_length=64),
+    db: AsyncSession = Depends(get_db),
+):
+    normalized = entity_type_code.strip().lower()
+    if normalized not in DOCUMENT_ENTITY_TYPE_CODES:
+        raise HTTPException(status_code=400, detail="Неизвестный тип сущности")
+
+    doc = await db.get(Document, document_id)
+    if doc is None:
+        raise HTTPException(status_code=404, detail="Документ не найден")
+
+    et_id = await entity_type_id_by_code(db, normalized)
+
+    assigned_rows = await db.execute(
+        select(DocumentEntity.entity_id)
+        .join(Entity, Entity.id == DocumentEntity.entity_id)
+        .where(
+            DocumentEntity.document_id == document_id,
+            Entity.entity_type_id == et_id,
+        )
+    )
+    assigned_ids = {row[0] for row in assigned_rows}
+
+    stmt = (
+        select(Entity.id, Entity.name)
+        .where(
+            Entity.entity_type_id == et_id,
+            Entity.language_id == doc.original_language_id,
+        )
+        .order_by(Entity.name.asc())
+    )
+    if assigned_ids:
+        stmt = stmt.where(Entity.id.not_in(assigned_ids))
+
+    rows = await db.execute(stmt)
+    return [DocumentEntityItem(id=row.id, name=row.name) for row in rows]
+
+
+@router.get("/{document_id}/entities", response_model=DocumentEntitiesExtractResponse)
+async def get_document_entities_snapshot(
+    document_id: UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    doc = await db.get(Document, document_id)
+    if doc is None:
+        raise HTTPException(status_code=404, detail="Документ не найден")
+
+    military_equipment, manufacturers, contracts = await _get_document_entities(db, document_id)
+    return DocumentEntitiesExtractResponse(
+        document_id=document_id,
+        military_equipment=military_equipment,
+        manufacturers=manufacturers,
+        contracts=contracts,
+    )
+
+
+@router.post("/{document_id}/entities/assign")
+async def assign_document_entity(
+    document_id: UUID,
+    payload: DocumentEntityAssignRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    _ = user
+    doc = await db.get(Document, document_id)
+    if doc is None:
+        raise HTTPException(status_code=404, detail="Документ не найден")
+
+    ent = await db.get(Entity, payload.entity_id)
+    if ent is None:
+        raise HTTPException(status_code=404, detail="Сущность не найдена")
+    if ent.language_id != doc.original_language_id:
+        raise HTTPException(status_code=400, detail="Язык сущности не совпадает с языком документа")
+
+    manual_id = await prediction_source_id(db, "manual")
+    await _prepare_write_session(db)
+    async with db.begin():
+        stmt = insert(DocumentEntity).values(
+            document_id=document_id,
+            entity_id=payload.entity_id,
+            prediction_source_id=manual_id,
+        )
+        stmt = stmt.on_conflict_do_nothing(
+            index_elements=[DocumentEntity.document_id, DocumentEntity.entity_id],
+        )
+        await db.execute(stmt)
+    return {"ok": True, "document_id": str(document_id), "entity_id": str(payload.entity_id)}
+
+
+@router.delete("/{document_id}/entities/{entity_id}")
+async def remove_document_entity(
+    document_id: UUID,
+    entity_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    _ = user
+    doc = await db.get(Document, document_id)
+    if doc is None:
+        raise HTTPException(status_code=404, detail="Документ не найден")
+
+    await _prepare_write_session(db)
+    async with db.begin():
+        await db.execute(
+            delete(DocumentEntity).where(
+                DocumentEntity.document_id == document_id,
+                DocumentEntity.entity_id == entity_id,
+            )
+        )
+    return {"ok": True, "document_id": str(document_id), "entity_id": str(entity_id)}
 
 
 @router.post("/{document_id}/entities", response_model=DocumentEntitiesExtractResponse)

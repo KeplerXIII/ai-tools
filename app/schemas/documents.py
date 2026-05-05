@@ -9,6 +9,11 @@ from pydantic import BaseModel, Field, HttpUrl, model_validator
 from app.schemas.extract import ExtractResponse, RefineSummaryMode
 
 
+class DocumentEntityItem(BaseModel):
+    id: uuid.UUID
+    name: str
+
+
 class DocumentExtractResponse(ExtractResponse):
     document_id: uuid.UUID
     from_cache: bool
@@ -24,9 +29,9 @@ class DocumentExtractResponse(ExtractResponse):
     statuses: list["DocumentStatusItem"] = []
     original_tags: list[str] = []
     translated_tags: list[str] = []
-    entities_military_equipment: list[str] = []
-    entities_manufacturers: list[str] = []
-    entities_contracts: list[str] = []
+    entities_military_equipment: list[DocumentEntityItem] = []
+    entities_manufacturers: list[DocumentEntityItem] = []
+    entities_contracts: list[DocumentEntityItem] = []
 
 
 class DocumentTranslateRequest(BaseModel):
@@ -41,9 +46,13 @@ class DocumentTagRequest(BaseModel):
 class DocumentEntitiesExtractResponse(BaseModel):
     ok: bool = True
     document_id: uuid.UUID
-    military_equipment: list[str]
-    manufacturers: list[str]
-    contracts: list[str]
+    military_equipment: list[DocumentEntityItem]
+    manufacturers: list[DocumentEntityItem]
+    contracts: list[DocumentEntityItem]
+
+
+class DocumentEntityAssignRequest(BaseModel):
+    entity_id: uuid.UUID
 
 
 class DocumentStatusAssignRequest(BaseModel):

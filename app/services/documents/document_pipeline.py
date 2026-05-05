@@ -23,6 +23,7 @@ from app.infrastructure.db.models import (
     Tag,
 )
 from app.schemas.documents import (
+    DocumentEntityItem,
     DocumentExtractResponse,
     DocumentStatusItem,
     DocumentUpdateRequest,
@@ -66,9 +67,9 @@ def document_to_extract_response(
     statuses: list[DocumentStatusItem] | None = None,
     original_tags: list[str] | None = None,
     translated_tags: list[str] | None = None,
-    entities_military_equipment: list[str] | None = None,
-    entities_manufacturers: list[str] | None = None,
-    entities_contracts: list[str] | None = None,
+    entities_military_equipment: list[DocumentEntityItem] | None = None,
+    entities_manufacturers: list[DocumentEntityItem] | None = None,
+    entities_contracts: list[DocumentEntityItem] | None = None,
 ) -> DocumentExtractResponse:
     images: list[ImageInfo] = []
     for item in doc.extracted_images or []:
@@ -110,9 +111,9 @@ def document_to_extract_response(
         statuses=statuses or [],
         original_tags=original_tags or [],
         translated_tags=translated_tags or [],
-        entities_military_equipment=entities_military_equipment or [],
-        entities_manufacturers=entities_manufacturers or [],
-        entities_contracts=entities_contracts or [],
+        entities_military_equipment=list(entities_military_equipment or []),
+        entities_manufacturers=list(entities_manufacturers or []),
+        entities_contracts=list(entities_contracts or []),
     )
 
 

@@ -9,6 +9,11 @@ export interface ImageInfo {
   title: string | null;
 }
 
+export interface DocumentEntityRef {
+  id: string;
+  name: string;
+}
+
 export interface ExtractResponse {
   title: string | null;
   author: string | null;
@@ -41,9 +46,9 @@ export interface ExtractResponse {
   }[];
   original_tags?: string[];
   translated_tags?: string[];
-  entities_military_equipment?: string[];
-  entities_manufacturers?: string[];
-  entities_contracts?: string[];
+  entities_military_equipment?: DocumentEntityRef[];
+  entities_manufacturers?: DocumentEntityRef[];
+  entities_contracts?: DocumentEntityRef[];
 }
 
 export interface DocumentStatusCatalogItem {
@@ -64,9 +69,11 @@ export interface DocumentStatusesResponse {
 }
 
 export interface EntitiesResponse {
-  military_equipment: string[];
-  manufacturers: string[];
-  contracts: string[];
+  document_id?: string;
+  ok?: boolean;
+  military_equipment: DocumentEntityRef[];
+  manufacturers: DocumentEntityRef[];
+  contracts: DocumentEntityRef[];
 }
 
 export interface TranslateResponse {
@@ -110,10 +117,28 @@ export class ArticleParserApi {
     });
   }
 
-  extractEntities(documentId: string, text: string) {
-    return this.http.post<EntitiesResponse>(`/api/v1/documents/${documentId}/entities`, {
-      text,
+  extractEntities(documentId: string) {
+    return this.http.post<EntitiesResponse>(`/api/v1/documents/${documentId}/entities`, {});
+  }
+
+  getDocumentEntities(documentId: string) {
+    return this.http.get<EntitiesResponse>(`/api/v1/documents/${documentId}/entities`);
+  }
+
+  getEntityCatalog(documentId: string, entityTypeCode: string) {
+    return this.http.get<DocumentEntityRef[]>(`/api/v1/documents/${documentId}/entities/catalog`, {
+      params: { entity_type_code: entityTypeCode },
     });
+  }
+
+  assignDocumentEntity(documentId: string, entityId: string) {
+    return this.http.post<{ ok?: boolean }>(`/api/v1/documents/${documentId}/entities/assign`, {
+      entity_id: entityId,
+    });
+  }
+
+  removeDocumentEntity(documentId: string, entityId: string) {
+    return this.http.delete<{ ok?: boolean }>(`/api/v1/documents/${documentId}/entities/${entityId}`);
   }
 
   translateToRussian(documentId: string, text: string) {

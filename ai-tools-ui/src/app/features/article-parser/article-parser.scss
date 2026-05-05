@@ -258,7 +258,8 @@
   padding-bottom: 10px;
 }
 
-.status-add-chip {
+.status-add-chip,
+.entity-add-chip {
   border: 1px dashed #93c5fd;
   background: #eff6ff;
   color: #1d4ed8;
@@ -274,27 +275,27 @@
   justify-content: center;
 }
 
-.status-add-chip:disabled {
+.status-add-chip:disabled,
+.entity-add-chip:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-.status-add-wrapper {
+.status-add-wrapper,
+.entity-add-wrapper {
   position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
 }
 
-.status-picker-popover {
+.status-picker-popover,
+.entity-picker-popover {
   position: absolute;
   top: calc(100% + 8px);
-  right: 0;
   z-index: 20;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  min-width: 180px;
   padding: 8px;
   border: 1px solid #cbd5e1;
   border-radius: 10px;
@@ -304,7 +305,21 @@
     0 1px 3px rgba(15, 23, 42, 0.08);
 }
 
-.status-picker-item {
+.status-picker-popover {
+  right: 0;
+  gap: 6px;
+  min-width: 180px;
+}
+
+.entity-picker-popover {
+  left: 0;
+  gap: 8px;
+  min-width: 240px;
+  max-width: min(320px, 90vw);
+}
+
+.status-picker-item,
+.entity-picker-item {
   border: 1px solid #dbeafe;
   background: #f8fbff;
   color: #1e3a8a;
@@ -313,15 +328,47 @@
   font-size: 13px;
   cursor: pointer;
   text-align: left;
+  flex-shrink: 0;
 }
 
-.status-picker-item:hover {
+.status-picker-item:hover,
+.entity-picker-item:hover {
   background: #e0e7ff;
 }
 
-.status-picker-item:disabled {
+.status-picker-item:disabled,
+.entity-picker-item:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.entity-picker-search {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 14px;
+}
+
+.entity-picker-search:focus {
+  outline: 2px solid #93c5fd;
+  outline-offset: 0;
+}
+
+.entity-picker-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.entity-picker-empty,
+.entity-picker-loading {
+  font-size: 13px;
+  color: #64748b;
+  padding: 4px 2px;
 }
 
 .prew-image-block {
