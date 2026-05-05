@@ -55,6 +55,12 @@ class Document(Base):
     extracted_images: Mapped[list[dict] | None] = mapped_column(JSON, nullable=True)
     extracted_main_image: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    extracted_author: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    extracted_date: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    extract_method: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    extract_quality: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    extract_needs_review: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     version: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")

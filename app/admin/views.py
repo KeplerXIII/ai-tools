@@ -182,20 +182,33 @@ class DocumentAdmin(ModelView, model=Document):
     name_plural = "Документы"
     icon = "fa-solid fa-file-lines"
     column_labels = {
-        Document.extracted_images: "Images",
-        Document.extracted_main_image: "Main image",
+        Document.extracted_images: "Изображения (JSON)",
+        Document.extracted_main_image: "Главное изображение",
+        Document.extracted_author: "Автор (парсер)",
+        Document.extracted_date: "Дата в тексте (парсер)",
+        Document.published_at: "Дата публикации",
+        Document.extract_method: "Способ извлечения",
+        Document.extract_quality: "Оценка качества",
+        Document.extract_needs_review: "Нужна проверка",
     }
     column_list = [
         Document.id,
         Document.title,
         Document.source_url,
+        Document.extracted_author,
+        Document.extracted_date,
+        Document.published_at,
+        Document.extract_method,
+        Document.extract_quality,
+        Document.extract_needs_review,
         Document.extracted_images,
+        Document.extracted_main_image,
         Document.version,
         Document.locked_by_id,
         Document.created_at,
     ]
-    column_searchable_list = [Document.title, Document.source_url]
-    column_sortable_list = [Document.created_at, Document.version]
+    column_searchable_list = [Document.title, Document.source_url, Document.extracted_author]
+    column_sortable_list = [Document.created_at, Document.version, Document.published_at]
 
 
 class DocumentCategoryAdmin(ModelView, model=DocumentCategory):

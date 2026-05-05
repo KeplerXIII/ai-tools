@@ -49,6 +49,22 @@ from app.services.processing.jobs import JobStatus, JobType, processing_job
 NOT_FOUND_ENTITY_NAME = "не обнаружено"
 
 
+def _published_at_from_extract_date(date_str: str | None) -> datetime | None:
+    if not date_str:
+        return None
+    s = str(date_str).strip()
+    if not s:
+        return None
+    try:
+        normalized = s.replace("Z", "+00:00")
+        dt = datetime.fromisoformat(normalized)
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=UTC)
+    return dt.astimezone(UTC)
+
+
 def _map_lang_for_db(detected: str) -> str:
     if detected in ("ru", "de", "en"):
         return detected
@@ -86,16 +102,20 @@ def document_to_extract_response(
                 title=item.get("title"),
             )
         )
+    needs_review = False if doc.extract_needs_review is None else bool(doc.extract_needs_review)
+    method = doc.extract_method or "unknown"
+    quality = doc.extract_quality or "unknown"
+
     return DocumentExtractResponse(
         title=doc.title or None,
-        author=None,
-        date=None,
+        author=doc.extracted_author,
+        date=doc.extracted_date,
         url=doc.source_url,
         text=doc.original_content,
         length=len(doc.original_content or ""),
-        method="cached" if from_cache else "live",
-        quality="unknown" if from_cache else "ok",
-        needs_review=False,
+        method=method,
+        quality=quality,
+        needs_review=needs_review,
         images=images,
         main_image=doc.extracted_main_image,
         document_id=doc.id,
@@ -132,6 +152,27 @@ async def create_document_after_extract(
     dt_id = await document_type_id_by_code(session, document_type_code)
     title = (extract_payload.get("title") or "").strip() or "Без названия"
 
+    raw_author = extract_payload.get("author")
+    extracted_author = (str(raw_author).strip()[:512] if raw_author else None) or None
+
+    raw_date = extract_payload.get("date")
+    extracted_date: str | None = None
+    if raw_date is not None:
+        ds = str(raw_date).strip()
+        if ds:
+            extracted_date = ds[:128]
+
+    published_at = _published_at_from_extract_date(extracted_date)
+
+    raw_method = extract_payload.get("method")
+    extract_method = (str(raw_method).strip()[:64] if raw_method else None) or None
+
+    raw_quality = extract_payload.get("quality")
+    extract_quality = (str(raw_quality).strip()[:32] if raw_quality else None) or None
+
+    nr = extract_payload.get("needs_review")
+    extract_needs_review: bool | None = bool(nr) if nr is not None else None
+
     doc = Document(
         title=title[:512],
         original_content=text,
@@ -140,6 +181,12 @@ async def create_document_after_extract(
         source_url=norm_url,
         extracted_images=extract_payload.get("images") or [],
         extracted_main_image=extract_payload.get("main_image"),
+        extracted_author=extracted_author,
+        extracted_date=extracted_date,
+        extract_method=extract_method,
+        extract_quality=extract_quality,
+        extract_needs_review=extract_needs_review,
+        published_at=published_at,
         created_by_id=created_by_id,
         original_summary_stale=True,
         translated_summary_stale=True,

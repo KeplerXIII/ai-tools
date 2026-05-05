@@ -242,7 +242,8 @@ async def parse_source(
                     document_type_code=payload.document_type_code,
                 )
                 doc.source_id = source_id
-                doc.published_at = item.published_at
+                if item.published_at is not None:
+                    doc.published_at = item.published_at
 
                 await db.execute(
                     insert(DocumentStatusAssignment)
