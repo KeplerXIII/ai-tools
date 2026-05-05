@@ -219,10 +219,6 @@ class ParseSourceEndpointTests(IsolatedAsyncioTestCase):
                 AsyncMock(return_value=discovered),
             ),
             patch(
-                "app.api.v1.endpoints.parsing._status_ids_by_codes",
-                AsyncMock(return_value={"new": uuid.uuid4(), "unprocessed": uuid.uuid4()}),
-            ),
-            patch(
                 "app.api.v1.endpoints.parsing.get_document_by_source_url",
                 AsyncMock(return_value=None),
             ),
@@ -308,10 +304,6 @@ class ParseSourceEndpointTests(IsolatedAsyncioTestCase):
             patch(
                 "app.api.v1.endpoints.parsing.discover_source_news_urls",
                 AsyncMock(return_value=discovered),
-            ),
-            patch(
-                "app.api.v1.endpoints.parsing._status_ids_by_codes",
-                AsyncMock(return_value={"new": uuid.uuid4(), "unprocessed": uuid.uuid4()}),
             ),
             patch(
                 "app.api.v1.endpoints.parsing.get_document_by_source_url",

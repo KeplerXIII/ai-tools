@@ -6,6 +6,8 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 from sqlalchemy import delete, or_, select
+from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -17,6 +19,8 @@ from app.infrastructure.db.models import (
     DocumentCategory,
     DocumentChunk,
     DocumentEntity,
+    DocumentStatus,
+    DocumentStatusAssignment,
     DocumentTag,
     Entity,
     ProcessingJob,
@@ -69,6 +73,57 @@ def _map_lang_for_db(detected: str) -> str:
     if detected in ("ru", "de", "en"):
         return detected
     return "en"
+
+
+async def _attach_default_new_unprocessed_statuses(
+    session: AsyncSession,
+    *,
+    document_id: uuid.UUID,
+    assigned_by_id: uuid.UUID | None,
+) -> None:
+    try:
+        rows = (
+            await session.execute(
+                select(DocumentStatus.code, DocumentStatus.id).where(
+                    DocumentStatus.code.in_(("new", "unprocessed"))
+                )
+            )
+        ).all()
+    except ProgrammingError as exc:
+        if "document_statuses" in str(exc).lower():
+            raise ValidationError(
+                "Справочник статусов документов не инициализирован. Примените миграции и сиды БД."
+            ) from None
+        raise
+    by_code = {code: sid for code, sid in rows}
+    missing = [c for c in ("new", "unprocessed") if c not in by_code]
+    if missing:
+        raise ValidationError(
+            f"Справочник статусов документов неполон: отсутствуют коды {', '.join(missing)}"
+        )
+    await session.execute(
+        insert(DocumentStatusAssignment)
+        .values(
+            [
+                {
+                    "document_id": document_id,
+                    "status_id": by_code["new"],
+                    "assigned_by_id": assigned_by_id,
+                },
+                {
+                    "document_id": document_id,
+                    "status_id": by_code["unprocessed"],
+                    "assigned_by_id": assigned_by_id,
+                },
+            ]
+        )
+        .on_conflict_do_nothing(
+            index_elements=[
+                DocumentStatusAssignment.document_id,
+                DocumentStatusAssignment.status_id,
+            ]
+        )
+    )
 
 
 async def get_document_by_source_url(session: AsyncSession, url: str) -> Document | None:
@@ -193,6 +248,11 @@ async def create_document_after_extract(
     )
     session.add(doc)
     await session.flush()
+    await _attach_default_new_unprocessed_statuses(
+        session,
+        document_id=doc.id,
+        assigned_by_id=created_by_id,
+    )
     return doc
 
 

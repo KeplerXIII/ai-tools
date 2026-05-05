@@ -18,7 +18,7 @@ from app.api.deps import (
     get_optional_started_by_id,
 )
 from app.api.error_mapping import map_app_error
-from app.domain.errors import AppError
+from app.domain.errors import AppError, ValidationError
 from app.infrastructure.db.models import Document, DocumentStatus, DocumentStatusAssignment, User
 from app.infrastructure.db.models import DocumentEntity, DocumentTag, Entity, EntityType, Tag
 from app.infrastructure.db.session import AsyncSessionLocal, get_db
@@ -255,6 +255,9 @@ async def extract_url_persist(
                 started_by_id=created_by_id,
             )
             doc_id = doc.id
+    except ValidationError as exc:
+        await db.rollback()
+        _handle(exc)
     except IntegrityError:
         await db.rollback()
         existing2 = await get_document_by_source_url(db, url_str)
@@ -279,10 +282,11 @@ async def extract_url_persist(
     created_doc = await db.get(Document, doc_id)
     if created_doc is None:
         raise HTTPException(status_code=500, detail="Не удалось загрузить созданный документ")
+    statuses_new = await _get_document_status_items(db, doc_id)
     return document_to_extract_response(
         created_doc,
         from_cache=False,
-        statuses=[],
+        statuses=statuses_new,
         original_tags=[],
         translated_tags=[],
         entities_military_equipment=[],
@@ -349,6 +353,26 @@ async def assign_document_status(
 
     await _prepare_write_session(db)
     async with db.begin():
+        if status_code == "processed":
+            unproc_id = await db.scalar(
+                select(DocumentStatus.id).where(DocumentStatus.code == "unprocessed")
+            )
+            if unproc_id is not None:
+                await db.execute(
+                    delete(DocumentStatusAssignment).where(
+                        DocumentStatusAssignment.document_id == document_id,
+                        DocumentStatusAssignment.status_id == unproc_id,
+                    )
+                )
+        elif status_code == "unprocessed":
+            proc_id = await db.scalar(select(DocumentStatus.id).where(DocumentStatus.code == "processed"))
+            if proc_id is not None:
+                await db.execute(
+                    delete(DocumentStatusAssignment).where(
+                        DocumentStatusAssignment.document_id == document_id,
+                        DocumentStatusAssignment.status_id == proc_id,
+                    )
+                )
         stmt = insert(DocumentStatusAssignment).values(
             document_id=document_id,
             status_id=status_id,

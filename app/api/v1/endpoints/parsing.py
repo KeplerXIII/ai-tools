@@ -5,9 +5,11 @@ from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
+
+from app.api.error_mapping import map_app_error
+from app.domain.errors import ValidationError
 from sqlalchemy import select
-from sqlalchemy.dialects.postgresql import insert
-from sqlalchemy.exc import IntegrityError, ProgrammingError
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_current_user_optional
@@ -57,24 +59,6 @@ async def _country_id_by_code(db: AsyncSession, code: str | None) -> UUID | None
     if not code:
         return None
     return await db.scalar(select(Country.id).where(Country.code == code.upper()))
-
-
-async def _status_ids_by_codes(db: AsyncSession, *codes: str) -> dict[str, UUID]:
-    try:
-        rows = await db.execute(select(DocumentStatus.code, DocumentStatus.id).where(DocumentStatus.code.in_(codes)))
-    except ProgrammingError as exc:
-        # When migrations are not applied yet, return a clear operational error instead of raw SQL stacktrace.
-        if "document_statuses" in str(exc).lower():
-            raise HTTPException(
-                status_code=503,
-                detail="Справочник статусов документов не инициализирован. Примените миграции и сиды БД.",
-            ) from None
-        raise
-    out = {code: sid for code, sid in rows}
-    missing = [code for code in codes if code not in out]
-    if missing:
-        raise HTTPException(status_code=500, detail=f"Не найдены коды статусов: {', '.join(missing)}")
-    return out
 
 
 async def _list_unprocessed_by_source(
@@ -199,7 +183,6 @@ async def parse_source(
         raise HTTPException(status_code=400, detail="Источник неактивен")
     source_id = source.id
 
-    status_ids = await _status_ids_by_codes(db, "new", "unprocessed")
     discovered = await discover_source_news_urls(source.url, rss_url=source.rss_url, days=payload.days)
     created_by_id = user.id if user else None
 
@@ -245,30 +228,10 @@ async def parse_source(
                 if item.published_at is not None:
                     doc.published_at = item.published_at
 
-                await db.execute(
-                    insert(DocumentStatusAssignment)
-                    .values(
-                        [
-                            {
-                                "document_id": doc.id,
-                                "status_id": status_ids["new"],
-                                "assigned_by_id": created_by_id,
-                            },
-                            {
-                                "document_id": doc.id,
-                                "status_id": status_ids["unprocessed"],
-                                "assigned_by_id": created_by_id,
-                            },
-                        ]
-                    )
-                    .on_conflict_do_nothing(
-                        index_elements=[
-                            DocumentStatusAssignment.document_id,
-                            DocumentStatusAssignment.status_id,
-                        ]
-                    )
-                )
                 new_doc_ids.add(doc.id)
+        except ValidationError as exc:
+            await db.rollback()
+            raise map_app_error(exc) from exc
         except IntegrityError:
             await db.rollback()
             continue
