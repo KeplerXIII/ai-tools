@@ -7,7 +7,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_current_user_optional
@@ -60,7 +60,16 @@ async def _country_id_by_code(db: AsyncSession, code: str | None) -> UUID | None
 
 
 async def _status_ids_by_codes(db: AsyncSession, *codes: str) -> dict[str, UUID]:
-    rows = await db.execute(select(DocumentStatus.code, DocumentStatus.id).where(DocumentStatus.code.in_(codes)))
+    try:
+        rows = await db.execute(select(DocumentStatus.code, DocumentStatus.id).where(DocumentStatus.code.in_(codes)))
+    except ProgrammingError as exc:
+        # When migrations are not applied yet, return a clear operational error instead of raw SQL stacktrace.
+        if "document_statuses" in str(exc).lower():
+            raise HTTPException(
+                status_code=503,
+                detail="Справочник статусов документов не инициализирован. Примените миграции и сиды БД.",
+            ) from None
+        raise
     out = {code: sid for code, sid in rows}
     missing = [code for code in codes if code not in out]
     if missing:
@@ -156,6 +165,25 @@ async def create_source(
     )
 
 
+@router.delete("/sources/{source_id}")
+async def deactivate_source(
+    source_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    source = await db.get(Source, source_id)
+    if source is None:
+        raise HTTPException(status_code=404, detail="Источник не найден")
+    if source.user_id != user.id:
+        raise HTTPException(status_code=403, detail="Нет доступа к источнику")
+
+    if source.is_active:
+        source.is_active = False
+        await db.commit()
+
+    return {"ok": True, "source_id": str(source_id), "is_active": source.is_active}
+
+
 @router.post("/sources/parse", response_model=ParseSourceResponse)
 async def parse_source(
     payload: ParseSourceRequest,
@@ -169,6 +197,7 @@ async def parse_source(
         raise HTTPException(status_code=404, detail="Источник не найден")
     if not source.is_active:
         raise HTTPException(status_code=400, detail="Источник неактивен")
+    source_id = source.id
 
     status_ids = await _status_ids_by_codes(db, "new", "unprocessed")
     discovered = await discover_source_news_urls(source.url, rss_url=source.rss_url, days=payload.days)
@@ -212,7 +241,7 @@ async def parse_source(
                     created_by_id=created_by_id,
                     document_type_code=payload.document_type_code,
                 )
-                doc.source_id = source.id
+                doc.source_id = source_id
                 doc.published_at = item.published_at
 
                 await db.execute(
@@ -243,14 +272,14 @@ async def parse_source(
             await db.rollback()
             continue
 
-    existing_unprocessed = await _list_unprocessed_by_source(db, source_id=source.id)
+    existing_unprocessed = await _list_unprocessed_by_source(db, source_id=source_id)
     new_unprocessed = await _list_unprocessed_by_source(
         db,
-        source_id=source.id,
+        source_id=source_id,
         document_ids=new_doc_ids,
     )
     return ParseSourceResponse(
-        source_id=source.id,
+        source_id=source_id,
         found_total=len(discovered),
         created_total=len(new_doc_ids),
         existing_unprocessed_by_source=existing_unprocessed,

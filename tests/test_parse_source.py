@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, patch
 
 from fastapi import HTTPException
 
-from app.api.v1.endpoints.parsing import create_source, parse_source
+from app.api.v1.endpoints.parsing import create_source, deactivate_source, parse_source
 from app.schemas.parsing import ParseSourceRequest, SourceCreateRequest
 from app.services.parsing.source_discovery import DiscoveredUrl
 
@@ -71,6 +71,48 @@ class _FakeDb:
 
 
 class ParseSourceEndpointTests(IsolatedAsyncioTestCase):
+    async def test_deactivate_source_happy_path(self):
+        source_id = uuid.uuid4()
+        user_id = uuid.uuid4()
+        source = SimpleNamespace(
+            id=source_id,
+            user_id=user_id,
+            is_active=True,
+        )
+        db = _FakeDb(source=source)
+        user = SimpleNamespace(id=user_id)
+
+        result = await deactivate_source(source_id=source_id, db=db, user=user)
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["source_id"], str(source_id))
+        self.assertFalse(result["is_active"])
+        self.assertFalse(source.is_active)
+
+    async def test_deactivate_source_returns_404_when_source_missing(self):
+        db = _FakeDb(source=None)
+        user = SimpleNamespace(id=uuid.uuid4())
+
+        with self.assertRaises(HTTPException) as exc:
+            await deactivate_source(source_id=uuid.uuid4(), db=db, user=user)
+
+        self.assertEqual(exc.exception.status_code, 404)
+
+    async def test_deactivate_source_returns_403_for_foreign_source(self):
+        source_id = uuid.uuid4()
+        source = SimpleNamespace(
+            id=source_id,
+            user_id=uuid.uuid4(),
+            is_active=True,
+        )
+        db = _FakeDb(source=source)
+        user = SimpleNamespace(id=uuid.uuid4())
+
+        with self.assertRaises(HTTPException) as exc:
+            await deactivate_source(source_id=source_id, db=db, user=user)
+
+        self.assertEqual(exc.exception.status_code, 403)
+
     async def test_parse_source_returns_404_when_source_missing(self):
         db = _FakeDb(source=None)
         payload = ParseSourceRequest(source_id=uuid.uuid4(), days=3)
