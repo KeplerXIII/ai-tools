@@ -209,18 +209,14 @@ export class ArticleParser {
   // =========================
 
   tagOriginal(): void {
-    if (!this.state.article?.text) return;
+    if (!this.state.article?.document_id) return;
 
     this.loadingOriginalTags = true;
     this.originalTagsError = '';
 
-    this.api.tagText(this.state.article.text).subscribe({
-      next: (res) => {
-        this.state.originalTags = res.tags;
-        this.syncTagsToText();
-        this.loadingOriginalTags = false;
-        this.cdr.detectChanges();
-        this.scrollToElement(() => this.entitiesBlock);
+    this.api.tagText(this.state.article.document_id, 12, false).subscribe({
+      next: () => {
+        this.reloadTagsFromServer('original');
       },
       error: () => {
         this.originalTagsError = 'Ошибка тегирования оригинала';
@@ -230,18 +226,14 @@ export class ArticleParser {
   }
 
   tagTranslated(): void {
-    if (!this.state.translatedText.trim()) return;
+    if (!this.state.article?.document_id) return;
 
     this.loadingTranslatedTags = true;
     this.translatedTagsError = '';
 
-    this.api.tagText(this.state.translatedText).subscribe({
-      next: (res) => {
-        this.state.translatedTags = res.tags;
-        this.syncTagsToText();
-        this.loadingTranslatedTags = false;
-        this.cdr.detectChanges();
-        this.scrollToElement(() => this.entitiesBlock);
+    this.api.tagText(this.state.article.document_id, 12, true).subscribe({
+      next: () => {
+        this.reloadTagsFromServer('translated');
       },
       error: () => {
         this.translatedTagsError = 'Ошибка при тегировании перевода';
@@ -288,6 +280,40 @@ export class ArticleParser {
       .map((x) => x.trim())
       .filter(Boolean)
       .filter((x, i, arr) => arr.indexOf(x) === i);
+  }
+
+  private reloadTagsFromServer(kind: 'original' | 'translated'): void {
+    const url = this.state.url.trim();
+    if (!url) {
+      if (kind === 'original') {
+        this.loadingOriginalTags = false;
+      } else {
+        this.loadingTranslatedTags = false;
+      }
+      return;
+    }
+
+    this.api.extractByUrl(url).subscribe({
+      next: (response) => {
+        this.state.article = response;
+        this.state.originalTags = response.original_tags || [];
+        this.state.translatedTags = response.translated_tags || [];
+        this.syncTagsToText();
+        this.loadingOriginalTags = false;
+        this.loadingTranslatedTags = false;
+        this.cdr.detectChanges();
+        this.scrollToElement(() => this.entitiesBlock);
+      },
+      error: () => {
+        if (kind === 'original') {
+          this.originalTagsError = 'Теги сохранены, но не удалось обновить список';
+          this.loadingOriginalTags = false;
+        } else {
+          this.translatedTagsError = 'Теги сохранены, но не удалось обновить список';
+          this.loadingTranslatedTags = false;
+        }
+      },
+    });
   }
 
   // =========================

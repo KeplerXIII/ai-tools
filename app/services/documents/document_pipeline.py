@@ -174,11 +174,21 @@ async def _llm_ps_id(session: AsyncSession) -> uuid.UUID:
     return await prediction_source_id(session, "llm")
 
 
-async def delete_auto_document_tags(session: AsyncSession, document_id: uuid.UUID) -> None:
+async def delete_auto_document_tags(
+    session: AsyncSession,
+    document_id: uuid.UUID,
+    *,
+    language_id: uuid.UUID | None = None,
+) -> None:
     manual_id = await _manual_ps_id(session)
+    tag_ids_subquery = select(Tag.id)
+    if language_id is not None:
+        tag_ids_subquery = tag_ids_subquery.where(Tag.language_id == language_id)
+
     await session.execute(
         delete(DocumentTag).where(
             DocumentTag.document_id == document_id,
+            DocumentTag.tag_id.in_(tag_ids_subquery),
             or_(
                 DocumentTag.prediction_source_id.is_(None),
                 DocumentTag.prediction_source_id != manual_id,
@@ -407,7 +417,7 @@ async def run_tag_document(
         started_by_id=started_by_id,
         llm_task_for_provider=LLMTask.TAGGING,
     ):
-        await delete_auto_document_tags(session, document_id)
+        await delete_auto_document_tags(session, document_id, language_id=lang_id)
         tags_payload = await tag_text(src, max_tags=max_tags)
         for tag_name in tags_payload.get("tags", []):
             tid = await _get_or_create_tag(session, tag_name, lang_id)

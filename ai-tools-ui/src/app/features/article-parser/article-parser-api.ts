@@ -324,10 +324,10 @@ export class ArticleParserApi {
     });
   }
 
-  tagText(text: string, maxTags = 12) {
-    return this.http.post<{ tags: string[] }>('/api/v1/documents/{document_id}/tags', {
-      text,
+  tagText(documentId: string, maxTags = 12, useTranslation = false) {
+    return this.http.post<{ tags?: string[]; ok?: boolean }>(`/api/v1/documents/${documentId}/tags`, {
       max_tags: maxTags,
+      use_translation: useTranslation,
     });
   }
 }
