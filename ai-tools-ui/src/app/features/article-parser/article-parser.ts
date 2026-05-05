@@ -267,6 +267,7 @@ export class ArticleParser {
 
   toggleEditMode(): void {
     this.state.editMode = !this.state.editMode;
+    this.isStatusPickerOpen = false;
 
     if (this.state.editMode) {
       this.syncTagsToText();
