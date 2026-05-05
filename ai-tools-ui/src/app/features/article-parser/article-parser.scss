@@ -8,6 +8,43 @@
   color: var(--dark-text-color);
 }
 
+:host ::ng-deep .entity-chip-military {
+  background-color: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+
+:host ::ng-deep .entity-chip-manufacturer {
+  background-color: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fcd34d;
+}
+
+:host ::ng-deep .entity-chip-contract {
+  background-color: #f3e8ff;
+  color: #6b21a8;
+  border: 1px solid #d8b4fe;
+}
+
+:host ::ng-deep .chip-compact.p-chip {
+  padding: 0.125rem 0.45rem;
+  gap: 0.2rem;
+  min-height: 1.375rem;
+  font-size: 12px;
+}
+
+:host ::ng-deep .chip-compact.p-chip .p-chip-label {
+  line-height: 1.25;
+  margin: 0;
+  padding: 0;
+}
+
+:host ::ng-deep .chip-compact.p-chip .p-chip-remove-icon {
+  width: 0.875rem;
+  height: 0.875rem;
+  margin-inline-start: 0.1rem;
+}
+
 :host ::ng-deep .chip-item {
   background-color: var(--default-chips-color);
   color: var(--dark-text-color);
@@ -345,6 +382,11 @@
   }
 }
 
+.entity-block--edit {
+  margin-top: 10px;
+  margin-bottom: 0;
+}
+
 .full-width {
   width: 100%;
 }
@@ -358,11 +400,55 @@
   margin-top: 12px;
 }
 
+/* Единая вертикаль для чипов: фиксированная колонка подписей (по самой длинной строке). */
+.meta-tags--entity-row {
+  --entity-meta-label-width: 18rem;
+
+  display: grid;
+  grid-template-columns: var(--entity-meta-label-width) minmax(0, 1fr);
+  column-gap: 10px;
+  row-gap: 8px;
+  align-items: start;
+}
+
+.meta-tags--entity-row .entity-row-title {
+  grid-column: 1;
+  margin: 0;
+  padding-top: 0.125rem;
+  line-height: 1.35;
+  font-size: var(--font-size-prewiew);
+  font-weight: var(--font-weight-semibold);
+  color: var(--primary-text-color);
+}
+
+.meta-tags--entity-row .tags {
+  grid-column: 2;
+  margin-top: 0;
+  align-items: center;
+  align-content: start;
+}
+
+.meta-tags--entity-row > .entity-block--edit {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 640px) {
+  .meta-tags--entity-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .meta-tags--entity-row .entity-row-title,
+  .meta-tags--entity-row .tags {
+    grid-column: 1;
+  }
+}
+
 .tags {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   margin-top: 8px;
+  align-items: center;
 }
 
 .tag {
@@ -820,12 +906,27 @@
   box-shadow: none !important;
 }
 
-:host ::ng-deep .highlighted-entity {
+:host ::ng-deep .highlighted-entity-military,
+:host ::ng-deep .highlighted-entity-manufacturer,
+:host ::ng-deep .highlighted-entity-contract {
   font-weight: var(--font-weight-medium);
-  color: var(--primary-text-color-light);
-  background: var(--active-select-color);
   padding: 2px 3px;
   border-radius: 2px;
+}
+
+:host ::ng-deep .highlighted-entity-military {
+  color: #991b1b;
+  background: #fee2e2;
+}
+
+:host ::ng-deep .highlighted-entity-manufacturer {
+  color: #92400e;
+  background: #fef3c7;
+}
+
+:host ::ng-deep .highlighted-entity-contract {
+  color: #6b21a8;
+  background: #f3e8ff;
 }
 
 .custom-textarea-scroll {

@@ -423,6 +423,17 @@ export class ArticleParser {
       .filter(Boolean);
   }
 
+  removeEntityItem(
+    field: 'military_equipment' | 'manufacturers' | 'contracts',
+    item: string,
+  ): void {
+    if (!this.state.entities) {
+      return;
+    }
+
+    this.state.entities[field] = this.state.entities[field].filter((x) => x !== item);
+  }
+
   // =========================
   // ЗАГЛУШКИ
   // =========================
@@ -625,24 +636,34 @@ export class ArticleParser {
 
   get highlightedArticleText(): string {
     const text = this.state.article?.text || '';
+    const ent = this.state.entities;
 
-    const entities = [
-      ...(this.state.entities?.military_equipment || []),
-      ...(this.state.entities?.manufacturers || []),
-      ...(this.state.entities?.contracts || []),
-    ]
-      .filter(Boolean)
-      .sort((a, b) => b.length - a.length);
+    const sortDesc = (a: string, b: string) => b.length - a.length;
+    const military = [...(ent?.military_equipment || [])].filter(Boolean).sort(sortDesc);
+    const manufacturers = [...(ent?.manufacturers || [])].filter(Boolean).sort(sortDesc);
+    const contracts = [...(ent?.contracts || [])].filter(Boolean).sort(sortDesc);
 
-    if (!entities.length) {
+    if (!military.length && !manufacturers.length && !contracts.length) {
       return this.escapeHtml(text).replace(/\n/g, '<br>');
     }
 
     let result = this.escapeHtml(text);
+    result = this.applyEntityHighlights(result, military, 'highlighted-entity-military');
+    result = this.applyEntityHighlights(result, manufacturers, 'highlighted-entity-manufacturer');
+    result = this.applyEntityHighlights(result, contracts, 'highlighted-entity-contract');
 
-    entities.forEach((entity) => {
+    return result.replace(/\n/g, '<br>');
+  }
+
+  private applyEntityHighlights(
+    html: string,
+    entities: string[],
+    className: string,
+  ): string {
+    let result = html;
+
+    for (const entity of entities) {
       const escapedEntity = this.escapeHtml(entity.trim());
-
       const pattern = this.createFlexibleEntityPattern(escapedEntity);
 
       result = result.replace(pattern, (match) => {
@@ -650,11 +671,11 @@ export class ArticleParser {
           return match;
         }
 
-        return `<span class="highlighted-entity">${match}</span>`;
+        return `<span class="${className}">${match}</span>`;
       });
-    });
+    }
 
-    return result.replace(/\n/g, '<br>');
+    return result;
   }
 
   private createFlexibleEntityPattern(value: string): RegExp {
