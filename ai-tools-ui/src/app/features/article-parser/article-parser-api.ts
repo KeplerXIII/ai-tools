@@ -24,6 +24,26 @@ export interface ExtractResponse {
   document_id?: string;
   from_cache?: boolean;
   version?: number;
+  published_at?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  translated_content?: string | null;
+  original_summary?: string | null;
+  translated_summary?: string | null;
+  original_summary_stale?: boolean;
+  translated_summary_stale?: boolean;
+  statuses?: {
+    code: string;
+    name_ru: string;
+    description: string | null;
+    assigned_at: string;
+    assigned_by_id: string | null;
+  }[];
+  original_tags?: string[];
+  translated_tags?: string[];
+  entities_military_equipment?: string[];
+  entities_manufacturers?: string[];
+  entities_contracts?: string[];
 }
 
 export interface EntitiesResponse {
@@ -305,7 +325,7 @@ export class ArticleParserApi {
   }
 
   tagText(text: string, maxTags = 12) {
-    return this.http.post<{ tags: string[] }>('/api/v1/extract/tags', {
+    return this.http.post<{ tags: string[] }>('/api/v1/documents/{document_id}/tags', {
       text,
       max_tags: maxTags,
     });

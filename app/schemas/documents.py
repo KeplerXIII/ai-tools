@@ -13,6 +13,20 @@ class DocumentExtractResponse(ExtractResponse):
     document_id: uuid.UUID
     from_cache: bool
     version: int = 1
+    published_at: datetime | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+    translated_content: str | None = None
+    original_summary: str | None = None
+    translated_summary: str | None = None
+    original_summary_stale: bool = False
+    translated_summary_stale: bool = False
+    statuses: list["DocumentStatusItem"] = []
+    original_tags: list[str] = []
+    translated_tags: list[str] = []
+    entities_military_equipment: list[str] = []
+    entities_manufacturers: list[str] = []
+    entities_contracts: list[str] = []
 
 
 class DocumentTranslateRequest(BaseModel):

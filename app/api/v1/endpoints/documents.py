@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -21,6 +20,7 @@ from app.api.deps import (
 from app.api.error_mapping import map_app_error
 from app.domain.errors import AppError
 from app.infrastructure.db.models import Document, DocumentStatus, DocumentStatusAssignment, User
+from app.infrastructure.db.models import DocumentEntity, DocumentTag, Entity, EntityType, Tag
 from app.infrastructure.db.session import AsyncSessionLocal, get_db
 from app.schemas.documents import (
     DocumentExtractResponse,
@@ -37,7 +37,6 @@ from app.schemas.documents import (
     ExtractUrlPersistRequest,
     SummarySource,
 )
-from app.schemas.extract import ImageInfo
 from app.services.documents.document_pipeline import (
     acquire_edit_lock,
     create_document_after_extract,
@@ -80,16 +79,83 @@ def _sse_error(message: str) -> bytes:
     return f"event: error\ndata: {safe}\n\n".encode("utf-8")
 
 
-def _images_from_extract(data: dict[str, Any]) -> list[ImageInfo]:
-    out: list[ImageInfo] = []
-    for x in data.get("images") or []:
-        if not isinstance(x, dict):
+async def _get_document_status_items(db: AsyncSession, document_id: UUID) -> list[DocumentStatusItem]:
+    result = await db.execute(
+        select(
+            DocumentStatus.code,
+            DocumentStatus.name_ru,
+            DocumentStatus.description,
+            DocumentStatusAssignment.assigned_at,
+            DocumentStatusAssignment.assigned_by_id,
+        )
+        .join(DocumentStatus, DocumentStatus.id == DocumentStatusAssignment.status_id)
+        .where(DocumentStatusAssignment.document_id == document_id)
+        .order_by(DocumentStatusAssignment.assigned_at.desc(), DocumentStatus.code.asc())
+    )
+    return [
+        DocumentStatusItem(
+            code=row.code,
+            name_ru=row.name_ru,
+            description=row.description,
+            assigned_at=row.assigned_at,
+            assigned_by_id=row.assigned_by_id,
+        )
+        for row in result
+    ]
+
+
+async def _get_document_tags(
+    db: AsyncSession,
+    doc: Document,
+) -> tuple[list[str], list[str]]:
+    rows = await db.execute(
+        select(Tag.name, Tag.language_id)
+        .join(DocumentTag, DocumentTag.tag_id == Tag.id)
+        .where(DocumentTag.document_id == doc.id)
+        .order_by(Tag.name.asc())
+    )
+    original_tags: list[str] = []
+    translated_tags: list[str] = []
+    for row in rows:
+        name = row.name
+        if not name:
             continue
-        u = x.get("url")
-        if not u:
+        if row.language_id == doc.original_language_id:
+            original_tags.append(name)
+        elif doc.translated_language_id is not None and row.language_id == doc.translated_language_id:
+            translated_tags.append(name)
+        else:
+            original_tags.append(name)
+    return original_tags, translated_tags
+
+
+async def _get_document_entities(
+    db: AsyncSession,
+    document_id: UUID,
+) -> tuple[list[str], list[str], list[str]]:
+    rows = await db.execute(
+        select(EntityType.code, Entity.name)
+        .select_from(DocumentEntity)
+        .join(Entity, Entity.id == DocumentEntity.entity_id)
+        .join(EntityType, EntityType.id == Entity.entity_type_id)
+        .where(DocumentEntity.document_id == document_id)
+        .order_by(EntityType.code.asc(), Entity.name.asc())
+    )
+    military_equipment: list[str] = []
+    manufacturers: list[str] = []
+    contracts: list[str] = []
+    for row in rows:
+        name = row.name
+        if not name:
             continue
-        out.append(ImageInfo(url=str(u), alt=x.get("alt"), title=x.get("title")))
-    return out
+        code = row.code
+        if code == "military_equipment":
+            military_equipment.append(name)
+        elif code == "manufacturer":
+            manufacturers.append(name)
+        elif code == "contract":
+            contracts.append(name)
+    return military_equipment, manufacturers, contracts
 
 
 
@@ -118,7 +184,21 @@ async def extract_url_persist(
                         existing.extracted_main_image = extracted_main_image
             except Exception:
                 logger.exception("failed to backfill extract images for cached document", extra={"url": url_str})
-        return document_to_extract_response(existing, from_cache=True)
+        statuses = await _get_document_status_items(db, existing.id)
+        original_tags, translated_tags = await _get_document_tags(db, existing)
+        entities_military_equipment, entities_manufacturers, entities_contracts = await _get_document_entities(
+            db, existing.id
+        )
+        return document_to_extract_response(
+            existing,
+            from_cache=True,
+            statuses=statuses,
+            original_tags=original_tags,
+            translated_tags=translated_tags,
+            entities_military_equipment=entities_military_equipment,
+            entities_manufacturers=entities_manufacturers,
+            entities_contracts=entities_contracts,
+        )
 
     t0 = time.perf_counter()
     html = await download_html(url_str)
@@ -143,7 +223,6 @@ async def extract_url_persist(
                 started_by_id=created_by_id,
             )
             doc_id = doc.id
-            ver = doc.version
     except IntegrityError:
         await db.rollback()
         existing2 = await get_document_by_source_url(db, url_str)
@@ -151,21 +230,18 @@ async def extract_url_persist(
             return document_to_extract_response(existing2, from_cache=True)
         raise
 
-    return DocumentExtractResponse(
-        title=data.get("title") or None,
-        author=data.get("author"),
-        date=data.get("date"),
-        url=data.get("url"),
-        text=data["text"],
-        length=data["length"],
-        method=data["method"],
-        quality=data["quality"],
-        needs_review=data["needs_review"],
-        images=_images_from_extract(data),
-        main_image=(str(data["main_image"]) if data.get("main_image") else None),
-        document_id=doc_id,
+    created_doc = await db.get(Document, doc_id)
+    if created_doc is None:
+        raise HTTPException(status_code=500, detail="Не удалось загрузить созданный документ")
+    return document_to_extract_response(
+        created_doc,
         from_cache=False,
-        version=ver,
+        statuses=[],
+        original_tags=[],
+        translated_tags=[],
+        entities_military_equipment=[],
+        entities_manufacturers=[],
+        entities_contracts=[],
     )
 
 
@@ -182,28 +258,7 @@ async def document_statuses(
     if doc is None:
         raise HTTPException(status_code=404, detail="Документ не найден")
 
-    result = await db.execute(
-        select(
-            DocumentStatus.code,
-            DocumentStatus.name_ru,
-            DocumentStatus.description,
-            DocumentStatusAssignment.assigned_at,
-            DocumentStatusAssignment.assigned_by_id,
-        )
-        .join(DocumentStatus, DocumentStatus.id == DocumentStatusAssignment.status_id)
-        .where(DocumentStatusAssignment.document_id == document_id)
-        .order_by(DocumentStatusAssignment.assigned_at.desc(), DocumentStatus.code.asc())
-    )
-    statuses = [
-        DocumentStatusItem(
-            code=row.code,
-            name_ru=row.name_ru,
-            description=row.description,
-            assigned_at=row.assigned_at,
-            assigned_by_id=row.assigned_by_id,
-        )
-        for row in result
-    ]
+    statuses = await _get_document_status_items(db, document_id)
     return DocumentStatusesResponse(document_id=document_id, statuses=statuses)
 
 

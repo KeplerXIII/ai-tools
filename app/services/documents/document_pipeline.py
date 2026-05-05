@@ -22,7 +22,12 @@ from app.infrastructure.db.models import (
     ProcessingJob,
     Tag,
 )
-from app.schemas.documents import DocumentExtractResponse, DocumentUpdateRequest, SummarySource
+from app.schemas.documents import (
+    DocumentExtractResponse,
+    DocumentStatusItem,
+    DocumentUpdateRequest,
+    SummarySource,
+)
 from app.schemas.extract import ImageInfo
 from app.schemas.extract import RefineSummaryMode
 from app.services.documents.db_refs import (
@@ -52,7 +57,17 @@ async def get_document_by_source_url(session: AsyncSession, url: str) -> Documen
     return q.scalar_one_or_none()
 
 
-def document_to_extract_response(doc: Document, *, from_cache: bool) -> DocumentExtractResponse:
+def document_to_extract_response(
+    doc: Document,
+    *,
+    from_cache: bool,
+    statuses: list[DocumentStatusItem] | None = None,
+    original_tags: list[str] | None = None,
+    translated_tags: list[str] | None = None,
+    entities_military_equipment: list[str] | None = None,
+    entities_manufacturers: list[str] | None = None,
+    entities_contracts: list[str] | None = None,
+) -> DocumentExtractResponse:
     images: list[ImageInfo] = []
     for item in doc.extracted_images or []:
         if not isinstance(item, dict):
@@ -82,6 +97,20 @@ def document_to_extract_response(doc: Document, *, from_cache: bool) -> Document
         document_id=doc.id,
         from_cache=from_cache,
         version=doc.version,
+        published_at=doc.published_at,
+        created_at=doc.created_at,
+        updated_at=doc.updated_at,
+        translated_content=doc.translated_content,
+        original_summary=doc.original_summary,
+        translated_summary=doc.translated_summary,
+        original_summary_stale=bool(doc.original_summary_stale),
+        translated_summary_stale=bool(doc.translated_summary_stale),
+        statuses=statuses or [],
+        original_tags=original_tags or [],
+        translated_tags=translated_tags or [],
+        entities_military_equipment=entities_military_equipment or [],
+        entities_manufacturers=entities_manufacturers or [],
+        entities_contracts=entities_contracts or [],
     )
 
 

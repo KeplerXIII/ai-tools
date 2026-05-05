@@ -101,6 +101,16 @@ export class ArticleParser {
     this.api.extractByUrl(value).subscribe({
       next: (response) => {
         this.state.article = response;
+        this.state.translatedText = response.translated_content?.trim() || '';
+        this.state.annotation = (response.translated_summary || response.original_summary || '').trim();
+        this.state.originalTags = response.original_tags || [];
+        this.state.translatedTags = response.translated_tags || [];
+        this.syncTagsToText();
+        this.state.entities = {
+          military_equipment: response.entities_military_equipment || [],
+          manufacturers: response.entities_manufacturers || [],
+          contracts: response.entities_contracts || [],
+        };
         this.loadingArticle = false;
       },
       error: () => {
