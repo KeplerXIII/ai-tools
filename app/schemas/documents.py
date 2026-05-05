@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from enum import Enum
 
 from pydantic import BaseModel, Field, HttpUrl, model_validator
@@ -21,6 +22,23 @@ class DocumentTranslateRequest(BaseModel):
 class DocumentTagRequest(BaseModel):
     max_tags: int = Field(default=12, ge=1, le=50)
     use_translation: bool = False
+
+
+class DocumentStatusAssignRequest(BaseModel):
+    code: str = Field(min_length=1, max_length=64)
+
+
+class DocumentStatusItem(BaseModel):
+    code: str
+    name_ru: str
+    description: str | None = None
+    assigned_at: datetime
+    assigned_by_id: uuid.UUID | None = None
+
+
+class DocumentStatusesResponse(BaseModel):
+    document_id: uuid.UUID
+    statuses: list[DocumentStatusItem]
 
 
 class SummarySource(str, Enum):

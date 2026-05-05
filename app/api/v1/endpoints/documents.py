@@ -8,6 +8,8 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
+from sqlalchemy import delete, select
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,12 +20,15 @@ from app.api.deps import (
 )
 from app.api.error_mapping import map_app_error
 from app.domain.errors import AppError
-from app.infrastructure.db.models import Document, User
+from app.infrastructure.db.models import Document, DocumentStatus, DocumentStatusAssignment, User
 from app.infrastructure.db.session import AsyncSessionLocal, get_db
 from app.schemas.documents import (
     DocumentExtractResponse,
     DocumentRefineSummaryRequest,
     DocumentRefineSummaryResponse,
+    DocumentStatusAssignRequest,
+    DocumentStatusesResponse,
+    DocumentStatusItem,
     DocumentSummaryRequest,
     DocumentSummaryResponse,
     DocumentTagRequest,
@@ -138,6 +143,104 @@ async def extract_url_persist(
 
 def _handle(exc: AppError):
     raise map_app_error(exc) from exc
+
+
+@router.get("/{document_id}/statuses", response_model=DocumentStatusesResponse)
+async def document_statuses(
+    document_id: UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    doc = await db.get(Document, document_id)
+    if doc is None:
+        raise HTTPException(status_code=404, detail="Документ не найден")
+
+    result = await db.execute(
+        select(
+            DocumentStatus.code,
+            DocumentStatus.name_ru,
+            DocumentStatus.description,
+            DocumentStatusAssignment.assigned_at,
+            DocumentStatusAssignment.assigned_by_id,
+        )
+        .join(DocumentStatus, DocumentStatus.id == DocumentStatusAssignment.status_id)
+        .where(DocumentStatusAssignment.document_id == document_id)
+        .order_by(DocumentStatusAssignment.assigned_at.desc(), DocumentStatus.code.asc())
+    )
+    statuses = [
+        DocumentStatusItem(
+            code=row.code,
+            name_ru=row.name_ru,
+            description=row.description,
+            assigned_at=row.assigned_at,
+            assigned_by_id=row.assigned_by_id,
+        )
+        for row in result
+    ]
+    return DocumentStatusesResponse(document_id=document_id, statuses=statuses)
+
+
+@router.post("/{document_id}/statuses")
+async def assign_document_status(
+    document_id: UUID,
+    payload: DocumentStatusAssignRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    status_code = payload.code.strip().lower()
+    if not status_code:
+        raise HTTPException(status_code=400, detail="Код статуса не должен быть пустым")
+
+    doc = await db.get(Document, document_id)
+    if doc is None:
+        raise HTTPException(status_code=404, detail="Документ не найден")
+
+    status_id = await db.scalar(select(DocumentStatus.id).where(DocumentStatus.code == status_code))
+    if status_id is None:
+        raise HTTPException(status_code=404, detail="Статус не найден")
+
+    await _prepare_write_session(db)
+    async with db.begin():
+        stmt = insert(DocumentStatusAssignment).values(
+            document_id=document_id,
+            status_id=status_id,
+            assigned_by_id=user.id,
+        )
+        stmt = stmt.on_conflict_do_nothing(
+            index_elements=[DocumentStatusAssignment.document_id, DocumentStatusAssignment.status_id]
+        )
+        await db.execute(stmt)
+    return {"ok": True, "document_id": str(document_id), "status_code": status_code}
+
+
+@router.delete("/{document_id}/statuses/{status_code}")
+async def remove_document_status(
+    document_id: UUID,
+    status_code: str,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    _ = user
+    normalized_code = status_code.strip().lower()
+    if not normalized_code:
+        raise HTTPException(status_code=400, detail="Код статуса не должен быть пустым")
+
+    doc = await db.get(Document, document_id)
+    if doc is None:
+        raise HTTPException(status_code=404, detail="Документ не найден")
+
+    status_id = await db.scalar(select(DocumentStatus.id).where(DocumentStatus.code == normalized_code))
+    if status_id is None:
+        raise HTTPException(status_code=404, detail="Статус не найден")
+
+    await _prepare_write_session(db)
+    async with db.begin():
+        await db.execute(
+            delete(DocumentStatusAssignment).where(
+                DocumentStatusAssignment.document_id == document_id,
+                DocumentStatusAssignment.status_id == status_id,
+            )
+        )
+    return {"ok": True, "document_id": str(document_id), "status_code": normalized_code}
 
 
 @router.post("/{document_id}/translate/stream")
