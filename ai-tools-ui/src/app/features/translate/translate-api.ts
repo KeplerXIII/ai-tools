@@ -36,6 +36,7 @@ export class TranslateApi {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        Accept: 'text/event-stream',
       },
       body: JSON.stringify({
         text,
@@ -74,6 +75,10 @@ export class TranslateApi {
 
       for (const line of lines) {
         const trimmedLine = line.trim();
+
+        if (trimmedLine.startsWith('event: error')) {
+          throw new Error('Ошибка потокового перевода');
+        }
 
         if (!trimmedLine.startsWith('data:')) {
           continue;

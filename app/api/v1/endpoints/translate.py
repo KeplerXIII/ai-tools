@@ -15,9 +15,12 @@ router = APIRouter(prefix="/translate", tags=["translate"])
 async def _safe_stream_bytes(stream):
     try:
         async for part in bytes_from_text_stream(stream):
-            yield part
+            text = part.decode("utf-8", errors="replace")
+            yield f"data: {text}\n\n".encode("utf-8")
+        yield b"data: [DONE]\n\n"
     except Exception as exc:
-        yield f"\n[stream_error] {exc}\n".encode("utf-8")
+        msg = str(exc).replace("\n", " ").strip()
+        yield f"event: error\ndata: {msg}\n\n".encode("utf-8")
 
 
 @router.post("", response_model=TranslateResponse)
@@ -64,9 +67,11 @@ async def translate_stream(payload: TranslateRequest):
 
     return StreamingResponse(
         _safe_stream_bytes(stream),
-        media_type="text/plain; charset=utf-8",
+        media_type="text/event-stream",
         headers={
             "X-Source-Lang": source_lang,
             "X-Target-Lang": payload.target_lang,
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
         },
     )
