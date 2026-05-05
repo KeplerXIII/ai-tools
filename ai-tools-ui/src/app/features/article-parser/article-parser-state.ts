@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 
 import {
+  DocumentTagRef,
   EntitiesResponse,
   ExtractResponse,
 } from './article-parser-api';
@@ -14,11 +15,8 @@ export class ArticleParserState {
   article: ExtractResponse | null = null;
   entities: EntitiesResponse | null = null;
 
-  originalTags: string[] = [];
-  translatedTags: string[] = [];
-
-  originalTagsText = '';
-  translatedTagsText = '';
+  originalTags: DocumentTagRef[] = [];
+  translatedTags: DocumentTagRef[] = [];
 
   translatedText = '';
   annotation = '';
@@ -33,8 +31,6 @@ export class ArticleParserState {
     this.entities = null;
     this.originalTags = [];
     this.translatedTags = [];
-    this.originalTagsText = '';
-    this.translatedTagsText = '';
     this.translatedText = '';
     this.annotation = '';
     this.editMode = false;

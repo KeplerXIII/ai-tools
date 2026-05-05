@@ -14,6 +14,11 @@ class DocumentEntityItem(BaseModel):
     name: str
 
 
+class DocumentTagItem(BaseModel):
+    id: uuid.UUID
+    name: str
+
+
 class DocumentExtractResponse(ExtractResponse):
     document_id: uuid.UUID
     from_cache: bool
@@ -27,8 +32,8 @@ class DocumentExtractResponse(ExtractResponse):
     original_summary_stale: bool = False
     translated_summary_stale: bool = False
     statuses: list["DocumentStatusItem"] = []
-    original_tags: list[str] = []
-    translated_tags: list[str] = []
+    original_tags: list[DocumentTagItem] = []
+    translated_tags: list[DocumentTagItem] = []
     entities_military_equipment: list[DocumentEntityItem] = []
     entities_manufacturers: list[DocumentEntityItem] = []
     entities_contracts: list[DocumentEntityItem] = []
@@ -41,6 +46,16 @@ class DocumentTranslateRequest(BaseModel):
 class DocumentTagRequest(BaseModel):
     max_tags: int = Field(default=12, ge=1, le=50)
     use_translation: bool = False
+
+
+class DocumentTagsResponse(BaseModel):
+    document_id: uuid.UUID
+    original_tags: list[DocumentTagItem]
+    translated_tags: list[DocumentTagItem]
+
+
+class DocumentTagAssignRequest(BaseModel):
+    tag_id: uuid.UUID
 
 
 class DocumentEntitiesExtractResponse(BaseModel):

@@ -11,7 +11,13 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { ChipModule } from 'primeng/chip';
 import { ImageModule } from 'primeng/image';
 import { TextareaModule } from 'primeng/textarea';
-import { ArticleParserApi, DocumentEntityRef, EntitiesResponse } from './article-parser-api';
+import {
+  ArticleParserApi,
+  DocumentEntityRef,
+  DocumentTagRef,
+  DocumentTagsResponse,
+  EntitiesResponse,
+} from './article-parser-api';
 import { ArticleParserState } from './article-parser-state';
 import {
   ButtonVariant,
@@ -28,6 +34,8 @@ export type ArticleParserBlock =
   | 'annotation';
 
 export type EntitySection = 'military_equipment' | 'manufacturers' | 'contracts';
+
+export type TagScope = 'original' | 'translated';
 
 @Component({
   selector: 'app-article-parser',
@@ -82,6 +90,12 @@ export class ArticleParser {
   loadingEntityPickerCatalog = false;
   loadingDocumentEntitiesMutation = false;
 
+  tagPickerOpen: TagScope | null = null;
+  tagPickerSearch = '';
+  tagPickerCatalogItems: DocumentTagRef[] = [];
+  loadingTagPickerCatalog = false;
+  loadingDocumentTagsMutation = false;
+
   isEditingStatusBlock = false;
   isEditingMetaBlock = false;
   isEditingEntitiesBlock = false;
@@ -125,8 +139,6 @@ export class ArticleParser {
     this.state.annotation = '';
     this.state.originalTags = [];
     this.state.translatedTags = [];
-    this.state.originalTagsText = '';
-    this.state.translatedTagsText = '';
     this.state.editMode = false;
     this.resetBlockEditors();
 
@@ -141,7 +153,6 @@ export class ArticleParser {
         this.state.annotation = (response.translated_summary || response.original_summary || '').trim();
         this.state.originalTags = response.original_tags || [];
         this.state.translatedTags = response.translated_tags || [];
-        this.syncTagsToText();
         this.state.entities = {
           military_equipment: response.entities_military_equipment || [],
           manufacturers: response.entities_manufacturers || [],
@@ -188,7 +199,6 @@ export class ArticleParser {
     this.state.translatedText = '';
     this.state.annotation = '';
     this.state.translatedTags = [];
-    this.state.translatedTagsText = '';
 
     this.scrollToElement(() => this.translationSkeleton);
 
@@ -303,14 +313,13 @@ export class ArticleParser {
     this.state.editMode = !this.state.editMode;
     this.isStatusPickerOpen = false;
     this.closeEntityPicker();
+    this.closeTagPicker();
 
     if (this.state.editMode) {
-      this.syncTagsToText();
       return;
     }
 
     this.resetBlockEditors();
-    this.applyEditedTags();
   }
 
   toggleBlockEdit(block: ArticleParserBlock): void {
@@ -328,6 +337,7 @@ export class ArticleParser {
         this.isEditingEntitiesBlock = !this.isEditingEntitiesBlock;
         if (!this.isEditingEntitiesBlock) {
           this.closeEntityPicker();
+          this.closeTagPicker();
         }
         break;
       case 'original':
@@ -359,6 +369,14 @@ export class ArticleParser {
     this.isEditingAnnotationBlock = false;
     this.isStatusPickerOpen = false;
     this.closeEntityPicker();
+    this.closeTagPicker();
+  }
+
+  private closeTagPicker(): void {
+    this.tagPickerOpen = null;
+    this.tagPickerSearch = '';
+    this.tagPickerCatalogItems = [];
+    this.loadingTagPickerCatalog = false;
   }
 
   private closeEntityPicker(): void {
@@ -454,27 +472,92 @@ export class ArticleParser {
     });
   }
 
-  applyEditedTags(): void {
-    this.state.originalTags = this.textToTags(this.state.originalTagsText);
-    this.state.translatedTags = this.textToTags(this.state.translatedTagsText);
+  toggleTagPicker(scope: TagScope): void {
+    if (!this.isEditingEntitiesBlock || !this.state.article?.document_id) {
+      return;
+    }
+
+    if (this.tagPickerOpen === scope) {
+      this.closeTagPicker();
+      return;
+    }
+
+    this.tagPickerOpen = scope;
+    this.tagPickerSearch = '';
+    this.tagPickerCatalogItems = [];
+    const docId = this.state.article.document_id;
+    this.loadingTagPickerCatalog = true;
+
+    this.api.getTagCatalog(docId, scope).subscribe({
+      next: (items: DocumentTagRef[]) => {
+        this.tagPickerCatalogItems = items;
+        this.loadingTagPickerCatalog = false;
+      },
+      error: () => {
+        if (scope === 'original') {
+          this.originalTagsError = 'Не удалось загрузить каталог тегов';
+        } else {
+          this.translatedTagsError = 'Не удалось загрузить каталог тегов';
+        }
+        this.loadingTagPickerCatalog = false;
+        this.closeTagPicker();
+      },
+    });
   }
 
-  private syncTagsToText(): void {
-    this.state.originalTagsText = this.state.originalTags.join('\n');
-    this.state.translatedTagsText = this.state.translatedTags.join('\n');
+  get filteredTagPickerItems(): DocumentTagRef[] {
+    const q = this.tagPickerSearch.trim().toLowerCase();
+    if (!q) {
+      return this.tagPickerCatalogItems;
+    }
+    return this.tagPickerCatalogItems.filter((item) => item.name.toLowerCase().includes(q));
   }
 
-  private textToTags(value: string): string[] {
-    return value
-      .split('\n')
-      .map((x) => x.trim())
-      .filter(Boolean)
-      .filter((x, i, arr) => arr.indexOf(x) === i);
+  onTagPickerSelect(item: DocumentTagRef): void {
+    const docId = this.state.article?.document_id;
+    if (!docId || this.loadingDocumentTagsMutation) {
+      return;
+    }
+
+    this.loadingDocumentTagsMutation = true;
+    this.originalTagsError = '';
+    this.translatedTagsError = '';
+
+    this.api.assignDocumentTag(docId, item.id).subscribe({
+      next: () => {
+        this.closeTagPicker();
+        this.refreshDocumentTagsFromServer(docId);
+      },
+      error: () => {
+        const scope = this.tagPickerOpen;
+        if (scope === 'translated') {
+          this.translatedTagsError = 'Не удалось добавить тег';
+        } else {
+          this.originalTagsError = 'Не удалось добавить тег';
+        }
+        this.loadingDocumentTagsMutation = false;
+      },
+    });
+  }
+
+  private refreshDocumentTagsFromServer(documentId: string): void {
+    this.api.getDocumentTags(documentId).subscribe({
+      next: (res: DocumentTagsResponse) => {
+        this.state.originalTags = res.original_tags || [];
+        this.state.translatedTags = res.translated_tags || [];
+        this.loadingDocumentTagsMutation = false;
+      },
+      error: () => {
+        this.originalTagsError = 'Не удалось обновить список тегов';
+        this.translatedTagsError = 'Не удалось обновить список тегов';
+        this.loadingDocumentTagsMutation = false;
+      },
+    });
   }
 
   private reloadTagsFromServer(kind: 'original' | 'translated'): void {
-    const url = this.state.url.trim();
-    if (!url) {
+    const documentId = this.state.article?.document_id;
+    if (!documentId) {
       if (kind === 'original') {
         this.loadingOriginalTags = false;
       } else {
@@ -483,13 +566,10 @@ export class ArticleParser {
       return;
     }
 
-    this.api.extractByUrl(url).subscribe({
-      next: (response) => {
-        this.state.article = response;
-        this.syncDocumentStatusTagsFromArticle();
-        this.state.originalTags = response.original_tags || [];
-        this.state.translatedTags = response.translated_tags || [];
-        this.syncTagsToText();
+    this.api.getDocumentTags(documentId).subscribe({
+      next: (res: DocumentTagsResponse) => {
+        this.state.originalTags = res.original_tags || [];
+        this.state.translatedTags = res.translated_tags || [];
         this.loadingOriginalTags = false;
         this.loadingTranslatedTags = false;
         this.cdr.detectChanges();
@@ -553,14 +633,44 @@ export class ArticleParser {
     });
   }
 
-  removeOriginalTag(tag: string): void {
-    this.state.originalTags = this.state.originalTags.filter((item) => item !== tag);
-    this.syncTagsToText();
+  removeOriginalTag(tag: DocumentTagRef): void {
+    const docId = this.state.article?.document_id;
+    if (!docId || this.loadingDocumentTagsMutation) {
+      return;
+    }
+
+    this.loadingDocumentTagsMutation = true;
+    this.originalTagsError = '';
+
+    this.api.removeDocumentTag(docId, tag.id).subscribe({
+      next: () => {
+        this.refreshDocumentTagsFromServer(docId);
+      },
+      error: () => {
+        this.originalTagsError = 'Не удалось удалить тег';
+        this.loadingDocumentTagsMutation = false;
+      },
+    });
   }
 
-  removeTranslatedTag(tag: string): void {
-    this.state.translatedTags = this.state.translatedTags.filter((item) => item !== tag);
-    this.syncTagsToText();
+  removeTranslatedTag(tag: DocumentTagRef): void {
+    const docId = this.state.article?.document_id;
+    if (!docId || this.loadingDocumentTagsMutation) {
+      return;
+    }
+
+    this.loadingDocumentTagsMutation = true;
+    this.translatedTagsError = '';
+
+    this.api.removeDocumentTag(docId, tag.id).subscribe({
+      next: () => {
+        this.refreshDocumentTagsFromServer(docId);
+      },
+      error: () => {
+        this.translatedTagsError = 'Не удалось удалить тег';
+        this.loadingDocumentTagsMutation = false;
+      },
+    });
   }
 
   addDocumentStatus(): void {

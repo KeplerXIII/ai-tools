@@ -35,13 +35,16 @@ from app.schemas.documents import (
     DocumentStatusItem,
     DocumentSummaryRequest,
     DocumentSummaryResponse,
+    DocumentTagAssignRequest,
+    DocumentTagItem,
     DocumentTagRequest,
+    DocumentTagsResponse,
     DocumentTranslateRequest,
     DocumentUpdateRequest,
     ExtractUrlPersistRequest,
     SummarySource,
 )
-from app.services.documents.db_refs import entity_type_id_by_code, prediction_source_id
+from app.services.documents.db_refs import entity_type_id_by_code, language_id_by_code, prediction_source_id
 from app.services.documents.document_pipeline import (
     acquire_edit_lock,
     create_document_after_extract,
@@ -67,6 +70,7 @@ router = APIRouter(prefix="/documents", tags=["documents"])
 logger = logging.getLogger(__name__)
 
 DOCUMENT_ENTITY_TYPE_CODES = frozenset({"military_equipment", "manufacturer", "contract"})
+TAG_LANGUAGE_SCOPES = frozenset({"original", "translated"})
 
 
 async def _prepare_write_session(db: AsyncSession) -> None:
@@ -114,26 +118,46 @@ async def _get_document_status_items(db: AsyncSession, document_id: UUID) -> lis
 async def _get_document_tags(
     db: AsyncSession,
     doc: Document,
-) -> tuple[list[str], list[str]]:
+) -> tuple[list[DocumentTagItem], list[DocumentTagItem]]:
     rows = await db.execute(
-        select(Tag.name, Tag.language_id)
+        select(Tag.id, Tag.name, Tag.language_id)
         .join(DocumentTag, DocumentTag.tag_id == Tag.id)
         .where(DocumentTag.document_id == doc.id)
         .order_by(Tag.name.asc())
     )
-    original_tags: list[str] = []
-    translated_tags: list[str] = []
+    original_tags: list[DocumentTagItem] = []
+    translated_tags: list[DocumentTagItem] = []
     for row in rows:
         name = row.name
         if not name:
             continue
+        item = DocumentTagItem(id=row.id, name=name)
         if row.language_id == doc.original_language_id:
-            original_tags.append(name)
+            original_tags.append(item)
         elif doc.translated_language_id is not None and row.language_id == doc.translated_language_id:
-            translated_tags.append(name)
+            translated_tags.append(item)
         else:
-            original_tags.append(name)
+            original_tags.append(item)
     return original_tags, translated_tags
+
+
+async def _tag_catalog_language_id(db: AsyncSession, doc: Document, scope: str) -> UUID:
+    if scope == "original":
+        return doc.original_language_id
+    if scope == "translated":
+        if doc.translated_language_id is not None:
+            return doc.translated_language_id
+        return await language_id_by_code(db, "ru")
+    raise HTTPException(status_code=400, detail="Недопустимый язык для каталога тегов")
+
+
+async def _document_allowed_tag_language_ids(db: AsyncSession, doc: Document) -> set[UUID]:
+    out: set[UUID] = {doc.original_language_id}
+    if doc.translated_language_id is not None:
+        out.add(doc.translated_language_id)
+    else:
+        out.add(await language_id_by_code(db, "ru"))
+    return out
 
 
 async def _get_document_entities(
@@ -235,7 +259,21 @@ async def extract_url_persist(
         await db.rollback()
         existing2 = await get_document_by_source_url(db, url_str)
         if existing2:
-            return document_to_extract_response(existing2, from_cache=True)
+            statuses = await _get_document_status_items(db, existing2.id)
+            original_tags, translated_tags = await _get_document_tags(db, existing2)
+            entities_military_equipment, entities_manufacturers, entities_contracts = await _get_document_entities(
+                db, existing2.id
+            )
+            return document_to_extract_response(
+                existing2,
+                from_cache=True,
+                statuses=statuses,
+                original_tags=original_tags,
+                translated_tags=translated_tags,
+                entities_military_equipment=entities_military_equipment,
+                entities_manufacturers=entities_manufacturers,
+                entities_contracts=entities_contracts,
+            )
         raise
 
     created_doc = await db.get(Document, doc_id)
@@ -436,6 +474,115 @@ async def document_translate(
     except AppError as exc:
         _handle(exc)
     return {"ok": True, "document_id": str(document_id)}
+
+
+@router.get("/{document_id}/tags/catalog", response_model=list[DocumentTagItem])
+async def document_tags_catalog(
+    document_id: UUID,
+    language_scope: str = Query(..., min_length=1, max_length=16),
+    db: AsyncSession = Depends(get_db),
+):
+    normalized = language_scope.strip().lower()
+    if normalized not in TAG_LANGUAGE_SCOPES:
+        raise HTTPException(status_code=400, detail="Укажите language_scope: original или translated")
+
+    doc = await db.get(Document, document_id)
+    if doc is None:
+        raise HTTPException(status_code=404, detail="Документ не найден")
+
+    lang_id = await _tag_catalog_language_id(db, doc, normalized)
+
+    assigned_rows = await db.execute(
+        select(DocumentTag.tag_id)
+        .join(Tag, Tag.id == DocumentTag.tag_id)
+        .where(
+            DocumentTag.document_id == document_id,
+            Tag.language_id == lang_id,
+        )
+    )
+    assigned_ids = {row[0] for row in assigned_rows}
+
+    stmt = select(Tag.id, Tag.name).where(Tag.language_id == lang_id).order_by(Tag.name.asc())
+    if assigned_ids:
+        stmt = stmt.where(Tag.id.not_in(assigned_ids))
+
+    rows = await db.execute(stmt)
+    return [DocumentTagItem(id=row.id, name=row.name) for row in rows]
+
+
+@router.get("/{document_id}/tags", response_model=DocumentTagsResponse)
+async def get_document_tags_snapshot(
+    document_id: UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    doc = await db.get(Document, document_id)
+    if doc is None:
+        raise HTTPException(status_code=404, detail="Документ не найден")
+
+    original_tags, translated_tags = await _get_document_tags(db, doc)
+    return DocumentTagsResponse(
+        document_id=document_id,
+        original_tags=original_tags,
+        translated_tags=translated_tags,
+    )
+
+
+@router.post("/{document_id}/tags/assign")
+async def assign_document_tag(
+    document_id: UUID,
+    payload: DocumentTagAssignRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    _ = user
+    doc = await db.get(Document, document_id)
+    if doc is None:
+        raise HTTPException(status_code=404, detail="Документ не найден")
+
+    tag_row = await db.get(Tag, payload.tag_id)
+    if tag_row is None:
+        raise HTTPException(status_code=404, detail="Тег не найден")
+
+    allowed_lang = await _document_allowed_tag_language_ids(db, doc)
+    if tag_row.language_id not in allowed_lang:
+        raise HTTPException(status_code=400, detail="Язык тега не соответствует документу")
+
+    manual_id = await prediction_source_id(db, "manual")
+    await _prepare_write_session(db)
+    async with db.begin():
+        stmt = insert(DocumentTag).values(
+            document_id=document_id,
+            tag_id=payload.tag_id,
+            prediction_source_id=manual_id,
+        )
+        stmt = stmt.on_conflict_do_nothing(
+            index_elements=[DocumentTag.document_id, DocumentTag.tag_id],
+        )
+        await db.execute(stmt)
+    return {"ok": True, "document_id": str(document_id), "tag_id": str(payload.tag_id)}
+
+
+@router.delete("/{document_id}/tags/{tag_id}")
+async def remove_document_tag(
+    document_id: UUID,
+    tag_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    _ = user
+    doc = await db.get(Document, document_id)
+    if doc is None:
+        raise HTTPException(status_code=404, detail="Документ не найден")
+
+    await _prepare_write_session(db)
+    async with db.begin():
+        await db.execute(
+            delete(DocumentTag).where(
+                DocumentTag.document_id == document_id,
+                DocumentTag.tag_id == tag_id,
+            )
+        )
+    return {"ok": True, "document_id": str(document_id), "tag_id": str(tag_id)}
 
 
 @router.post("/{document_id}/tags")

@@ -14,6 +14,9 @@ export interface DocumentEntityRef {
   name: string;
 }
 
+/** Совпадает с серверным DocumentTagItem (id + name). */
+export type DocumentTagRef = DocumentEntityRef;
+
 export interface ExtractResponse {
   title: string | null;
   author: string | null;
@@ -44,8 +47,8 @@ export interface ExtractResponse {
     assigned_at: string;
     assigned_by_id: string | null;
   }[];
-  original_tags?: string[];
-  translated_tags?: string[];
+  original_tags?: DocumentTagRef[];
+  translated_tags?: DocumentTagRef[];
   entities_military_equipment?: DocumentEntityRef[];
   entities_manufacturers?: DocumentEntityRef[];
   entities_contracts?: DocumentEntityRef[];
@@ -74,6 +77,12 @@ export interface EntitiesResponse {
   military_equipment: DocumentEntityRef[];
   manufacturers: DocumentEntityRef[];
   contracts: DocumentEntityRef[];
+}
+
+export interface DocumentTagsResponse {
+  document_id: string;
+  original_tags: DocumentTagRef[];
+  translated_tags: DocumentTagRef[];
 }
 
 export interface TranslateResponse {
@@ -371,6 +380,26 @@ export class ArticleParserApi {
       max_tags: maxTags,
       use_translation: useTranslation,
     });
+  }
+
+  getDocumentTags(documentId: string) {
+    return this.http.get<DocumentTagsResponse>(`/api/v1/documents/${documentId}/tags`);
+  }
+
+  getTagCatalog(documentId: string, languageScope: 'original' | 'translated') {
+    return this.http.get<DocumentTagRef[]>(`/api/v1/documents/${documentId}/tags/catalog`, {
+      params: { language_scope: languageScope },
+    });
+  }
+
+  assignDocumentTag(documentId: string, tagId: string) {
+    return this.http.post<{ ok?: boolean }>(`/api/v1/documents/${documentId}/tags/assign`, {
+      tag_id: tagId,
+    });
+  }
+
+  removeDocumentTag(documentId: string, tagId: string) {
+    return this.http.delete<{ ok?: boolean }>(`/api/v1/documents/${documentId}/tags/${tagId}`);
   }
 
   getAvailableDocumentStatuses() {
