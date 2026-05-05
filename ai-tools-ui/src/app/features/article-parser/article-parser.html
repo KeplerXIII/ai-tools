@@ -11,41 +11,6 @@
     (clearClicked)="clear()"
   />
 
-  @if (loadingArticle) {
-    <div class="btn-wrapper">
-      <p-skeleton height="2.5rem" width="12rem" borderRadius="20px" />
-      <p-skeleton height="2.5rem" width="12rem" borderRadius="20px" />
-      <p-skeleton height="2.5rem" width="12rem" borderRadius="20px" />
-    </div>
-  }
-
-  @if (state.article && !loadingArticle) {
-    <div class="btn-wrapper">
-      <app-outline-button
-        [text]="state.editMode ? 'Завершить редактирование' : 'Редактировать'"
-        [disabled]="isLoading"
-        iconName="pi pi-pen-to-square"
-        size="large"
-        [variant]="ButtonVariant.Rounded"
-        (clicked)="toggleEditMode()"
-      />
-
-      <app-outline-button
-        text="Отправить в MAX"
-        size="large"
-        [variant]="ButtonVariant.Rounded"
-        [disabled]="true"
-      />
-
-      <app-outline-button
-        text="Добавить в БД"
-        size="large"
-        [variant]="ButtonVariant.Rounded"
-        [disabled]="true"
-      />
-    </div>
-  }
-
   @if (articleError) {
     <div class="field-error">{{ articleError }}</div>
   }

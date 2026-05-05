@@ -139,7 +139,6 @@ export class ArticleParser {
     this.state.annotation = '';
     this.state.originalTags = [];
     this.state.translatedTags = [];
-    this.state.editMode = false;
     this.resetBlockEditors();
 
     this.loadingArticle = true;
@@ -308,19 +307,6 @@ export class ArticleParser {
   // =========================
   // РЕДАКТИРОВАНИЕ
   // =========================
-
-  toggleEditMode(): void {
-    this.state.editMode = !this.state.editMode;
-    this.isStatusPickerOpen = false;
-    this.closeEntityPicker();
-    this.closeTagPicker();
-
-    if (this.state.editMode) {
-      return;
-    }
-
-    this.resetBlockEditors();
-  }
 
   toggleBlockEdit(block: ArticleParserBlock): void {
     switch (block) {
@@ -611,28 +597,6 @@ export class ArticleParser {
     });
   }
 
-  // =========================
-  // ЗАГЛУШКИ
-  // =========================
-
-  sendToMax(): void {
-    console.log('sendToMax', {
-      article: this.state.article,
-      text: this.state.translatedText,
-      tags: this.state.translatedTags,
-      annotation: this.state.annotation,
-    });
-  }
-
-  saveToDb(): void {
-    console.log('saveToDb', {
-      article: this.state.article,
-      text: this.state.translatedText,
-      tags: this.state.translatedTags,
-      annotation: this.state.annotation,
-    });
-  }
-
   removeOriginalTag(tag: DocumentTagRef): void {
     const docId = this.state.article?.document_id;
     if (!docId || this.loadingDocumentTagsMutation) {
@@ -838,7 +802,7 @@ export class ArticleParser {
   }
 
   get isDisabled(): boolean {
-    return this.isLoading || this.state.editMode;
+    return this.isLoading;
   }
 
   get highlightedArticleText(): string {

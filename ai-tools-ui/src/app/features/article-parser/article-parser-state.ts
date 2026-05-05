@@ -21,8 +21,6 @@ export class ArticleParserState {
   translatedText = '';
   annotation = '';
 
-  editMode = false;
-
   error = '';
 
   clear(): void {
@@ -33,7 +31,6 @@ export class ArticleParserState {
     this.translatedTags = [];
     this.translatedText = '';
     this.annotation = '';
-    this.editMode = false;
     this.error = '';
   }
 }
