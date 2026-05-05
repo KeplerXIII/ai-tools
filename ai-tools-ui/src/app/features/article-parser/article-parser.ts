@@ -10,6 +10,7 @@ import { SkeletonModule } from 'primeng/skeleton';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { ChipModule } from 'primeng/chip';
 import { ImageModule } from 'primeng/image';
+import { TextareaModule } from 'primeng/textarea';
 import { ArticleParserApi } from './article-parser-api';
 import { ArticleParserState } from './article-parser-state';
 import {
@@ -17,6 +18,14 @@ import {
   OutlineButtonComponent,
 } from '../../shared/ui/outline-button/outline-button.component';
 import { ArticleParserUrlFormComponent } from './article-parser-url-form/article-parser-url-form';
+
+export type ArticleParserBlock =
+  | 'status'
+  | 'meta'
+  | 'entities'
+  | 'original'
+  | 'translation'
+  | 'annotation';
 
 @Component({
   selector: 'app-article-parser',
@@ -34,6 +43,7 @@ import { ArticleParserUrlFormComponent } from './article-parser-url-form/article
     ChipModule,
     ImageModule,
     SkeletonModule,
+    TextareaModule,
   ],
   templateUrl: './article-parser.html',
   styleUrl: './article-parser.scss',
@@ -42,6 +52,8 @@ export class ArticleParser {
   @ViewChild('translationSkeleton') translationSkeleton?: ElementRef;
   @ViewChild('annotationSkeleton') annotationSkeleton?: ElementRef;
   @ViewChild('entitiesBlock') entitiesBlock?: ElementRef;
+  @ViewChild('originalTextPreview') originalTextPreview?: ElementRef<HTMLElement>;
+  @ViewChild('originalTextEditor') originalTextEditor?: ElementRef<HTMLElement>;
   readonly ButtonVariant = ButtonVariant;
   loadingArticle = false;
   loadingEntities = false;
@@ -62,7 +74,15 @@ export class ArticleParser {
   documentStatusError = '';
   isStatusPickerOpen = false;
 
+  isEditingStatusBlock = false;
+  isEditingMetaBlock = false;
+  isEditingEntitiesBlock = false;
+  isEditingOriginalBlock = false;
+  isEditingTranslationBlock = false;
+  isEditingAnnotationBlock = false;
+
   private buffer = '';
+  private originalTextViewportScroll = 0;
 
   constructor(
     private api: ArticleParserApi,
@@ -100,6 +120,7 @@ export class ArticleParser {
     this.state.originalTagsText = '';
     this.state.translatedTagsText = '';
     this.state.editMode = false;
+    this.resetBlockEditors();
 
     this.loadingArticle = true;
 
@@ -205,6 +226,7 @@ export class ArticleParser {
     });
   }
   clear(): void {
+    this.resetBlockEditors();
     this.state.clear();
     this.documentStatusTags = [];
     this.loadingDocumentStatuses = false;
@@ -278,7 +300,52 @@ export class ArticleParser {
       return;
     }
 
+    this.resetBlockEditors();
     this.applyEditedTags();
+  }
+
+  toggleBlockEdit(block: ArticleParserBlock): void {
+    switch (block) {
+      case 'status':
+        this.isEditingStatusBlock = !this.isEditingStatusBlock;
+        if (!this.isEditingStatusBlock) {
+          this.isStatusPickerOpen = false;
+        }
+        break;
+      case 'meta':
+        this.isEditingMetaBlock = !this.isEditingMetaBlock;
+        break;
+      case 'entities':
+        this.isEditingEntitiesBlock = !this.isEditingEntitiesBlock;
+        break;
+      case 'original':
+        if (!this.isEditingOriginalBlock) {
+          this.originalTextViewportScroll =
+            this.originalTextPreview?.nativeElement?.scrollTop ?? 0;
+        } else {
+          const ta = this.getOriginalTextTextarea();
+          this.originalTextViewportScroll = ta?.scrollTop ?? 0;
+        }
+        this.isEditingOriginalBlock = !this.isEditingOriginalBlock;
+        this.scheduleRestoreOriginalTextScroll();
+        break;
+      case 'translation':
+        this.isEditingTranslationBlock = !this.isEditingTranslationBlock;
+        break;
+      case 'annotation':
+        this.isEditingAnnotationBlock = !this.isEditingAnnotationBlock;
+        break;
+    }
+  }
+
+  private resetBlockEditors(): void {
+    this.isEditingStatusBlock = false;
+    this.isEditingMetaBlock = false;
+    this.isEditingEntitiesBlock = false;
+    this.isEditingOriginalBlock = false;
+    this.isEditingTranslationBlock = false;
+    this.isEditingAnnotationBlock = false;
+    this.isStatusPickerOpen = false;
   }
 
   applyEditedTags(): void {
@@ -507,7 +574,11 @@ export class ArticleParser {
   pendingStatusCode = '';
 
   toggleStatusPicker(): void {
-    if (!this.state.editMode || this.loadingDocumentStatuses || !this.unassignedDocumentStatuses.length) {
+    if (
+      !this.isEditingStatusBlock ||
+      this.loadingDocumentStatuses ||
+      !this.unassignedDocumentStatuses.length
+    ) {
       return;
     }
 
@@ -603,5 +674,35 @@ export class ArticleParser {
         block: 'start',
       });
     }, 0);
+  }
+
+  private getOriginalTextTextarea(): HTMLTextAreaElement | null {
+    const host = this.originalTextEditor?.nativeElement;
+    if (!host) {
+      return null;
+    }
+    return host.querySelector('textarea');
+  }
+
+  /** Keep viewport and in-block scroll when swapping preview ↔ textarea */
+  private scheduleRestoreOriginalTextScroll(): void {
+    const savedInnerScroll = this.originalTextViewportScroll;
+    const savedWinX = window.scrollX;
+    const savedWinY = window.scrollY;
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        window.scrollTo(savedWinX, savedWinY);
+
+        const textarea = this.getOriginalTextTextarea();
+        const preview = this.originalTextPreview?.nativeElement;
+        if (this.isEditingOriginalBlock && textarea) {
+          textarea.scrollTop = savedInnerScroll;
+          textarea.focus({ preventScroll: true });
+        } else if (!this.isEditingOriginalBlock && preview) {
+          preview.scrollTop = savedInnerScroll;
+        }
+      });
+    });
   }
 }

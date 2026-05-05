@@ -106,8 +106,9 @@
         <div class="title-wrapper status-title-row">
           <h3 class="panel-title">Статус</h3>
 
-          <div class="tags status-tags">
-            @if (state.editMode) {
+          <div class="status-title-trailing">
+            <div class="tags status-tags">
+            @if (isEditingStatusBlock) {
               <div class="status-add-wrapper">
                 <button
                   type="button"
@@ -139,10 +140,22 @@
               <p-chip
                 [label]="status.label"
                 class="chip-item status-chip"
-                [removable]="state.editMode && !loadingDocumentStatuses"
+                [removable]="isEditingStatusBlock && !loadingDocumentStatuses"
                 (onRemove)="removeDocumentStatusTag(status.code)"
               />
             }
+            </div>
+
+            <button
+              type="button"
+              class="block-edit-toggle no-print-field"
+              [class.block-edit-toggle--active]="isEditingStatusBlock"
+              [attr.aria-pressed]="isEditingStatusBlock"
+              [attr.aria-label]="isEditingStatusBlock ? 'Завершить редактирование блока' : 'Редактировать блок'"
+              (click)="toggleBlockEdit('status')"
+            >
+              <i class="pi" [class.pi-pencil]="!isEditingStatusBlock" [class.pi-check]="isEditingStatusBlock"></i>
+            </button>
           </div>
         </div>
 
@@ -153,26 +166,41 @@
 
       <section class="panel meta-panel">
         <div class="meta-wrapper">
-          <div class="title-wrapper">
+          <div class="title-wrapper meta-title-row">
             <h3 class="panel-title">Метаданные</h3>
 
-            <div class="chips-wrapper">
-              @if (state.article.length) {
-                <p-chip label="Длина: {{ state.article.length }}" class="chip-item" />
-              }
+            <div class="meta-title-trailing">
+              <div class="meta-chips-with-edit">
+                <div class="chips-wrapper">
+                  @if (state.article.length) {
+                    <p-chip label="Длина: {{ state.article.length }}" class="chip-item" />
+                  }
 
-              @if (state.article.quality) {
-                <p-chip label="Качество: {{ state.article.quality }}" class="chip-item" />
-              }
+                  @if (state.article.quality) {
+                    <p-chip label="Качество: {{ state.article.quality }}" class="chip-item" />
+                  }
 
-              @if (
-                state.article.needs_review !== null && state.article.needs_review !== undefined
-              ) {
-                <p-chip
-                  [label]="'Требует проверки: ' + (state.article.needs_review ? 'да' : 'нет')"
-                  class="chip-item"
-                />
-              }
+                  @if (
+                    state.article.needs_review !== null && state.article.needs_review !== undefined
+                  ) {
+                    <p-chip
+                      [label]="'Проверка: ' + (state.article.needs_review ? 'да' : 'нет')"
+                      class="chip-item"
+                    />
+                  }
+                </div>
+
+                <button
+                  type="button"
+                  class="block-edit-toggle no-print-field"
+                  [class.block-edit-toggle--active]="isEditingMetaBlock"
+                  [attr.aria-pressed]="isEditingMetaBlock"
+                  [attr.aria-label]="isEditingMetaBlock ? 'Завершить редактирование блока' : 'Редактировать блок'"
+                  (click)="toggleBlockEdit('meta')"
+                >
+                  <i class="pi" [class.pi-pencil]="!isEditingMetaBlock" [class.pi-check]="isEditingMetaBlock"></i>
+                </button>
+              </div>
             </div>
           </div>
 
@@ -184,9 +212,12 @@
                   id="article_title"
                   name="article_title"
                   [ngModel]="
-                    state.editMode ? state.article.title : state.article.title || 'Нет информации'
+                    isEditingMetaBlock ? state.article.title : state.article.title || 'Нет информации'
                   "
-                  [disabled]="!state.editMode"
+                  (ngModelChange)="
+                    isEditingMetaBlock && state.article && (state.article.title = $event)
+                  "
+                  [disabled]="!isEditingMetaBlock"
                 />
                 <label class="label-input" for="article_title">Заголовок</label>
               </p-floatlabel>
@@ -197,9 +228,12 @@
                   id="article_author"
                   name="article_author"
                   [ngModel]="
-                    state.editMode ? state.article.author : state.article.author || 'Нет информации'
+                    isEditingMetaBlock ? state.article.author : state.article.author || 'Нет информации'
                   "
-                  [disabled]="!state.editMode"
+                  (ngModelChange)="
+                    isEditingMetaBlock && state.article && (state.article.author = $event)
+                  "
+                  [disabled]="!isEditingMetaBlock"
                 />
                 <label for="article_author">Автор</label>
               </p-floatlabel>
@@ -210,9 +244,12 @@
                   id="article_date"
                   name="article_date"
                   [ngModel]="
-                    state.editMode ? state.article.date : state.article.date || 'Нет информации'
+                    isEditingMetaBlock ? state.article.date : state.article.date || 'Нет информации'
                   "
-                  [disabled]="!state.editMode"
+                  (ngModelChange)="
+                    isEditingMetaBlock && state.article && (state.article.date = $event)
+                  "
+                  [disabled]="!isEditingMetaBlock"
                 />
                 <label for="article_date">Дата</label>
               </p-floatlabel>
@@ -223,9 +260,12 @@
                   id="article_url"
                   name="article_url"
                   [ngModel]="
-                    state.editMode ? state.article.url : state.article.url || 'Нет информации'
+                    isEditingMetaBlock ? state.article.url : state.article.url || 'Нет информации'
                   "
-                  [disabled]="!state.editMode"
+                  (ngModelChange)="
+                    isEditingMetaBlock && state.article && (state.article.url = $event)
+                  "
+                  [disabled]="!isEditingMetaBlock"
                 />
                 <label for="article_url">URL</label>
               </p-floatlabel>
@@ -236,11 +276,14 @@
                   id="article_main_image"
                   name="article_main_image"
                   [ngModel]="
-                    state.editMode
+                    isEditingMetaBlock
                       ? state.article.main_image
                       : state.article.main_image || 'Нет информации'
                   "
-                  [disabled]="!state.editMode"
+                  (ngModelChange)="
+                    isEditingMetaBlock && state.article && (state.article.main_image = $event)
+                  "
+                  [disabled]="!isEditingMetaBlock"
                   placeholder="https://example.com/image.jpg"
                 />
                 <label for="article_main_image">Главное изображение</label>
@@ -271,13 +314,26 @@
         <div #entitiesBlock class="title-wrapper entities-title-row">
           <h3 class="panel-title">Сущности</h3>
 
-          <app-outline-button
-            text="Извлечь"
-            size="large"
-            [variant]="ButtonVariant.Rounded"
-            [disabled]="isDisabled"
-            (clicked)="requestEntities()"
-          />
+          <div class="entities-title-trailing">
+            <app-outline-button
+              text="Извлечь"
+              size="large"
+              [variant]="ButtonVariant.Rounded"
+              [disabled]="isDisabled"
+              (clicked)="requestEntities()"
+            />
+
+            <button
+              type="button"
+              class="block-edit-toggle no-print-field"
+              [class.block-edit-toggle--active]="isEditingEntitiesBlock"
+              [attr.aria-pressed]="isEditingEntitiesBlock"
+              [attr.aria-label]="isEditingEntitiesBlock ? 'Завершить редактирование блока' : 'Редактировать блок'"
+              (click)="toggleBlockEdit('entities')"
+            >
+              <i class="pi" [class.pi-pencil]="!isEditingEntitiesBlock" [class.pi-check]="isEditingEntitiesBlock"></i>
+            </button>
+          </div>
         </div>
 
         @if (entitiesError) {
@@ -301,7 +357,7 @@
 
         @if (state.entities?.military_equipment?.length) {
             <div class="entity-block">
-              @if (state.editMode) {
+              @if (isEditingEntitiesBlock) {
                 <p-floatlabel variant="on" class="prime-field full-width textarea-field">
                   <textarea
                     pTextarea
@@ -323,7 +379,7 @@
 
           @if (state.entities?.manufacturers?.length) {
             <div class="entity-block">
-              @if (state.editMode) {
+              @if (isEditingEntitiesBlock) {
                 <p-floatlabel variant="on" class="prime-field full-width textarea-field">
                   <textarea
                     pTextarea
@@ -345,7 +401,7 @@
 
           @if (state.entities?.contracts?.length) {
             <div class="entity-block">
-              @if (state.editMode) {
+              @if (isEditingEntitiesBlock) {
                 <p-floatlabel variant="on" class="prime-field full-width textarea-field">
                   <textarea
                     pTextarea
@@ -389,7 +445,7 @@
                   <p-chip
                     label="{{ tag }}"
                     class="original-chip"
-                    [removable]="state.editMode"
+                    [removable]="isEditingEntitiesBlock"
                     (onRemove)="removeOriginalTag(tag)"
                   />
                 }
@@ -421,7 +477,7 @@
                   <p-chip
                     label="{{ tag }}"
                     class="translated-chip"
-                    [removable]="state.editMode"
+                    [removable]="isEditingEntitiesBlock"
                     (onRemove)="removeTranslatedTag(tag)"
                   />
                 }
@@ -432,94 +488,121 @@
     </div>
 
     <section class="panel full print-original-last">
-      <div class="title-wrapper">
+      <div class="title-wrapper original-title-row">
         <h3 class="panel-title">Исходный текст</h3>
 
-        <div class="translate-teg-btn">
-          <div class="teg-btn-wrapper">
-            <app-outline-button
-              text="Тегировать оригинал"
-              size="large"
-              [variant]="ButtonVariant.Rounded"
-              [disabled]="isDisabled"
-              (clicked)="tagOriginal()"
-            />
+        <div class="original-title-trailing">
+          <div class="translate-teg-btn">
+            <div class="teg-btn-wrapper">
+              <app-outline-button
+                text="Тегировать оригинал"
+                size="large"
+                [variant]="ButtonVariant.Rounded"
+                [disabled]="isDisabled"
+                (clicked)="tagOriginal()"
+              />
 
-            @if (originalTagsError) {
-              <div class="field-error">{{ originalTagsError }}</div>
-            }
+              @if (originalTagsError) {
+                <div class="field-error">{{ originalTagsError }}</div>
+              }
+            </div>
+
+            <div class="translate-btn-wrapper">
+              <app-outline-button
+                text="Перевести на русский"
+                size="large"
+                [variant]="ButtonVariant.Rounded"
+                [disabled]="isDisabled"
+                (clicked)="translateArticle()"
+              />
+
+              @if (translationError) {
+                <div class="field-error">{{ translationError }}</div>
+              }
+            </div>
           </div>
 
-          <div class="translate-btn-wrapper">
-            <app-outline-button
-              text="Перевести на русский"
-              size="large"
-              [variant]="ButtonVariant.Rounded"
-              [disabled]="isDisabled"
-              (clicked)="translateArticle()"
-            />
-
-            @if (translationError) {
-              <div class="field-error">{{ translationError }}</div>
-            }
-          </div>
+          <button
+            type="button"
+            class="block-edit-toggle no-print-field"
+            [class.block-edit-toggle--active]="isEditingOriginalBlock"
+            [attr.aria-pressed]="isEditingOriginalBlock"
+            [attr.aria-label]="isEditingOriginalBlock ? 'Завершить редактирование блока' : 'Редактировать блок'"
+            (click)="toggleBlockEdit('original')"
+          >
+            <i class="pi" [class.pi-pencil]="!isEditingOriginalBlock" [class.pi-check]="isEditingOriginalBlock"></i>
+          </button>
         </div>
       </div>
 
       <div class="print-text-block">{{ state.article.text }}</div>
-      <p-floatlabel variant="on" class="prime-field full-width textarea-field no-print-field">
-        @if (state.editMode) {
+      @if (isEditingOriginalBlock) {
+        <div #originalTextEditor class="article-original-editor no-print-field">
           <textarea
             pTextarea
             id="article_text"
             class="full-width custom-textarea-scroll"
             name="article_text"
             [(ngModel)]="state.article.text"
-            rows="8"
+            rows="12"
             style="resize: none"
           ></textarea>
-        } @else {
-          <div
-            class="highlighted-article-text custom-textarea-scroll"
-            [innerHTML]="highlightedArticleText"
-          ></div>
-        }
-      </p-floatlabel>
+        </div>
+      } @else {
+        <div
+          #originalTextPreview
+          class="highlighted-article-text custom-textarea-scroll no-print-field"
+          [innerHTML]="highlightedArticleText"
+        ></div>
+      }
     </section>
 
     @if (state.translatedText.trim() || loadingTranslation) {
       <section class="panel full print-translation-middle">
-        <div class="title-wrapper">
+        <div class="title-wrapper translation-title-row">
           <h3 class="panel-title">Перевод</h3>
 
-          <div class="title-actions">
-            <div class="teg-btn-wrapper">
-              <app-outline-button
-                text="Тегировать перевод"
-                size="large"
-                [variant]="ButtonVariant.Rounded"
-                [disabled]="isDisabled"
-                (clicked)="tagTranslated()"
-              />
+          <div class="translation-title-trailing">
+            <div class="title-actions">
+              <div class="teg-btn-wrapper">
+                <app-outline-button
+                  text="Тегировать перевод"
+                  size="large"
+                  [variant]="ButtonVariant.Rounded"
+                  [disabled]="isDisabled"
+                  (clicked)="tagTranslated()"
+                />
 
-              @if (translatedTagsError) {
-                <div class="field-error">{{ translatedTagsError }}</div>
-              }
+                @if (translatedTagsError) {
+                  <div class="field-error">{{ translatedTagsError }}</div>
+                }
+              </div>
+
+              <div class="summary-btn-wrapper">
+                <app-outline-button
+                  text="Сформировать аннотацию"
+                  size="large"
+                  [variant]="ButtonVariant.Rounded"
+                  [disabled]="isDisabled || !state.translatedText.trim()"
+                  (clicked)="summarizeArticle()"
+                />
+
+                @if (summaryError) {
+                  <div class="field-error">{{ summaryError }}</div>
+                }
+              </div>
             </div>
 
-            <div class="summary-btn-wrapper">
-              <app-outline-button
-                text="Сформировать аннотацию"
-                size="large"
-                [variant]="ButtonVariant.Rounded"
-                [disabled]="isDisabled || !state.translatedText.trim()"
-                (clicked)="summarizeArticle()"
-              />
-
-              @if (summaryError) {
-                <div class="field-error">{{ summaryError }}</div>
-              }
-            </div>
+            <button
+              type="button"
+              class="block-edit-toggle no-print-field"
+              [class.block-edit-toggle--active]="isEditingTranslationBlock"
+              [attr.aria-pressed]="isEditingTranslationBlock"
+              [attr.aria-label]="isEditingTranslationBlock ? 'Завершить редактирование блока' : 'Редактировать блок'"
+              (click)="toggleBlockEdit('translation')"
+            >
+              <i class="pi" [class.pi-pencil]="!isEditingTranslationBlock" [class.pi-check]="isEditingTranslationBlock"></i>
+            </button>
           </div>
         </div>
 
@@ -543,7 +626,7 @@
               name="translated_text"
               class="full-width custom-textarea-scroll no-print-textarea"
               [(ngModel)]="state.translatedText"
-              [disabled]="!state.editMode"
+              [disabled]="!isEditingTranslationBlock"
               rows="8"
               placeholder="Здесь появится перевод"
               style="resize: none"
@@ -555,8 +638,19 @@
 
     @if (state.annotation.trim() || loadingSummary) {
       <section class="panel full print-annotation-after-tags">
-        <div class="title-wrapper">
+        <div class="title-wrapper annotation-title-row">
           <h3 class="panel-title">Аннотация</h3>
+
+          <button
+            type="button"
+            class="block-edit-toggle no-print-field"
+            [class.block-edit-toggle--active]="isEditingAnnotationBlock"
+            [attr.aria-pressed]="isEditingAnnotationBlock"
+            [attr.aria-label]="isEditingAnnotationBlock ? 'Завершить редактирование блока' : 'Редактировать блок'"
+            (click)="toggleBlockEdit('annotation')"
+          >
+            <i class="pi" [class.pi-pencil]="!isEditingAnnotationBlock" [class.pi-check]="isEditingAnnotationBlock"></i>
+          </button>
         </div>
 
         @if (loadingSummary && !state.annotation) {
@@ -577,7 +671,7 @@
               name="annotation"
               class="full-width custom-textarea-scroll no-print-textarea"
               [(ngModel)]="state.annotation"
-              [disabled]="!state.editMode"
+              [disabled]="!isEditingAnnotationBlock"
               rows="6"
               placeholder="Аннотация доступна после перевода"
               style="resize: none"
