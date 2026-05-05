@@ -43,10 +43,16 @@ body {
     margin: 12mm;
   }
 
+  html {
+    font-size: 16px !important;
+  }
+
   html,
   body {
     height: auto !important;
     background: #fff !important;
+    font-size: 18px !important;
+    line-height: 1.6 !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
     forced-color-adjust: none !important;
@@ -139,13 +145,30 @@ body {
   .print-text-block {
     display: block !important;
     white-space: pre-wrap;
-    line-height: 1.5;
-    font-size: 14px;
+    line-height: 1.75 !important;
+    font-size: 19px !important;
+    font-weight: 400 !important;
     color: var(--primary-text-color);
     margin-top: 8px;
     overflow-wrap: anywhere;
     break-inside: auto;
     page-break-inside: auto;
+  }
+
+  .panel-title {
+    font-size: 26px !important;
+    line-height: 1.35 !important;
+  }
+
+  .entity-block p,
+  .meta-list,
+  .meta-list p,
+  .meta-tags,
+  .meta-tags h4,
+  .meta-tags b,
+  .empty-entities-message {
+    font-size: 18px !important;
+    line-height: 1.6 !important;
   }
 
   .panel,
