@@ -1,0 +1,275 @@
+from __future__ import annotations
+
+import asyncio
+import uuid
+from contextlib import asynccontextmanager
+from datetime import UTC, datetime
+from types import SimpleNamespace
+from unittest import IsolatedAsyncioTestCase
+from unittest.mock import AsyncMock, patch
+
+from fastapi import HTTPException
+
+from app.api.v1.endpoints.parsing import create_source, parse_source
+from app.schemas.parsing import ParseSourceRequest, SourceCreateRequest
+from app.services.parsing.source_discovery import DiscoveredUrl
+
+
+class _FakeResult:
+    def __iter__(self):
+        return iter([])
+
+    def scalars(self):
+        return self
+
+    def all(self):
+        return []
+
+
+class _FakeDb:
+    def __init__(self, source):
+        self._source = source
+        self.insert_calls = 0
+        self._added = None
+
+    async def get(self, model, item_id):
+        if self._source is not None and item_id == self._source.id:
+            return self._source
+        return None
+
+    async def execute(self, statement):
+        self.insert_calls += 1
+        _ = statement
+        return _FakeResult()
+
+    async def rollback(self):
+        return None
+
+    def add(self, item):
+        self._added = item
+
+    async def commit(self):
+        if self._added is not None and getattr(self._added, "id", None) is None:
+            self._added.id = uuid.uuid4()
+        return None
+
+    async def refresh(self, item):
+        _ = item
+        return None
+
+    async def scalar(self, statement):
+        text = str(statement)
+        if "SELECT languages.code" in text:
+            return "en"
+        if "SELECT countries.code" in text:
+            return None
+        return None
+
+    @asynccontextmanager
+    async def begin(self):
+        yield self
+
+
+class ParseSourceEndpointTests(IsolatedAsyncioTestCase):
+    async def test_parse_source_returns_404_when_source_missing(self):
+        db = _FakeDb(source=None)
+        payload = ParseSourceRequest(source_id=uuid.uuid4(), days=3)
+
+        with self.assertRaises(HTTPException) as exc:
+            await parse_source(payload=payload, db=db, user=None)
+
+        self.assertEqual(exc.exception.status_code, 404)
+
+    async def test_parse_source_happy_path_response_shape(self):
+        source_id = uuid.uuid4()
+        source = SimpleNamespace(
+            id=source_id,
+            url="https://example.com",
+            rss_url=None,
+            is_active=True,
+        )
+        user = SimpleNamespace(id=uuid.uuid4())
+        db = _FakeDb(source=source)
+
+        url1 = "https://example.com/news/2026/05/01/a"
+        url2 = "https://example.com/news/2026/05/02/b"
+        discovered = [
+            DiscoveredUrl(url=url1, published_at=datetime(2026, 5, 1, tzinfo=UTC)),
+            DiscoveredUrl(url=url2, published_at=datetime(2026, 5, 2, tzinfo=UTC)),
+        ]
+
+        docs_created: list[SimpleNamespace] = []
+
+        async def _create_doc(*args, **kwargs):
+            _ = args
+            doc = SimpleNamespace(
+                id=uuid.uuid4(),
+                version=1,
+                source_id=None,
+                published_at=None,
+            )
+            docs_created.append(doc)
+            _ = kwargs
+            return doc
+
+        async def _list_unprocessed(_db, *, source_id, document_ids=None):
+            _ = _db
+            _ = source_id
+            if document_ids is None:
+                ids = [doc.id for doc in docs_created]
+            else:
+                ids = list(document_ids)
+            return [
+                {
+                    "document_id": doc_id,
+                    "title": "T",
+                    "source_url": "https://example.com/news",
+                    "published_at": None,
+                    "created_at": datetime(2026, 5, 5, tzinfo=UTC),
+                }
+                for doc_id in ids
+            ]
+
+        with (
+            patch(
+                "app.api.v1.endpoints.parsing.discover_source_news_urls",
+                AsyncMock(return_value=discovered),
+            ),
+            patch(
+                "app.api.v1.endpoints.parsing._status_ids_by_codes",
+                AsyncMock(return_value={"new": uuid.uuid4(), "unprocessed": uuid.uuid4()}),
+            ),
+            patch(
+                "app.api.v1.endpoints.parsing.get_document_by_source_url",
+                AsyncMock(return_value=None),
+            ),
+            patch(
+                "app.api.v1.endpoints.parsing._extract_single_article_for_parse_source",
+                AsyncMock(
+                    return_value={
+                        "title": "n",
+                        "text": "body",
+                        "length": 4,
+                        "method": "m",
+                        "quality": "good",
+                        "needs_review": False,
+                    }
+                ),
+            ),
+            patch(
+                "app.api.v1.endpoints.parsing.create_document_after_extract",
+                AsyncMock(side_effect=_create_doc),
+            ),
+            patch(
+                "app.api.v1.endpoints.parsing._list_unprocessed_by_source",
+                AsyncMock(side_effect=_list_unprocessed),
+            ),
+        ):
+            result = await parse_source(
+                payload=ParseSourceRequest(source_id=source_id, days=7),
+                db=db,
+                user=user,
+            )
+
+        self.assertEqual(result.source_id, source_id)
+        self.assertEqual(result.found_total, 2)
+        self.assertEqual(result.created_total, 2)
+        self.assertEqual(len(result.existing_unprocessed_by_source), 2)
+        self.assertEqual(len(result.new_unprocessed_by_source), 2)
+
+    async def test_parse_source_respects_extract_concurrency_limit(self):
+        source_id = uuid.uuid4()
+        source = SimpleNamespace(
+            id=source_id,
+            url="https://example.com",
+            rss_url=None,
+            is_active=True,
+        )
+        db = _FakeDb(source=source)
+        discovered = [
+            DiscoveredUrl(url=f"https://example.com/news/2026/05/0{i}/x{i}", published_at=None)
+            for i in range(1, 9)
+        ]
+
+        in_flight = 0
+        max_in_flight = 0
+        lock = asyncio.Lock()
+
+        async def _extract_stub(url: str, *, delay_sec: float, **kwargs):
+            _ = url
+            _ = delay_sec
+            _ = kwargs
+            nonlocal in_flight, max_in_flight
+            async with lock:
+                in_flight += 1
+                max_in_flight = max(max_in_flight, in_flight)
+            await asyncio.sleep(0.02)
+            async with lock:
+                in_flight -= 1
+            return {
+                "title": "t",
+                "text": "body",
+                "length": 4,
+                "method": "m",
+                "quality": "good",
+                "needs_review": False,
+            }
+
+        async def _create_doc(*args, **kwargs):
+            _ = args
+            _ = kwargs
+            return SimpleNamespace(id=uuid.uuid4(), version=1, source_id=None, published_at=None)
+
+        with (
+            patch(
+                "app.api.v1.endpoints.parsing.discover_source_news_urls",
+                AsyncMock(return_value=discovered),
+            ),
+            patch(
+                "app.api.v1.endpoints.parsing._status_ids_by_codes",
+                AsyncMock(return_value={"new": uuid.uuid4(), "unprocessed": uuid.uuid4()}),
+            ),
+            patch(
+                "app.api.v1.endpoints.parsing.get_document_by_source_url",
+                AsyncMock(return_value=None),
+            ),
+            patch(
+                "app.api.v1.endpoints.parsing._extract_single_article_for_parse_source",
+                AsyncMock(side_effect=_extract_stub),
+            ),
+            patch(
+                "app.api.v1.endpoints.parsing.create_document_after_extract",
+                AsyncMock(side_effect=_create_doc),
+            ),
+            patch(
+                "app.api.v1.endpoints.parsing._list_unprocessed_by_source",
+                AsyncMock(return_value=[]),
+            ),
+        ):
+            await parse_source(
+                payload=ParseSourceRequest(source_id=source_id, days=7),
+                db=db,
+                user=None,
+            )
+
+        self.assertLessEqual(max_in_flight, 3)
+
+    async def test_create_source_happy_path(self):
+        db = _FakeDb(source=None)
+        user = SimpleNamespace(id=uuid.uuid4())
+        payload = SourceCreateRequest(
+            url="https://example.com/",
+            name="Example",
+            language_code="en",
+            country_code=None,
+            rss_url="https://example.com/rss",
+        )
+        with (
+            patch("app.api.v1.endpoints.parsing._language_id_by_code", AsyncMock(return_value=uuid.uuid4())),
+            patch("app.api.v1.endpoints.parsing._country_id_by_code", AsyncMock(return_value=None)),
+        ):
+            result = await create_source(payload=payload, db=db, user=user)
+
+        self.assertEqual(result.url, "https://example.com/")
+        self.assertEqual(result.rss_url, "https://example.com/rss")
+        self.assertEqual(result.language_code, "en")

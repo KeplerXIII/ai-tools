@@ -80,6 +80,8 @@ def _images_from_extract(data: dict[str, Any]) -> list[ImageInfo]:
     return out
 
 
+
+
 @router.post("/extract-url", response_model=DocumentExtractResponse)
 async def extract_url_persist(
     payload: ExtractUrlPersistRequest,
