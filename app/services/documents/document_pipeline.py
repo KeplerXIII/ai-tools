@@ -44,6 +44,8 @@ from app.services.llm.tagger import tag_text
 from app.services.llm.translator import detect_language, translate_text
 from app.services.processing.jobs import JobStatus, JobType, processing_job
 
+NOT_FOUND_ENTITY_NAME = "не обнаружено"
+
 
 def _map_lang_for_db(detected: str) -> str:
     if detected in ("ru", "de", "en"):
@@ -461,7 +463,18 @@ async def run_entity_extract_document(
     ):
         await delete_auto_document_entities(session, document_id)
         raw = await extract_entities(src)
-        for name in dict.fromkeys(raw.get("military_equipment", [])):
+        military_equipment = [name.strip() for name in raw.get("military_equipment", []) if name and name.strip()]
+        manufacturers = [name.strip() for name in raw.get("manufacturers", []) if name and name.strip()]
+        contracts = [name.strip() for name in raw.get("contracts", []) if name and name.strip()]
+
+        if not military_equipment:
+            military_equipment = [NOT_FOUND_ENTITY_NAME]
+        if not manufacturers:
+            manufacturers = [NOT_FOUND_ENTITY_NAME]
+        if not contracts:
+            contracts = [NOT_FOUND_ENTITY_NAME]
+
+        for name in dict.fromkeys(military_equipment):
             eid = await _get_or_create_entity(session, name, et_mil, lang_id)
             session.add(
                 DocumentEntity(
@@ -470,7 +483,7 @@ async def run_entity_extract_document(
                     prediction_source_id=llm_ps,
                 ),
             )
-        for name in dict.fromkeys(raw.get("manufacturers", [])):
+        for name in dict.fromkeys(manufacturers):
             eid = await _get_or_create_entity(session, name, et_man, lang_id)
             session.add(
                 DocumentEntity(
@@ -479,7 +492,7 @@ async def run_entity_extract_document(
                     prediction_source_id=llm_ps,
                 ),
             )
-        for name in dict.fromkeys(raw.get("contracts", [])):
+        for name in dict.fromkeys(contracts):
             eid = await _get_or_create_entity(session, name, et_con, lang_id)
             session.add(
                 DocumentEntity(

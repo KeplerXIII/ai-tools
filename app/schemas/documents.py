@@ -38,6 +38,14 @@ class DocumentTagRequest(BaseModel):
     use_translation: bool = False
 
 
+class DocumentEntitiesExtractResponse(BaseModel):
+    ok: bool = True
+    document_id: uuid.UUID
+    military_equipment: list[str]
+    manufacturers: list[str]
+    contracts: list[str]
+
+
 class DocumentStatusAssignRequest(BaseModel):
     code: str = Field(min_length=1, max_length=64)
 

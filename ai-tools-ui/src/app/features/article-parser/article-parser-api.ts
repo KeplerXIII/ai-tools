@@ -110,14 +110,14 @@ export class ArticleParserApi {
     });
   }
 
-  extractEntities(text: string) {
-    return this.http.post<EntitiesResponse>('/api/v1/documents/{id}/entities', {
+  extractEntities(documentId: string, text: string) {
+    return this.http.post<EntitiesResponse>(`/api/v1/documents/${documentId}/entities`, {
       text,
     });
   }
 
-  translateToRussian(text: string) {
-    return this.http.post<TranslateResponse>('/api/v1/documents/{id}/translate', {
+  translateToRussian(documentId: string, text: string) {
+    return this.http.post<TranslateResponse>(`/api/v1/documents/${documentId}/translate`, {
       text,
       target_lang: 'ru',
     });
@@ -192,8 +192,8 @@ export class ArticleParserApi {
     });
   }
 
-  summarize(text: string) {
-    return this.http.post<SummaryResponse>('/api/v1/documents/${documentId}/summary/refine/stream', {
+  summarize(documentId: string, text: string) {
+    return this.http.post<SummaryResponse>(`/api/v1/documents/${documentId}/summary/refine/stream`, {
       text,
     });
   }

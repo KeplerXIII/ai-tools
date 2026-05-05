@@ -128,15 +128,19 @@ export class ArticleParser {
   }
 
   requestEntities(): void {
-    if (!this.state.article?.text) return;
+    if (!this.state.article?.text || !this.state.article.document_id) return;
 
     this.loadingEntities = true;
     this.entitiesError = '';
     this.state.entities = null;
 
-    this.api.extractEntities(this.state.article.text).subscribe({
+    this.api.extractEntities(this.state.article.document_id, this.state.article.text).subscribe({
       next: (response) => {
-        this.state.entities = response;
+        this.state.entities = {
+          military_equipment: response.military_equipment || [],
+          manufacturers: response.manufacturers || [],
+          contracts: response.contracts || [],
+        };
         this.loadingEntities = false;
       },
       error: () => {

@@ -25,6 +25,7 @@ from app.infrastructure.db.session import AsyncSessionLocal, get_db
 from app.schemas.documents import (
     DocumentStatusCatalogItem,
     DocumentExtractResponse,
+    DocumentEntitiesExtractResponse,
     DocumentRefineSummaryRequest,
     DocumentRefineSummaryResponse,
     DocumentStatusAssignRequest,
@@ -454,7 +455,7 @@ async def document_tags(
     return {"ok": True, "document_id": str(document_id)}
 
 
-@router.post("/{document_id}/entities")
+@router.post("/{document_id}/entities", response_model=DocumentEntitiesExtractResponse)
 async def document_entities(
     document_id: UUID,
     db: AsyncSession = Depends(get_db),
@@ -471,7 +472,13 @@ async def document_entities(
             )
     except AppError as exc:
         _handle(exc)
-    return {"ok": True, "document_id": str(document_id)}
+    military_equipment, manufacturers, contracts = await _get_document_entities(db, document_id)
+    return DocumentEntitiesExtractResponse(
+        document_id=document_id,
+        military_equipment=military_equipment,
+        manufacturers=manufacturers,
+        contracts=contracts,
+    )
 
 
 @router.post("/{document_id}/categorize")
