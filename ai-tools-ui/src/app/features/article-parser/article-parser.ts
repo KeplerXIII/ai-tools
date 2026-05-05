@@ -537,17 +537,6 @@ export class ArticleParser {
     );
   }
 
-  get hasEntitiesBlock(): boolean {
-    return (
-      this.loadingEntities ||
-      this.loadingOriginalTags ||
-      this.loadingTranslatedTags ||
-      !!this.state.entities ||
-      this.state.originalTags.length > 0 ||
-      this.state.translatedTags.length > 0
-    );
-  }
-
   get isLoading(): boolean {
     return (
       this.loadingArticle ||

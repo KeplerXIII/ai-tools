@@ -517,6 +517,15 @@
   white-space: nowrap;
 }
 
+.entities-title-row {
+  align-items: center;
+  gap: 12px;
+}
+
+.entities-title-row .panel-title {
+  margin-bottom: 0;
+}
+
 .chips-item {
   border: 1px solid var(--light-grey-text-color);
   padding: 7px;
@@ -564,6 +573,9 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .sceleton-translate-text {

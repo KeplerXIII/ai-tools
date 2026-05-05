@@ -69,8 +69,6 @@
               <p-skeleton height="1rem" borderRadius="12px" />
             </div>
           </div>
-
-          <p-skeleton width="12rem" height="2.5rem" borderRadius="20px" />
         </div>
 
         <div class="prew-image-block">
@@ -249,18 +247,6 @@
               </p-floatlabel>
             </div>
           </div>
-
-          <app-outline-button
-            text="Извлечь сущности"
-            size="large"
-            [variant]="ButtonVariant.Rounded"
-            [disabled]="isDisabled"
-            (clicked)="requestEntities()"
-          />
-
-          @if (entitiesError) {
-            <div class="field-error">{{ entitiesError }}</div>
-          }
         </div>
 
         @if (mainImageUrl) {
@@ -281,28 +267,39 @@
         }
       </section>
 
-      @if (hasEntitiesBlock) {
-        <section class="panel">
-          <div #entitiesBlock class="title-wrapper">
-            <h3 class="panel-title">Сущности</h3>
+      <section class="panel">
+        <div #entitiesBlock class="title-wrapper entities-title-row">
+          <h3 class="panel-title">Сущности</h3>
+
+          <app-outline-button
+            text="Извлечь"
+            size="large"
+            [variant]="ButtonVariant.Rounded"
+            [disabled]="isDisabled"
+            (clicked)="requestEntities()"
+          />
+        </div>
+
+        @if (entitiesError) {
+          <div class="field-error">{{ entitiesError }}</div>
+        }
+
+        @if (loadingEntities) {
+          <div class="entities-sceleton-wrapper">
+            <p-skeleton width="10rem" height="1rem" borderRadius="12px" />
+            <p-skeleton width="100%" height="1rem" borderRadius="12px" />
+            <p-skeleton width="100%" height="1rem" borderRadius="12px" />
+            <p-skeleton width="100%" height="1rem" borderRadius="12px" />
+            <p-skeleton width="100%" height="1rem" borderRadius="12px" />
+            <p-skeleton width="100%" height="1rem" borderRadius="12px" />
           </div>
+        }
 
-          @if (loadingEntities) {
-            <div class="entities-sceleton-wrapper">
-              <p-skeleton width="10rem" height="1rem" borderRadius="12px" />
-              <p-skeleton width="85rem" height="1rem" borderRadius="12px" />
-              <p-skeleton width="85rem" height="1rem" borderRadius="12px" />
-              <p-skeleton width="85rem" height="1rem" borderRadius="12px" />
-              <p-skeleton width="85rem" height="1rem" borderRadius="12px" />
-              <p-skeleton width="85rem" height="1rem" borderRadius="12px" />
-            </div>
-          }
+        @if (hasEmptyEntitiesResult) {
+          <p class="empty-entities-message">Сущностей не обнаружено</p>
+        }
 
-          @if (hasEmptyEntitiesResult) {
-            <p class="empty-entities-message">Сущностей не обнаружено</p>
-          }
-
-          @if (state.entities?.military_equipment?.length) {
+        @if (state.entities?.military_equipment?.length) {
             <div class="entity-block">
               @if (state.editMode) {
                 <p-floatlabel variant="on" class="prime-field full-width textarea-field">
@@ -431,8 +428,7 @@
               </div>
             </div>
           }
-        </section>
-      }
+      </section>
     </div>
 
     <section class="panel full print-original-last">
