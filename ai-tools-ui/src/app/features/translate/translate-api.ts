@@ -1,5 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
+import { AuthService } from '../../core/auth/auth.service';
 
 export interface TranslateResponse {
   translation: string;
@@ -19,7 +20,10 @@ export interface TranslateStreamResponse {
 export class TranslateApi {
   private readonly apiUrl = '/api/v1/translate';
 
-  constructor(private http: HttpClient) {}
+  constructor(
+    private http: HttpClient,
+    private authService: AuthService,
+  ) {}
 
   translate(text: string) {
     return this.http.post<TranslateResponse>(this.apiUrl, {
@@ -32,11 +36,14 @@ export class TranslateApi {
     text: string,
     onChunk: (chunk: string) => void,
   ): Promise<TranslateStreamResponse> {
+    const token = this.authService.getToken();
+
     const response = await fetch(`${this.apiUrl}/stream`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Accept: 'text/event-stream',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       body: JSON.stringify({
         text,

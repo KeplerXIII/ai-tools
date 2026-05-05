@@ -1,6 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
+import { AuthService } from '../../core/auth/auth.service';
 
 export interface ImageInfo {
   url: string;
@@ -51,7 +52,20 @@ export interface SummaryResponse {
   providedIn: 'root',
 })
 export class ArticleParserApi {
-  constructor(private http: HttpClient) {}
+  constructor(
+    private http: HttpClient,
+    private authService: AuthService,
+  ) {}
+
+  private getStreamHeaders(): HeadersInit {
+    const token = this.authService.getToken();
+
+    return {
+      'Content-Type': 'application/json',
+      Accept: 'text/event-stream',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    };
+  }
 
   extractByUrl(url: string) {
     return this.http.post<ExtractResponse>('/api/v1/parse', {
@@ -78,10 +92,7 @@ export class ArticleParserApi {
 
       fetch(`/api/v1/documents/${documentId}/translate/stream`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'text/event-stream',
-        },
+        headers: this.getStreamHeaders(),
         body: JSON.stringify({
           target_lang: 'ru',
         }),
@@ -161,10 +172,7 @@ export class ArticleParserApi {
 
       fetch(`/api/v1/documents/${documentId}/summary/refine/stream`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'text/event-stream',
-        },
+        headers: this.getStreamHeaders(),
         body: JSON.stringify({
           source,
           user_instruction: userInstruction,
@@ -235,10 +243,7 @@ export class ArticleParserApi {
 
       fetch(`/api/v1/documents/${documentId}/summary/stream`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'text/event-stream',
-        },
+        headers: this.getStreamHeaders(),
         body: JSON.stringify({ source }),
         signal: controller.signal,
       })

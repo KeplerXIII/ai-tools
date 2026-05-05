@@ -1,0 +1,43 @@
+<section class="login-shell">
+  <div class="login-card">
+    <h1 class="login-title">Вход</h1>
+    <p class="login-subtitle">Авторизация для работы с защищенными инструментами</p>
+
+    <form class="login-form" (ngSubmit)="submit()">
+      <label class="field">
+        <span class="field-label">Логин</span>
+        <input
+          [(ngModel)]="username"
+          name="username"
+          type="text"
+          class="field-input"
+          autocomplete="username"
+          placeholder="Введите username"
+        />
+      </label>
+
+      <label class="field">
+        <span class="field-label">Пароль</span>
+        <input
+          [(ngModel)]="password"
+          name="password"
+          type="password"
+          class="field-input"
+          autocomplete="current-password"
+          placeholder="Введите пароль"
+        />
+      </label>
+
+      <app-primary-button
+        text="Войти"
+        size="large"
+        type="submit"
+        [disabled]="loading || !username.trim() || !password.trim()"
+      />
+    </form>
+
+    @if (error) {
+      <p class="error">{{ error }}</p>
+    }
+  </div>
+</section>
