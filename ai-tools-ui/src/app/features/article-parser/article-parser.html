@@ -255,58 +255,67 @@
 
           @if (state.entities?.military_equipment?.length) {
             <div class="entity-block">
-              <p-floatlabel variant="on" class="prime-field full-width textarea-field">
-                <textarea
-                  pTextarea
-                  id="military_equipment"
-                  name="military_equipment"
-                  [disabled]="!state.editMode"
-                  [ngModel]="state.entities?.military_equipment?.join('\n') || ''"
-                  (ngModelChange)="updateEntityList('military_equipment', $event)"
-                  rows="3"
-                  class="full-width"
-                  style="resize: none"
-                ></textarea>
-                <label for="military_equipment">Упоминания образцов ВВТ</label>
-              </p-floatlabel>
+              @if (state.editMode) {
+                <p-floatlabel variant="on" class="prime-field full-width textarea-field">
+                  <textarea
+                    pTextarea
+                    id="military_equipment"
+                    name="military_equipment"
+                    [ngModel]="state.entities?.military_equipment?.join('\n') || ''"
+                    (ngModelChange)="updateEntityList('military_equipment', $event)"
+                    rows="3"
+                    class="full-width"
+                    style="resize: none"
+                  ></textarea>
+                  <label for="military_equipment">Упоминания образцов ВВТ</label>
+                </p-floatlabel>
+              } @else {
+                <p><b>Упоминания образцов ВВТ:</b> {{ state.entities?.military_equipment?.join(', ') }}</p>
+              }
             </div>
           }
 
           @if (state.entities?.manufacturers?.length) {
             <div class="entity-block">
-              <p-floatlabel variant="on" class="prime-field full-width textarea-field">
-                <textarea
-                  pTextarea
-                  id="manufacturers"
-                  name="manufacturers"
-                  [disabled]="!state.editMode"
-                  [ngModel]="state.entities?.manufacturers?.join('\n') || ''"
-                  (ngModelChange)="updateEntityList('manufacturers', $event)"
-                  rows="3"
-                  class="full-width"
-                  style="resize: none"
-                ></textarea>
-                <label for="manufacturers">Производители</label>
-              </p-floatlabel>
+              @if (state.editMode) {
+                <p-floatlabel variant="on" class="prime-field full-width textarea-field">
+                  <textarea
+                    pTextarea
+                    id="manufacturers"
+                    name="manufacturers"
+                    [ngModel]="state.entities?.manufacturers?.join('\n') || ''"
+                    (ngModelChange)="updateEntityList('manufacturers', $event)"
+                    rows="3"
+                    class="full-width"
+                    style="resize: none"
+                  ></textarea>
+                  <label for="manufacturers">Производители</label>
+                </p-floatlabel>
+              } @else {
+                <p><b>Производители:</b> {{ state.entities?.manufacturers?.join(', ') }}</p>
+              }
             </div>
           }
 
           @if (state.entities?.contracts?.length) {
             <div class="entity-block">
-              <p-floatlabel variant="on" class="prime-field full-width textarea-field">
-                <textarea
-                  pTextarea
-                  id="contracts"
-                  name="contracts"
-                  [disabled]="!state.editMode"
-                  [ngModel]="state.entities?.contracts?.join('\n') || ''"
-                  (ngModelChange)="updateEntityList('contracts', $event)"
-                  rows="3"
-                  class="full-width"
-                  style="resize: none"
-                ></textarea>
-                <label for="contracts">Контракты</label>
-              </p-floatlabel>
+              @if (state.editMode) {
+                <p-floatlabel variant="on" class="prime-field full-width textarea-field">
+                  <textarea
+                    pTextarea
+                    id="contracts"
+                    name="contracts"
+                    [ngModel]="state.entities?.contracts?.join('\n') || ''"
+                    (ngModelChange)="updateEntityList('contracts', $event)"
+                    rows="3"
+                    class="full-width"
+                    style="resize: none"
+                  ></textarea>
+                  <label for="contracts">Контракты</label>
+                </p-floatlabel>
+              } @else {
+                <p><b>Контракты:</b> {{ state.entities?.contracts?.join(', ') }}</p>
+              }
             </div>
           }
 
