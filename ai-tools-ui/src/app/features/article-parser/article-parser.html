@@ -250,7 +250,7 @@
           }
 
           @if (hasEmptyEntitiesResult) {
-            <p class="empty-entities-message">В данном документе не было обнаружено сущностей.</p>
+            <p class="empty-entities-message">Сущностей не обнаружено</p>
           }
 
           @if (state.entities?.military_equipment?.length) {
@@ -377,7 +377,7 @@
       }
     </div>
 
-    <section class="panel full">
+    <section class="panel full print-original-last">
       <div class="title-wrapper">
         <h3 class="panel-title">Исходный текст</h3>
 
@@ -412,7 +412,8 @@
         </div>
       </div>
 
-      <p-floatlabel variant="on" class="prime-field full-width textarea-field">
+      <div class="print-text-block">{{ state.article.text }}</div>
+      <p-floatlabel variant="on" class="prime-field full-width textarea-field no-print-field">
         @if (state.editMode) {
           <textarea
             pTextarea
@@ -433,7 +434,7 @@
     </section>
 
     @if (state.translatedText.trim() || loadingTranslation) {
-      <section class="panel full">
+      <section class="panel full print-translation-middle">
         <div class="title-wrapper">
           <h3 class="panel-title">Текст на русском языке</h3>
 
@@ -480,12 +481,13 @@
           </div>
         }
         @if (state.translatedText) {
-          <p-floatlabel variant="on" class="prime-field full-width textarea-field">
+          <div class="print-text-block">{{ state.translatedText }}</div>
+          <p-floatlabel variant="on" class="prime-field full-width textarea-field no-print-field">
             <textarea
               pTextarea
               id="translated_text"
               name="translated_text"
-              class="full-width custom-textarea-scroll"
+              class="full-width custom-textarea-scroll no-print-textarea"
               [(ngModel)]="state.translatedText"
               [disabled]="!state.editMode"
               rows="8"
@@ -498,7 +500,7 @@
     }
 
     @if (state.annotation.trim() || loadingSummary) {
-      <section class="panel full">
+      <section class="panel full print-annotation-after-tags">
         <div class="title-wrapper">
           <h3 class="panel-title">Аннотация</h3>
         </div>
@@ -513,12 +515,13 @@
           </div>
         }
         @if (state.annotation) {
-          <p-floatlabel variant="on" class="prime-field full-width textarea-field">
+          <div class="print-text-block">{{ state.annotation }}</div>
+          <p-floatlabel variant="on" class="prime-field full-width textarea-field no-print-field">
             <textarea
               pTextarea
               id="annotation"
               name="annotation"
-              class="full-width custom-textarea-scroll"
+              class="full-width custom-textarea-scroll no-print-textarea"
               [(ngModel)]="state.annotation"
               [disabled]="!state.editMode"
               rows="6"

@@ -32,3 +32,127 @@ body {
 .p-progress-spinner circle {
   stroke: var(--primary-text-color-light);
 }
+
+.print-text-block {
+  display: none;
+}
+
+@media print {
+  @page {
+    size: auto;
+    margin: 12mm;
+  }
+
+  html,
+  body {
+    height: auto !important;
+    background: #fff !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    forced-color-adjust: none !important;
+  }
+
+  .layout,
+  .content,
+  .page,
+  .panel,
+  .article-grid,
+  .translate-grid,
+  .meta-panel {
+    display: block !important;
+    width: 100% !important;
+    max-width: none !important;
+    min-height: auto !important;
+    margin: 0 !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  .tool-card {
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    max-width: none !important;
+    min-height: auto !important;
+    margin: 0 !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  .print-annotation-after-tags {
+    order: 1;
+  }
+
+  .print-translation-middle {
+    order: 2;
+  }
+
+  .print-original-last {
+    order: 3;
+  }
+
+  .title-wrapper {
+    break-after: avoid-page;
+    page-break-after: avoid;
+  }
+
+  app-sidebar-component,
+  .sidebar,
+  .sidebar_expanded {
+    display: none !important;
+  }
+
+  .parser_header,
+  app-article-parser-url-form {
+    display: none !important;
+  }
+
+  button,
+  [role='button'],
+  .p-button,
+  .copy-icon,
+  app-primary-button,
+  app-outline-button,
+  .btn-wrapper,
+  .actions,
+  .title-actions,
+  .translate-teg-btn {
+    display: none !important;
+  }
+
+  textarea,
+  .p-inputtext,
+  .p-inputtextarea,
+  .highlighted-article-text,
+  .custom-textarea-scroll {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  .no-print-field,
+  .no-print-textarea {
+    display: none !important;
+  }
+
+  .print-text-block {
+    display: block !important;
+    white-space: pre-wrap;
+    line-height: 1.5;
+    font-size: 14px;
+    color: var(--primary-text-color);
+    margin-top: 8px;
+    overflow-wrap: anywhere;
+    break-inside: auto;
+    page-break-inside: auto;
+  }
+
+  .panel,
+  .header {
+    box-shadow: none !important;
+    border: 0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
