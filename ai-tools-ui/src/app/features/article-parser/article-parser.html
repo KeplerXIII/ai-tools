@@ -104,6 +104,55 @@
 
   @if (state.article) {
     <div class="article-grid">
+      <section class="panel status-panel">
+        <div class="title-wrapper status-title-row">
+          <h3 class="panel-title">Статус</h3>
+
+          <div class="tags status-tags">
+            @if (state.editMode) {
+              <div class="status-add-wrapper">
+                <button
+                  type="button"
+                  class="status-add-chip"
+                  [disabled]="loadingDocumentStatuses || !unassignedDocumentStatuses.length"
+                  (click)="toggleStatusPicker()"
+                >
+                  +
+                </button>
+
+                @if (isStatusPickerOpen) {
+                  <div class="status-picker-popover">
+                    @for (status of unassignedDocumentStatuses; track status.code) {
+                      <button
+                        type="button"
+                        class="status-picker-item"
+                        [disabled]="loadingDocumentStatuses"
+                        (click)="onDocumentStatusSelected(status.code)"
+                      >
+                        {{ status.name_ru }}
+                      </button>
+                    }
+                  </div>
+                }
+              </div>
+            }
+
+            @for (status of documentStatusTags; track status.code) {
+              <p-chip
+                [label]="status.label"
+                class="chip-item status-chip"
+                [removable]="state.editMode && !loadingDocumentStatuses"
+                (onRemove)="removeDocumentStatusTag(status.code)"
+              />
+            }
+          </div>
+        </div>
+
+        @if (documentStatusError) {
+          <div class="field-error">{{ documentStatusError }}</div>
+        }
+      </section>
+
       <section class="panel meta-panel">
         <div class="meta-wrapper">
           <div class="title-wrapper">

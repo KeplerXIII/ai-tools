@@ -46,6 +46,23 @@ export interface ExtractResponse {
   entities_contracts?: string[];
 }
 
+export interface DocumentStatusCatalogItem {
+  code: string;
+  name_ru: string;
+  description: string | null;
+}
+
+export interface DocumentStatusesResponse {
+  document_id: string;
+  statuses: {
+    code: string;
+    name_ru: string;
+    description: string | null;
+    assigned_at: string;
+    assigned_by_id: string | null;
+  }[];
+}
+
 export interface EntitiesResponse {
   military_equipment: string[];
   manufacturers: string[];
@@ -329,5 +346,26 @@ export class ArticleParserApi {
       max_tags: maxTags,
       use_translation: useTranslation,
     });
+  }
+
+  getAvailableDocumentStatuses() {
+    return this.http.get<DocumentStatusCatalogItem[]>('/api/v1/documents/statuses/catalog');
+  }
+
+  getDocumentStatuses(documentId: string) {
+    return this.http.get<DocumentStatusesResponse>(`/api/v1/documents/${documentId}/statuses`);
+  }
+
+  assignDocumentStatus(documentId: string, code: string) {
+    return this.http.post<{ ok?: boolean; document_id?: string; status_code?: string }>(
+      `/api/v1/documents/${documentId}/statuses`,
+      { code },
+    );
+  }
+
+  removeDocumentStatus(documentId: string, code: string) {
+    return this.http.delete<{ ok?: boolean; document_id?: string; status_code?: string }>(
+      `/api/v1/documents/${documentId}/statuses/${encodeURIComponent(code)}`,
+    );
   }
 }

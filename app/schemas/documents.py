@@ -50,6 +50,12 @@ class DocumentStatusItem(BaseModel):
     assigned_by_id: uuid.UUID | None = None
 
 
+class DocumentStatusCatalogItem(BaseModel):
+    code: str
+    name_ru: str
+    description: str | None = None
+
+
 class DocumentStatusesResponse(BaseModel):
     document_id: uuid.UUID
     statuses: list[DocumentStatusItem]

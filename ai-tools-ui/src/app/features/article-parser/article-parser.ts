@@ -56,6 +56,11 @@ export class ArticleParser {
   translatedTagsError = '';
   summaryError = '';
   imagePreview: string | null = null;
+  availableDocumentStatuses: { code: string; name_ru: string; description: string | null }[] = [];
+  documentStatusTags: { code: string; label: string }[] = [];
+  loadingDocumentStatuses = false;
+  documentStatusError = '';
+  isStatusPickerOpen = false;
 
   private buffer = '';
 
@@ -101,6 +106,8 @@ export class ArticleParser {
     this.api.extractByUrl(value).subscribe({
       next: (response) => {
         this.state.article = response;
+        this.syncDocumentStatusTagsFromArticle();
+        this.loadAvailableDocumentStatuses();
         this.state.translatedText = response.translated_content?.trim() || '';
         this.state.annotation = (response.translated_summary || response.original_summary || '').trim();
         this.state.originalTags = response.original_tags || [];
@@ -195,6 +202,10 @@ export class ArticleParser {
   }
   clear(): void {
     this.state.clear();
+    this.documentStatusTags = [];
+    this.loadingDocumentStatuses = false;
+    this.documentStatusError = '';
+    this.isStatusPickerOpen = false;
     this.entitiesError = '';
     this.articleError = '';
     this.originalTagsError = '';
@@ -259,9 +270,10 @@ export class ArticleParser {
 
     if (this.state.editMode) {
       this.syncTagsToText();
-    } else {
-      this.applyEditedTags();
+      return;
     }
+
+    this.applyEditedTags();
   }
 
   applyEditedTags(): void {
@@ -296,6 +308,7 @@ export class ArticleParser {
     this.api.extractByUrl(url).subscribe({
       next: (response) => {
         this.state.article = response;
+        this.syncDocumentStatusTagsFromArticle();
         this.state.originalTags = response.original_tags || [];
         this.state.translatedTags = response.translated_tags || [];
         this.syncTagsToText();
@@ -370,6 +383,60 @@ export class ArticleParser {
     this.syncTagsToText();
   }
 
+  addDocumentStatus(): void {
+    const documentId = this.state.article?.document_id;
+    const code = this.pendingStatusCode.trim();
+    if (!documentId || !code) return;
+
+    this.loadingDocumentStatuses = true;
+    this.documentStatusError = '';
+
+    this.api.assignDocumentStatus(documentId, code).subscribe({
+      next: () => {
+        this.pendingStatusCode = '';
+        this.isStatusPickerOpen = false;
+        this.refreshDocumentStatuses(documentId);
+      },
+      error: () => {
+        this.documentStatusError = 'Не удалось добавить статус';
+        this.loadingDocumentStatuses = false;
+      },
+    });
+  }
+
+  onDocumentStatusSelected(code: string | null | undefined): void {
+    if (!code || this.loadingDocumentStatuses) {
+      return;
+    }
+
+    const alreadyAssigned = this.documentStatusTags.some((status) => status.code === code);
+    if (alreadyAssigned) {
+      this.pendingStatusCode = '';
+      return;
+    }
+
+    this.pendingStatusCode = code;
+    this.addDocumentStatus();
+  }
+
+  removeDocumentStatusTag(code: string): void {
+    const documentId = this.state.article?.document_id;
+    if (!documentId) return;
+
+    this.loadingDocumentStatuses = true;
+    this.documentStatusError = '';
+
+    this.api.removeDocumentStatus(documentId, code).subscribe({
+      next: () => {
+        this.refreshDocumentStatuses(documentId);
+      },
+      error: () => {
+        this.documentStatusError = 'Не удалось удалить статус';
+        this.loadingDocumentStatuses = false;
+      },
+    });
+  }
+
   autoResize(event: Event): void {
     const textarea = event.target as HTMLTextAreaElement;
 
@@ -388,6 +455,63 @@ export class ArticleParser {
 
   get mainImageUrl(): string {
     return this.state.article?.main_image?.trim() || '';
+  }
+
+  private syncDocumentStatusTagsFromArticle(): void {
+    if (!this.state.article) {
+      this.documentStatusTags = [];
+      return;
+    }
+
+    const statusItems = this.state.article.statuses || [];
+    this.documentStatusTags = statusItems
+      .map((status) => ({
+        code: status.code,
+        label: status.name_ru || status.code,
+      }))
+      .filter((status) => !!status.code);
+  }
+
+  private loadAvailableDocumentStatuses(): void {
+    this.api.getAvailableDocumentStatuses().subscribe({
+      next: (statuses) => {
+        this.availableDocumentStatuses = statuses;
+      },
+      error: () => {
+        this.documentStatusError = 'Не удалось загрузить справочник статусов';
+      },
+    });
+  }
+
+  private refreshDocumentStatuses(documentId: string): void {
+    this.api.getDocumentStatuses(documentId).subscribe({
+      next: (response) => {
+        if (this.state.article) {
+          this.state.article.statuses = response.statuses;
+        }
+        this.syncDocumentStatusTagsFromArticle();
+        this.loadingDocumentStatuses = false;
+      },
+      error: () => {
+        this.documentStatusError = 'Статусы обновлены, но не удалось получить актуальный список';
+        this.loadingDocumentStatuses = false;
+      },
+    });
+  }
+
+  pendingStatusCode = '';
+
+  toggleStatusPicker(): void {
+    if (!this.state.editMode || this.loadingDocumentStatuses || !this.unassignedDocumentStatuses.length) {
+      return;
+    }
+
+    this.isStatusPickerOpen = !this.isStatusPickerOpen;
+  }
+
+  get unassignedDocumentStatuses(): { code: string; name_ru: string; description: string | null }[] {
+    const assigned = new Set(this.documentStatusTags.map((status) => status.code));
+    return this.availableDocumentStatuses.filter((status) => !assigned.has(status.code));
   }
 
   onImageLoad(): void {

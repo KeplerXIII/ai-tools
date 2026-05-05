@@ -23,6 +23,7 @@ from app.infrastructure.db.models import Document, DocumentStatus, DocumentStatu
 from app.infrastructure.db.models import DocumentEntity, DocumentTag, Entity, EntityType, Tag
 from app.infrastructure.db.session import AsyncSessionLocal, get_db
 from app.schemas.documents import (
+    DocumentStatusCatalogItem,
     DocumentExtractResponse,
     DocumentRefineSummaryRequest,
     DocumentRefineSummaryResponse,
@@ -249,6 +250,25 @@ def _handle(exc: AppError):
     raise map_app_error(exc) from exc
 
 
+@router.get("/statuses/catalog", response_model=list[DocumentStatusCatalogItem])
+async def document_statuses_catalog(
+    db: AsyncSession = Depends(get_db),
+):
+    rows = await db.execute(
+        select(DocumentStatus.code, DocumentStatus.name_ru, DocumentStatus.description).order_by(
+            DocumentStatus.name_ru.asc()
+        )
+    )
+    return [
+        DocumentStatusCatalogItem(
+            code=row.code,
+            name_ru=row.name_ru,
+            description=row.description,
+        )
+        for row in rows
+    ]
+
+
 @router.get("/{document_id}/statuses", response_model=DocumentStatusesResponse)
 async def document_statuses(
     document_id: UUID,
@@ -269,6 +289,7 @@ async def assign_document_status(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
+    user_id = user.id
     status_code = payload.code.strip().lower()
     if not status_code:
         raise HTTPException(status_code=400, detail="Код статуса не должен быть пустым")
@@ -286,7 +307,7 @@ async def assign_document_status(
         stmt = insert(DocumentStatusAssignment).values(
             document_id=document_id,
             status_id=status_id,
-            assigned_by_id=user.id,
+            assigned_by_id=user_id,
         )
         stmt = stmt.on_conflict_do_nothing(
             index_elements=[DocumentStatusAssignment.document_id, DocumentStatusAssignment.status_id]

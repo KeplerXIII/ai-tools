@@ -13,6 +13,12 @@
   color: var(--dark-text-color);
 }
 
+:host ::ng-deep .status-chip {
+  background-color: #eef2ff;
+  color: #1e3a8a;
+  border: 1px solid #c7d2fe;
+}
+
 :host ::ng-deep .textarea-field label,
 :host ::ng-deep .textarea-field:has(textarea:focus) label,
 :host ::ng-deep .textarea-field:has(textarea:not(:placeholder-shown)) label,
@@ -182,6 +188,80 @@
 .meta-panel {
   display: flex;
   gap: 20px;
+}
+
+.status-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+.status-add-chip {
+  border: 1px dashed #93c5fd;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-radius: 999px;
+  min-width: 30px;
+  height: 30px;
+  padding: 0 10px;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.status-add-chip:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.status-add-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.status-picker-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 180px;
+  padding: 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow:
+    0 4px 12px rgba(15, 23, 42, 0.1),
+    0 1px 3px rgba(15, 23, 42, 0.08);
+}
+
+.status-picker-item {
+  border: 1px solid #dbeafe;
+  background: #f8fbff;
+  color: #1e3a8a;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.status-picker-item:hover {
+  background: #e0e7ff;
+}
+
+.status-picker-item:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .prew-image-block {
@@ -417,6 +497,24 @@
 .chips-wrapper {
   display: flex;
   gap: 10px;
+}
+
+.status-tags {
+  margin-top: 0;
+  justify-content: flex-end;
+  flex: 1;
+  align-items: center;
+}
+
+.status-title-row {
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.status-title-row .panel-title {
+  margin-bottom: 0;
+  white-space: nowrap;
 }
 
 .chips-item {
