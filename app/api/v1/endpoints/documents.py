@@ -68,6 +68,18 @@ async def _prepare_write_session(db: AsyncSession) -> None:
     await db.rollback()
 
 
+def _sse_data(payload: str) -> bytes:
+    # SSE requires each logical line to be prefixed with `data:`.
+    lines = payload.splitlines() or [""]
+    body = "".join(f"data: {line}\n" for line in lines)
+    return f"{body}\n".encode("utf-8")
+
+
+def _sse_error(message: str) -> bytes:
+    safe = message.replace("\n", " ").strip()
+    return f"event: error\ndata: {safe}\n\n".encode("utf-8")
+
+
 def _images_from_extract(data: dict[str, Any]) -> list[ImageInfo]:
     out: list[ImageInfo] = []
     for x in data.get("images") or []:
@@ -279,17 +291,17 @@ async def document_translate_stream(
         try:
             stream = await translate_text(source_text, target_lang=target_lang, stream=True)
         except AppError as exc:
-            yield f"\n[stream_error] {exc}\n".encode("utf-8")
+            yield _sse_error(f"[stream_error] {exc}")
             return
         parts: list[str] = []
         try:
             async for chunk in stream:
                 s = chunk if isinstance(chunk, str) else str(chunk)
                 parts.append(s)
-                yield s.encode("utf-8")
+                yield _sse_data(s)
                 await asyncio.sleep(0)
         except Exception as exc:
-            yield f"\n[stream_error] {exc}\n".encode("utf-8")
+            yield _sse_error(f"[stream_error] {exc}")
             return
         full = "".join(parts)
         try:
@@ -304,12 +316,16 @@ async def document_translate_stream(
                     )
         except Exception as exc:
             logger.exception("persist translation after stream failed")
-            yield f"\n[persist_error] {exc}\n".encode("utf-8")
+            yield _sse_error(f"[persist_error] {exc}")
+            return
+        yield _sse_data("[DONE]")
 
     return StreamingResponse(
         body(),
-        media_type="text/plain; charset=utf-8",
+        media_type="text/event-stream",
         headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
             "X-Source-Lang": source_lang,
             "X-Target-Lang": target_lang,
             "X-Document-Id": str(document_id),
@@ -463,17 +479,17 @@ async def document_summary_refine_stream(
                 stream=True,
             )
         except AppError as exc:
-            yield f"\n[stream_error] {exc}\n".encode("utf-8")
+            yield _sse_error(f"[stream_error] {exc}")
             return
         parts: list[str] = []
         try:
             async for chunk in stream:
                 s = chunk if isinstance(chunk, str) else str(chunk)
                 parts.append(s)
-                yield s.encode("utf-8")
+                yield _sse_data(s)
                 await asyncio.sleep(0)
         except Exception as exc:
-            yield f"\n[stream_error] {exc}\n".encode("utf-8")
+            yield _sse_error(f"[stream_error] {exc}")
             return
         full = "".join(parts)
         try:
@@ -488,12 +504,16 @@ async def document_summary_refine_stream(
                     )
         except Exception as exc:
             logger.exception("persist refined summary after stream failed")
-            yield f"\n[persist_error] {exc}\n".encode("utf-8")
+            yield _sse_error(f"[persist_error] {exc}")
+            return
+        yield _sse_data("[DONE]")
 
     return StreamingResponse(
         body(),
-        media_type="text/plain; charset=utf-8",
+        media_type="text/event-stream",
         headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
             "X-Document-Id": str(document_id),
             "X-Summary-Source": source.value,
         },
@@ -544,17 +564,17 @@ async def document_summary_stream(
         try:
             stream = await summarize_text(source_text, stream=True)
         except AppError as exc:
-            yield f"\n[stream_error] {exc}\n".encode("utf-8")
+            yield _sse_error(f"[stream_error] {exc}")
             return
         parts: list[str] = []
         try:
             async for chunk in stream:
                 s = chunk if isinstance(chunk, str) else str(chunk)
                 parts.append(s)
-                yield s.encode("utf-8")
+                yield _sse_data(s)
                 await asyncio.sleep(0)
         except Exception as exc:
-            yield f"\n[stream_error] {exc}\n".encode("utf-8")
+            yield _sse_error(f"[stream_error] {exc}")
             return
         full = "".join(parts)
         try:
@@ -569,12 +589,16 @@ async def document_summary_stream(
                     )
         except Exception as exc:
             logger.exception("persist summary after stream failed")
-            yield f"\n[persist_error] {exc}\n".encode("utf-8")
+            yield _sse_error(f"[persist_error] {exc}")
+            return
+        yield _sse_data("[DONE]")
 
     return StreamingResponse(
         body(),
-        media_type="text/plain; charset=utf-8",
+        media_type="text/event-stream",
         headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
             "X-Document-Id": str(document_id),
             "X-Summary-Source": source.value,
         },

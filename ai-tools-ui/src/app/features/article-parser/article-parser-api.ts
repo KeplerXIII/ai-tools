@@ -156,7 +156,7 @@ export class ArticleParserApi {
   }
 
   summarize(text: string) {
-    return this.http.post<SummaryResponse>('/api/v1/extract/summary', {
+    return this.http.post<SummaryResponse>('/api/v1/documents/${documentId}/summary/refine/stream', {
       text,
     });
   }
