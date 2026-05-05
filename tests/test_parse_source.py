@@ -1,5 +1,35 @@
 from __future__ import annotations
 
+"""Юнит-тесты эндпоинтов parsing (источники, разбор, деактивация).
+
+Что проверяется
+    Поведение функций FastAPI-эндпоинтов ``create_source``, ``deactivate_source``,
+    ``parse_source``: коды ошибок (404/403), форма успешного ответа, подсчёты
+    ``found_total`` / ``created_total``, лимит параллельного извлечения статей.
+
+Как устроено тестирование (без HTTP и без реальной БД)
+    - Эндпоинты вызываются напрямую как асинхронные функции с явной передачей
+      ``db`` и ``user``, без ``TestClient`` и без поднятого сервера.
+    - ``_FakeDb`` имитирует минимальный контракт async-сессии SQLAlchemy
+      (``get``, ``execute``, ``commit``, ``scalar``, ``begin`` и т.д.): данные
+      живут в памяти процесса, драйвер PostgreSQL не используется.
+    - ``SimpleNamespace`` играет роль строки источника/пользователя там, где
+      достаточно набора полей для ветвления в коде.
+    - Сетевые и «тяжёлые» зависимости подменяются ``unittest.mock.patch`` и
+      ``AsyncMock``: обнаружение URL, извлечение текста статьи, создание
+      документа, справочники статусов/языка/страны. Так проверяется оркестрация
+      и бизнес-ветки, а не реальный HTTP, RSS или запись в таблицы.
+
+Ограничения
+    Эти тесты не заменяют интеграционные: они не гарантируют корректность SQL,
+    миграций, таймаутов внешних API и поведения прод-парсеров. Для этого нужны
+    отдельные тесты с тестовой БД и/или контрактами к внешним сервисам.
+
+См. также
+    ``tests/conftest.py`` — переменные окружения для ``Settings`` при импорте
+    приложения во время прогона pytest.
+"""
+
 import asyncio
 import uuid
 from contextlib import asynccontextmanager
@@ -16,6 +46,8 @@ from app.services.parsing.source_discovery import DiscoveredUrl
 
 
 class _FakeResult:
+    """Заглушка результата execute/scalars для цепочек ORM в тестах."""
+
     def __iter__(self):
         return iter([])
 
@@ -27,6 +59,8 @@ class _FakeResult:
 
 
 class _FakeDb:
+    """In-memory двойник async Session: отдаёт заданный ``source`` из ``get``, считает ``execute``."""
+
     def __init__(self, source):
         self._source = source
         self.insert_calls = 0
@@ -71,7 +105,10 @@ class _FakeDb:
 
 
 class ParseSourceEndpointTests(IsolatedAsyncioTestCase):
+    """Сценарии вокруг ``deactivate_source``, ``parse_source``, ``create_source``."""
+
     async def test_deactivate_source_happy_path(self):
+        """Деактивация своего источника: ``ok``, id в ответе, ``is_active`` сброшен."""
         source_id = uuid.uuid4()
         user_id = uuid.uuid4()
         source = SimpleNamespace(
@@ -90,6 +127,7 @@ class ParseSourceEndpointTests(IsolatedAsyncioTestCase):
         self.assertFalse(source.is_active)
 
     async def test_deactivate_source_returns_404_when_source_missing(self):
+        """Нет источника в БД (фейковой) — HTTP 404."""
         db = _FakeDb(source=None)
         user = SimpleNamespace(id=uuid.uuid4())
 
@@ -99,6 +137,7 @@ class ParseSourceEndpointTests(IsolatedAsyncioTestCase):
         self.assertEqual(exc.exception.status_code, 404)
 
     async def test_deactivate_source_returns_403_for_foreign_source(self):
+        """Источник принадлежит другому пользователю — HTTP 403."""
         source_id = uuid.uuid4()
         source = SimpleNamespace(
             id=source_id,
@@ -114,6 +153,7 @@ class ParseSourceEndpointTests(IsolatedAsyncioTestCase):
         self.assertEqual(exc.exception.status_code, 403)
 
     async def test_parse_source_returns_404_when_source_missing(self):
+        """``parse_source`` без найденного источника — HTTP 404."""
         db = _FakeDb(source=None)
         payload = ParseSourceRequest(source_id=uuid.uuid4(), days=3)
 
@@ -123,6 +163,7 @@ class ParseSourceEndpointTests(IsolatedAsyncioTestCase):
         self.assertEqual(exc.exception.status_code, 404)
 
     async def test_parse_source_happy_path_response_shape(self):
+        """Успешный прогон с моками: счётчики и списки unprocessed соответствуют двум найденным URL."""
         source_id = uuid.uuid4()
         source = SimpleNamespace(
             id=source_id,
@@ -220,6 +261,7 @@ class ParseSourceEndpointTests(IsolatedAsyncioTestCase):
         self.assertEqual(len(result.new_unprocessed_by_source), 2)
 
     async def test_parse_source_respects_extract_concurrency_limit(self):
+        """Параллельные «извлечения» не превышают ожидаемый лимит (отслеживание через stub)."""
         source_id = uuid.uuid4()
         source = SimpleNamespace(
             id=source_id,
@@ -297,6 +339,7 @@ class ParseSourceEndpointTests(IsolatedAsyncioTestCase):
         self.assertLessEqual(max_in_flight, 3)
 
     async def test_create_source_happy_path(self):
+        """Создание источника: моки справочников языка/страны, проверка полей ответа."""
         db = _FakeDb(source=None)
         user = SimpleNamespace(id=uuid.uuid4())
         payload = SourceCreateRequest(
