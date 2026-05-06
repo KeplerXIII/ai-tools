@@ -31,6 +31,7 @@ from app.schemas.documents import (
     DocumentCategorizeItem,
     DocumentEntityItem,
     DocumentExtractResponse,
+    DocumentMetadataUpdateRequest,
     DocumentStatusItem,
     DocumentTagItem,
     DocumentUpdateRequest,
@@ -389,10 +390,13 @@ async def save_document_after_edit(
     if doc.lock_expires_at is None or doc.lock_expires_at < now:
         raise ConflictError("Срок блокировки истёк или блокировка не установлена")
 
-    if body.original_content is not None and body.original_content != doc.original_content:
-        doc.original_summary_stale = True
-    if body.translated_content is not None and body.translated_content != doc.translated_content:
-        doc.translated_summary_stale = True
+    original_changed = body.original_content is not None and body.original_content != doc.original_content
+    translated_changed = body.translated_content is not None and body.translated_content != doc.translated_content
+
+    if original_changed:
+        doc.original_summary_stale = body.original_summary is None
+    if translated_changed:
+        doc.translated_summary_stale = body.translated_summary is None
 
     if body.title is not None:
         doc.title = body.title.strip()[:512] or doc.title
@@ -400,6 +404,12 @@ async def save_document_after_edit(
         doc.original_content = body.original_content
     if body.translated_content is not None:
         doc.translated_content = body.translated_content
+    if body.original_summary is not None:
+        doc.original_summary = body.original_summary
+        doc.original_summary_stale = False
+    if body.translated_summary is not None:
+        doc.translated_summary = body.translated_summary
+        doc.translated_summary_stale = False
 
     doc.version = (doc.version or 1) + 1
     doc.locked_by_id = None
@@ -407,7 +417,45 @@ async def save_document_after_edit(
     doc.lock_expires_at = None
     doc.updated_at = now
 
-    await invalidate_auto_derivatives(session, document_id)
+    if original_changed or translated_changed:
+        await invalidate_auto_derivatives(session, document_id)
+    return doc
+
+
+async def update_document_metadata(
+    session: AsyncSession,
+    *,
+    document_id: uuid.UUID,
+    body: DocumentMetadataUpdateRequest,
+) -> Document:
+    doc = await get_document_for_update(session, document_id)
+    if doc is None:
+        raise NotFoundError("Документ не найден")
+
+    if body.title is not None:
+        doc.title = body.title.strip()[:512] or doc.title
+    if body.author is not None:
+        author = body.author.strip()
+        doc.extracted_author = author[:512] if author else None
+    if body.date is not None:
+        date = body.date.strip()
+        doc.extracted_date = date[:128] if date else None
+    if body.source_url is not None:
+        doc.source_url = normalize_source_url(str(body.source_url))
+    if body.main_image is not None:
+        doc.extracted_main_image = body.main_image.strip() or None
+    if body.images is not None:
+        doc.extracted_images = [
+            {
+                "url": item.url.strip(),
+                "alt": (item.alt.strip() if item.alt else None),
+                "title": (item.title.strip() if item.title else None),
+            }
+            for item in body.images
+            if item.url.strip()
+        ]
+
+    doc.updated_at = datetime.now(UTC)
     return doc
 
 

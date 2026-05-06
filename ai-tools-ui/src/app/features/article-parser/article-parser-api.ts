@@ -119,6 +119,23 @@ export interface SummaryResponse {
   annotation: string;
 }
 
+export interface DocumentUpdateRequest {
+  title?: string | null;
+  original_content?: string | null;
+  translated_content?: string | null;
+  original_summary?: string | null;
+  translated_summary?: string | null;
+}
+
+export interface DocumentMetadataUpdateRequest {
+  title?: string | null;
+  author?: string | null;
+  date?: string | null;
+  source_url?: string;
+  main_image?: string | null;
+  images?: ImageInfo[];
+}
+
 @Injectable({
   providedIn: 'root',
 })
@@ -142,6 +159,21 @@ export class ArticleParserApi {
     return this.http.post<ExtractResponse>('/api/v1/documents/extract-url', {
       url,
     });
+  }
+
+  lockDocument(documentId: string) {
+    return this.http.post<{ ok?: boolean; document_id?: string }>(`/api/v1/documents/${documentId}/lock`, {});
+  }
+
+  saveDocument(documentId: string, payload: DocumentUpdateRequest) {
+    return this.http.put<{ ok?: boolean; document_id?: string }>(`/api/v1/documents/${documentId}`, payload);
+  }
+
+  updateDocumentMetadata(documentId: string, payload: DocumentMetadataUpdateRequest) {
+    return this.http.patch<{ ok?: boolean; document_id?: string }>(
+      `/api/v1/documents/${documentId}/metadata`,
+      payload,
+    );
   }
 
   extractEntities(documentId: string) {

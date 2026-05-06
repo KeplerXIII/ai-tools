@@ -32,6 +32,7 @@ from app.schemas.documents import (
     DocumentStatusCatalogItem,
     DocumentExtractResponse,
     DocumentEntitiesExtractResponse,
+    DocumentMetadataUpdateRequest,
     DocumentRefineSummaryRequest,
     DocumentRefineSummaryResponse,
     DocumentStatusAssignRequest,
@@ -65,6 +66,7 @@ from app.services.documents.document_pipeline import (
     run_tag_document,
     run_translate_document,
     save_document_after_edit,
+    update_document_metadata,
 )
 from app.services.documents.url_norm import normalize_source_url
 from app.services.llm.summarizer import refine_summary, summarize_text
@@ -1152,6 +1154,27 @@ async def document_save(
                 db,
                 document_id=document_id,
                 user_id=user_id,
+                body=payload,
+            )
+    except AppError as exc:
+        _handle(exc)
+    return {"ok": True, "document_id": str(document_id)}
+
+
+@router.patch("/{document_id}/metadata")
+async def document_update_metadata(
+    document_id: UUID,
+    payload: DocumentMetadataUpdateRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    _ = user
+    try:
+        await _prepare_write_session(db)
+        async with db.begin():
+            await update_document_metadata(
+                db,
+                document_id=document_id,
                 body=payload,
             )
     except AppError as exc:

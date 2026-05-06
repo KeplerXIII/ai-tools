@@ -353,7 +353,42 @@ export class ArticleParser {
         }
         break;
       case 'meta':
+        if (!this.isEditingMetaBlock) {
+          const docId = this.state.article?.document_id;
+          if (docId) {
+            this.state.error = '';
+            this.api.lockDocument(docId).subscribe({
+              error: () => {
+                this.state.error = 'Не удалось заблокировать документ для редактирования';
+                this.cdr.detectChanges();
+              },
+            });
+          }
+        }
         this.isEditingMetaBlock = !this.isEditingMetaBlock;
+        if (!this.isEditingMetaBlock) {
+          const doc = this.state.article;
+          const docId = doc?.document_id;
+          if (docId && doc) {
+            const sourceUrl = (doc.url || '').trim();
+            this.state.error = '';
+            this.api
+              .updateDocumentMetadata(docId, {
+                title: doc.title ?? '',
+                author: doc.author ?? '',
+                date: doc.date ?? '',
+                main_image: doc.main_image ?? '',
+                images: doc.images ?? [],
+                ...(sourceUrl ? { source_url: sourceUrl } : {}),
+              })
+              .subscribe({
+                error: () => {
+                  this.state.error = 'Не удалось сохранить метаданные';
+                  this.cdr.detectChanges();
+                },
+              });
+          }
+        }
         break;
       case 'categories':
         this.isEditingCategoriesBlock = !this.isEditingCategoriesBlock;
@@ -370,6 +405,18 @@ export class ArticleParser {
         break;
       case 'original':
         if (!this.isEditingOriginalBlock) {
+          const docId = this.state.article?.document_id;
+          if (docId) {
+            this.state.error = '';
+            this.api.lockDocument(docId).subscribe({
+              error: () => {
+                this.state.error = 'Не удалось заблокировать документ для редактирования';
+                this.cdr.detectChanges();
+              },
+            });
+          }
+        }
+        if (!this.isEditingOriginalBlock) {
           this.originalTextViewportScroll =
             this.originalTextPreview?.nativeElement?.scrollTop ?? 0;
         } else {
@@ -378,12 +425,83 @@ export class ArticleParser {
         }
         this.isEditingOriginalBlock = !this.isEditingOriginalBlock;
         this.scheduleRestoreOriginalTextScroll();
+        if (!this.isEditingOriginalBlock) {
+          const docId = this.state.article?.document_id;
+          if (docId && this.state.article) {
+            this.state.error = '';
+            this.api
+              .saveDocument(docId, {
+                original_content: this.state.article.text ?? '',
+              })
+              .subscribe({
+                error: () => {
+                  this.state.error = 'Не удалось сохранить исходный текст';
+                  this.cdr.detectChanges();
+                },
+              });
+          }
+        }
         break;
       case 'translation':
+        if (!this.isEditingTranslationBlock) {
+          const docId = this.state.article?.document_id;
+          if (docId) {
+            this.state.error = '';
+            this.api.lockDocument(docId).subscribe({
+              error: () => {
+                this.state.error = 'Не удалось заблокировать документ для редактирования';
+                this.cdr.detectChanges();
+              },
+            });
+          }
+        }
         this.isEditingTranslationBlock = !this.isEditingTranslationBlock;
+        if (!this.isEditingTranslationBlock) {
+          const docId = this.state.article?.document_id;
+          if (docId) {
+            this.state.error = '';
+            this.api
+              .saveDocument(docId, {
+                translated_content: this.state.translatedText ?? '',
+              })
+              .subscribe({
+                error: () => {
+                  this.state.error = 'Не удалось сохранить перевод';
+                  this.cdr.detectChanges();
+                },
+              });
+          }
+        }
         break;
       case 'annotation':
+        if (!this.isEditingAnnotationBlock) {
+          const docId = this.state.article?.document_id;
+          if (docId) {
+            this.state.error = '';
+            this.api.lockDocument(docId).subscribe({
+              error: () => {
+                this.state.error = 'Не удалось заблокировать документ для редактирования';
+                this.cdr.detectChanges();
+              },
+            });
+          }
+        }
         this.isEditingAnnotationBlock = !this.isEditingAnnotationBlock;
+        if (!this.isEditingAnnotationBlock) {
+          const docId = this.state.article?.document_id;
+          if (docId) {
+            const hasTranslation = !!this.state.translatedText?.trim();
+            this.state.error = '';
+            this.api
+              .saveDocument(docId, hasTranslation ? { translated_summary: this.state.annotation ?? '' } : { original_summary: this.state.annotation ?? '' })
+              .subscribe({
+                error: () => {
+                  this.state.error = 'Не удалось сохранить аннотацию';
+                  this.cdr.detectChanges();
+                },
+              });
+          }
+        }
         break;
     }
   }

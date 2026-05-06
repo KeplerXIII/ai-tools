@@ -142,15 +142,55 @@ class DocumentRefineSummaryResponse(BaseModel):
     document_id: uuid.UUID
 
 
+class DocumentImageUpdateItem(BaseModel):
+    url: str = Field(min_length=1)
+    alt: str | None = None
+    title: str | None = None
+
+
+class DocumentMetadataUpdateRequest(BaseModel):
+    title: str | None = Field(default=None, max_length=512)
+    author: str | None = Field(default=None, max_length=512)
+    date: str | None = Field(default=None, max_length=128)
+    source_url: HttpUrl | None = None
+    main_image: str | None = None
+    images: list[DocumentImageUpdateItem] | None = None
+
+    @model_validator(mode="after")
+    def at_least_one_field(self) -> DocumentMetadataUpdateRequest:
+        if (
+            self.title is None
+            and self.author is None
+            and self.date is None
+            and self.source_url is None
+            and self.main_image is None
+            and self.images is None
+        ):
+            raise ValueError(
+                "Укажите хотя бы одно поле: title, author, date, source_url, main_image или images",
+            )
+        return self
+
+
 class DocumentUpdateRequest(BaseModel):
     title: str | None = Field(default=None, max_length=512)
     original_content: str | None = None
     translated_content: str | None = None
+    original_summary: str | None = None
+    translated_summary: str | None = None
 
     @model_validator(mode="after")
     def at_least_one_field(self) -> DocumentUpdateRequest:
-        if self.title is None and self.original_content is None and self.translated_content is None:
-            raise ValueError("Укажите хотя бы одно поле: title, original_content или translated_content")
+        if (
+            self.title is None
+            and self.original_content is None
+            and self.translated_content is None
+            and self.original_summary is None
+            and self.translated_summary is None
+        ):
+            raise ValueError(
+                "Укажите хотя бы одно поле: title, original_content, translated_content, original_summary или translated_summary",
+            )
         return self
 
 
