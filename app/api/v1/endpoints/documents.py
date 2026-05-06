@@ -486,7 +486,6 @@ async def delete_document(
     """
     user_id = user.id
     user_is_admin = user.is_admin
-    await _prepare_write_session(db)
     doc = await db.get(Document, document_id)
     if doc is None:
         raise HTTPException(status_code=404, detail="Документ не найден")
@@ -504,6 +503,7 @@ async def delete_document(
         ),
     )
 
+    await _prepare_write_session(db)
     async with db.begin():
         await db.execute(delete(Document).where(Document.id == document_id))
         if tag_ids:

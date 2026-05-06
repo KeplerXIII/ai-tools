@@ -35,6 +35,8 @@ export class Documents implements OnInit {
   dateFrom = '';
   dateTo = '';
   usePublishedDate = false;
+  /** Сортировка списка после загрузки: по дате загрузки или по «дате в полоске» (публикация / загрузка). */
+  dateSortOption: 'uploaded-desc' | 'uploaded-asc' | 'card-desc' | 'card-asc' = 'uploaded-desc';
   expandedDocumentId: string | null = null;
 
   /** Документ, для которого открыто подтверждение удаления. */
@@ -88,7 +90,7 @@ export class Documents implements OnInit {
       })
       .subscribe({
         next: (response) => {
-          this.documents = response.items;
+          this.documents = this.sortDocumentsByDate(response.items);
           this.loading = false;
         },
         error: () => {
@@ -102,6 +104,10 @@ export class Documents implements OnInit {
     this.loadDocuments();
   }
 
+  onDateSortChanged(): void {
+    this.documents = this.sortDocumentsByDate(this.documents);
+  }
+
   resetFilters(): void {
     this.selectedStatusCode = '';
     this.selectedDocumentTypeCode = '';
@@ -109,6 +115,7 @@ export class Documents implements OnInit {
     this.dateFrom = '';
     this.dateTo = '';
     this.usePublishedDate = false;
+    this.dateSortOption = 'uploaded-desc';
     this.loadDocuments();
   }
 
@@ -142,6 +149,20 @@ export class Documents implements OnInit {
         url: doc.source_url,
         autoload: '1',
       },
+    });
+  }
+
+  private sortDocumentsByDate(items: DocumentListItem[]): DocumentListItem[] {
+    const desc = this.dateSortOption.endsWith('desc');
+    const byCard = this.dateSortOption.startsWith('card');
+    const time = (doc: DocumentListItem): number => {
+      const iso = byCard ? this.documentStripPrimaryIso(doc) : doc.created_at;
+      const t = new Date(iso).getTime();
+      return Number.isNaN(t) ? 0 : t;
+    };
+    return [...items].sort((a, b) => {
+      const diff = time(a) - time(b);
+      return desc ? -diff : diff;
     });
   }
 

@@ -48,6 +48,16 @@
         <span>Искать по дате публикации</span>
       </label>
 
+      <label class="filter-item">
+        <span>Сортировка по дате</span>
+        <select [(ngModel)]="dateSortOption" (change)="onDateSortChanged()">
+          <option value="uploaded-desc">Сначала новые (дата загрузки)</option>
+          <option value="uploaded-asc">Сначала старые (дата загрузки)</option>
+          <option value="card-desc">Сначала новые (дата в списке)</option>
+          <option value="card-asc">Сначала старые (дата в списке)</option>
+        </select>
+      </label>
+
       <button class="reset-btn" type="button" (click)="resetFilters()">Сбросить</button>
     </div>
   </header>
