@@ -110,9 +110,103 @@
 
           @if (isExpanded(doc.document_id)) {
             <div class="document-expanded">
-              <div class="document-expanded__annotation">
-                <h4>Аннотация</h4>
-                <p>{{ doc.annotation || 'Аннотация отсутствует' }}</p>
+              <div class="document-expanded__main">
+                <div class="document-expanded__annotation">
+                  <h4>Аннотация</h4>
+                  <p>{{ doc.annotation || 'Аннотация отсутствует' }}</p>
+                </div>
+
+                <div class="document-expanded__chips">
+                  <div class="chips-group">
+                    <h4>Категории</h4>
+                    <div class="chips-wrap">
+                      @if (doc.categories.length) {
+                        @for (item of doc.categories; track item) {
+                          <p-chip
+                            [label]="categoryChipLabel(item)"
+                            class="entity-chip-category chip-compact"
+                          ></p-chip>
+                        }
+                      } @else {
+                        <span class="chips-empty">Нет категорий</span>
+                      }
+                    </div>
+                  </div>
+
+                  <div class="chips-group">
+                    <h4>Образцы вооружений и военной техники</h4>
+                    <div class="chips-wrap">
+                      @if (entityItemsByType(doc, 'military_equipment').length) {
+                        @for (item of entityItemsByType(doc, 'military_equipment'); track item.id) {
+                          <p-chip
+                            [label]="entityChipLabel(item)"
+                            [class]="entityChipClass(item)"
+                          ></p-chip>
+                        }
+                      } @else {
+                        <span class="chips-empty">Нет сущностей</span>
+                      }
+                    </div>
+                  </div>
+
+                  <div class="chips-group">
+                    <h4>Производители</h4>
+                    <div class="chips-wrap">
+                      @if (entityItemsByType(doc, 'manufacturer').length) {
+                        @for (item of entityItemsByType(doc, 'manufacturer'); track item.id) {
+                          <p-chip
+                            [label]="entityChipLabel(item)"
+                            [class]="entityChipClass(item)"
+                          ></p-chip>
+                        }
+                      } @else {
+                        <span class="chips-empty">Нет сущностей</span>
+                      }
+                    </div>
+                  </div>
+
+                  <div class="chips-group">
+                    <h4>Контракты</h4>
+                    <div class="chips-wrap">
+                      @if (entityItemsByType(doc, 'contract').length) {
+                        @for (item of entityItemsByType(doc, 'contract'); track item.id) {
+                          <p-chip
+                            [label]="entityChipLabel(item)"
+                            [class]="entityChipClass(item)"
+                          ></p-chip>
+                        }
+                      } @else {
+                        <span class="chips-empty">Нет сущностей</span>
+                      }
+                    </div>
+                  </div>
+
+                  <div class="chips-group">
+                    <h4>Теги (оригинал)</h4>
+                    <div class="chips-wrap">
+                      @if (doc.original_tags.length) {
+                        @for (item of doc.original_tags; track item.id) {
+                          <p-chip [label]="item.name" class="original-chip chip-compact"></p-chip>
+                        }
+                      } @else {
+                        <span class="chips-empty">Нет тегов</span>
+                      }
+                    </div>
+                  </div>
+
+                  <div class="chips-group">
+                    <h4>Теги (русский)</h4>
+                    <div class="chips-wrap">
+                      @if (doc.translated_tags.length) {
+                        @for (item of doc.translated_tags; track item.id) {
+                          <p-chip [label]="item.name" class="translated-chip chip-compact"></p-chip>
+                        }
+                      } @else {
+                        <span class="chips-empty">Нет тегов</span>
+                      }
+                    </div>
+                  </div>
+                </div>
               </div>
               <div class="document-expanded__image">
                 <h4>Фото</h4>

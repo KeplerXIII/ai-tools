@@ -123,6 +123,17 @@ class DocumentStatusesResponse(BaseModel):
     statuses: list[DocumentStatusItem]
 
 
+class DocumentListEntityItem(BaseModel):
+    id: uuid.UUID
+    name: str
+    entity_type_code: str
+
+
+class DocumentListTagItem(BaseModel):
+    id: uuid.UUID
+    name: str
+
+
 class DocumentListItem(BaseModel):
     document_id: uuid.UUID
     title: str
@@ -137,6 +148,10 @@ class DocumentListItem(BaseModel):
     has_categories: bool = False
     has_entities: bool = False
     has_tags: bool = False
+    categories: list[DocumentCategorizeItem] = []
+    entities: list[DocumentListEntityItem] = []
+    original_tags: list[DocumentListTagItem] = []
+    translated_tags: list[DocumentListTagItem] = []
 
 
 class DocumentListResponse(BaseModel):

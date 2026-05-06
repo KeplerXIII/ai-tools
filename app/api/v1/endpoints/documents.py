@@ -31,8 +31,10 @@ from app.schemas.documents import (
     DocumentCategoryAssignRequest,
     DocumentEntityAssignRequest,
     DocumentEntityItem,
+    DocumentListEntityItem,
     DocumentListItem,
     DocumentListResponse,
+    DocumentListTagItem,
     DocumentStatusCatalogItem,
     DocumentExtractResponse,
     DocumentEntitiesExtractResponse,
@@ -212,7 +214,7 @@ async def _get_document_categories(
             Category.name,
             Category.name_ru,
             DocumentCategory.confidence,
-            PredictionSource.code,
+            PredictionSource.code.label("prediction_source_code"),
         )
         .select_from(DocumentCategory)
         .join(Category, Category.id == DocumentCategory.category_id)
@@ -259,6 +261,8 @@ async def list_documents(
             Document.id,
             Document.title,
             Document.source_url,
+            Document.original_language_id,
+            Document.translated_language_id,
             Document.created_at,
             Document.published_at,
             Document.extracted_main_image,
@@ -329,6 +333,80 @@ async def list_documents(
     entity_ids = set(await db.scalars(select(DocumentEntity.document_id).where(DocumentEntity.document_id.in_(doc_ids))))
     tag_ids = set(await db.scalars(select(DocumentTag.document_id).where(DocumentTag.document_id.in_(doc_ids))))
 
+    category_rows = await db.execute(
+        select(
+            DocumentCategory.document_id,
+            Category.id,
+            Category.code,
+            Category.name,
+            Category.name_ru,
+            DocumentCategory.confidence,
+            PredictionSource.code.label("prediction_source_code"),
+        )
+        .join(Category, Category.id == DocumentCategory.category_id)
+        .outerjoin(PredictionSource, PredictionSource.id == DocumentCategory.prediction_source_id)
+        .where(DocumentCategory.document_id.in_(doc_ids))
+        .order_by(Category.sort_order.asc(), Category.code.asc())
+    )
+    categories_map: dict[UUID, list[DocumentCategorizeItem]] = {}
+    for row in category_rows:
+        conf_f = float(row.confidence) if row.confidence is not None else 1.0
+        conf_f = max(0.0, min(1.0, conf_f))
+        categories_map.setdefault(row.document_id, []).append(
+            DocumentCategorizeItem(
+                category_id=row.id,
+                code=row.code,
+                name=row.name,
+                name_ru=row.name_ru,
+                confidence=conf_f,
+                prediction_source_code=row.prediction_source_code or "unknown",
+                text_source=None,
+            )
+        )
+
+    entity_rows = await db.execute(
+        select(DocumentEntity.document_id, Entity.id, Entity.name, EntityType.code)
+        .join(Entity, Entity.id == DocumentEntity.entity_id)
+        .join(EntityType, EntityType.id == Entity.entity_type_id)
+        .where(DocumentEntity.document_id.in_(doc_ids))
+        .order_by(Entity.name.asc())
+    )
+    entities_map: dict[UUID, list[DocumentListEntityItem]] = {}
+    for row in entity_rows:
+        name = (row.name or "").strip()
+        if name:
+            entities_map.setdefault(row.document_id, []).append(
+                DocumentListEntityItem(
+                    id=row.id,
+                    name=name,
+                    entity_type_code=row.code,
+                )
+            )
+
+    tag_rows = await db.execute(
+        select(DocumentTag.document_id, Tag.id, Tag.name, Tag.language_id)
+        .join(Tag, Tag.id == DocumentTag.tag_id)
+        .where(DocumentTag.document_id.in_(doc_ids))
+        .order_by(Tag.name.asc())
+    )
+    doc_languages = {
+        row.id: (row.original_language_id, row.translated_language_id)
+        for row in docs
+    }
+    original_tags_map: dict[UUID, list[DocumentListTagItem]] = {}
+    translated_tags_map: dict[UUID, list[DocumentListTagItem]] = {}
+    for row in tag_rows:
+        name = (row.name or "").strip()
+        if name:
+            item = DocumentListTagItem(id=row.id, name=name)
+            original_lang_id, translated_lang_id = doc_languages.get(row.document_id, (None, None))
+            if original_lang_id is not None and row.language_id == original_lang_id:
+                original_tags_map.setdefault(row.document_id, []).append(item)
+            elif translated_lang_id is not None and row.language_id == translated_lang_id:
+                translated_tags_map.setdefault(row.document_id, []).append(item)
+            else:
+                original_tags_map.setdefault(row.document_id, []).append(item)
+
     items = [
         DocumentListItem(
             document_id=row.id,
@@ -344,6 +422,10 @@ async def list_documents(
             has_categories=row.id in category_ids,
             has_entities=row.id in entity_ids,
             has_tags=row.id in tag_ids,
+            categories=categories_map.get(row.id, []),
+            entities=entities_map.get(row.id, []),
+            original_tags=original_tags_map.get(row.id, []),
+            translated_tags=translated_tags_map.get(row.id, []),
         )
         for row in docs
     ]

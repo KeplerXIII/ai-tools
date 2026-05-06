@@ -10,6 +10,27 @@ export interface DocumentStatusItem {
   assigned_by_id: string | null;
 }
 
+export interface DocumentCategoryItem {
+  category_id: string;
+  code: string;
+  name: string;
+  name_ru?: string | null;
+  confidence: number;
+  prediction_source_code: string;
+  text_source?: 'original' | 'translated' | null;
+}
+
+export interface DocumentEntityItem {
+  id: string;
+  name: string;
+  entity_type_code: 'military_equipment' | 'manufacturer' | 'contract' | string;
+}
+
+export interface DocumentTagItem {
+  id: string;
+  name: string;
+}
+
 export interface DocumentListItem {
   document_id: string;
   title: string;
@@ -24,6 +45,10 @@ export interface DocumentListItem {
   has_categories: boolean;
   has_entities: boolean;
   has_tags: boolean;
+  categories: DocumentCategoryItem[];
+  entities: DocumentEntityItem[];
+  original_tags: DocumentTagItem[];
+  translated_tags: DocumentTagItem[];
 }
 
 export interface DocumentListResponse {

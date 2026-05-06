@@ -2,12 +2,20 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { DocumentsApi, DocumentListItem, DocumentStatusCatalogItem, DocumentTypeCatalogItem } from './documents-api';
+import { ChipModule } from 'primeng/chip';
+import {
+  DocumentCategoryItem,
+  DocumentEntityItem,
+  DocumentsApi,
+  DocumentListItem,
+  DocumentStatusCatalogItem,
+  DocumentTypeCatalogItem,
+} from './documents-api';
 
 @Component({
   selector: 'app-documents',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, ChipModule],
   templateUrl: './documents.html',
   styleUrl: './documents.scss',
 })
@@ -105,5 +113,32 @@ export class Documents implements OnInit {
         autoload: '1',
       },
     });
+  }
+
+  categoryChipLabel(item: DocumentCategoryItem): string {
+    const title = (item.name_ru || item.name || item.code).trim();
+    const conf = Number.isFinite(item.confidence) ? `${Math.round(item.confidence * 100)}%` : '—';
+    return `${title} (${conf})`;
+  }
+
+  entityChipLabel(item: DocumentEntityItem): string {
+    return item.name;
+  }
+
+  entityChipClass(item: DocumentEntityItem): string {
+    if (item.entity_type_code === 'manufacturer') {
+      return 'entity-chip-manufacturer chip-compact';
+    }
+    if (item.entity_type_code === 'contract') {
+      return 'entity-chip-contract chip-compact';
+    }
+    return 'entity-chip-military chip-compact';
+  }
+
+  entityItemsByType(
+    doc: DocumentListItem,
+    entityTypeCode: 'military_equipment' | 'manufacturer' | 'contract',
+  ): DocumentEntityItem[] {
+    return doc.entities.filter((item) => item.entity_type_code === entityTypeCode);
   }
 }

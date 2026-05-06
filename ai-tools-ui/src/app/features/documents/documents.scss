@@ -197,6 +197,12 @@
   gap: 16px;
 }
 
+.document-expanded__main {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
 .document-expanded h4 {
   margin: 0 0 8px;
   font-size: 14px;
@@ -216,6 +222,29 @@
   border: 1px solid #dbe3ee;
 }
 
+.document-expanded__chips {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.chips-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.chips-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chips-empty {
+  color: #94a3b8;
+  font-size: 13px;
+}
+
 .image-empty {
   color: #94a3b8;
   font-size: 13px;
@@ -228,4 +257,51 @@
 
 .state-message_error {
   color: #b91c1c;
+}
+
+:host ::ng-deep .translated-chip {
+  background-color: rgb(180, 235, 181);
+  color: var(--dark-text-color);
+}
+
+:host ::ng-deep .original-chip {
+  background-color: rgb(180, 220, 235);
+  color: var(--dark-text-color);
+}
+
+:host ::ng-deep .entity-chip-military {
+  background-color: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+
+:host ::ng-deep .entity-chip-manufacturer {
+  background-color: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fcd34d;
+}
+
+:host ::ng-deep .entity-chip-contract {
+  background-color: #f3e8ff;
+  color: #6b21a8;
+  border: 1px solid #d8b4fe;
+}
+
+:host ::ng-deep .entity-chip-category {
+  background-color: #ccfbf1;
+  color: #0f766e;
+  border: 1px solid #5eead4;
+}
+
+:host ::ng-deep .chip-compact.p-chip {
+  padding: 0.125rem 0.45rem;
+  gap: 0.2rem;
+  min-height: 1.375rem;
+  font-size: 12px;
+}
+
+:host ::ng-deep .chip-compact.p-chip .p-chip-label {
+  line-height: 1.25;
+  margin: 0;
+  padding: 0;
 }
