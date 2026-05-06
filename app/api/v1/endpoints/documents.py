@@ -484,11 +484,13 @@ async def delete_document(
     удаления документа на них больше нет ни одной строки в ``document_tags`` / ``document_entities``.
     Доступ: владелец документа или администратор.
     """
+    user_id = user.id
+    user_is_admin = user.is_admin
     await _prepare_write_session(db)
     doc = await db.get(Document, document_id)
     if doc is None:
         raise HTTPException(status_code=404, detail="Документ не найден")
-    if not user.is_admin and doc.created_by_id != user.id:
+    if not user_is_admin and doc.created_by_id != user_id:
         raise HTTPException(status_code=403, detail="Нет права удалить этот документ")
 
     tag_ids = list(
