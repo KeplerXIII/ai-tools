@@ -1,0 +1,88 @@
+<section class="documents-page">
+  <header class="documents-header">
+    <h1 class="documents-title">Документы</h1>
+
+    <div class="documents-filters">
+      <label class="filter-item">
+        <span>Статус</span>
+        <select [(ngModel)]="selectedStatusCode" (change)="onFiltersChanged()">
+          <option value="">Все</option>
+          @for (status of statuses; track status.code) {
+            <option [value]="status.code">{{ status.name_ru }}</option>
+          }
+        </select>
+      </label>
+
+      <label class="filter-item">
+        <span>Тип документа</span>
+        <select [(ngModel)]="selectedDocumentTypeCode" (change)="onFiltersChanged()">
+          <option value="">Все</option>
+          @for (type of documentTypes; track type.code) {
+            <option [value]="type.code">{{ type.name }}</option>
+          }
+        </select>
+      </label>
+
+      <label class="filter-item">
+        <span>Дата от</span>
+        <input type="date" [(ngModel)]="dateFrom" (change)="onFiltersChanged()" />
+      </label>
+
+      <label class="filter-item">
+        <span>Дата до</span>
+        <input type="date" [(ngModel)]="dateTo" (change)="onFiltersChanged()" />
+      </label>
+
+      <label class="toggle-item">
+        <input type="checkbox" [(ngModel)]="usePublishedDate" (change)="onFiltersChanged()" />
+        <span>Искать по дате публикации</span>
+      </label>
+
+      <button class="reset-btn" type="button" (click)="resetFilters()">Сбросить</button>
+    </div>
+  </header>
+
+  @if (loading) {
+    <div class="state-message">Загрузка документов...</div>
+  } @else if (error) {
+    <div class="state-message state-message_error">{{ error }}</div>
+  } @else if (!documents.length) {
+    <div class="state-message">Документы не найдены</div>
+  } @else {
+    <div class="documents-list">
+      @for (doc of documents; track doc.document_id) {
+        <article class="document-row">
+          <div class="document-main">
+            <h3 class="document-row__title">{{ doc.title }}</h3>
+            <div class="document-row__meta">{{ doc.document_type_name }}</div>
+          </div>
+
+          <div class="document-flags">
+            <span class="flag-item">
+              Категории
+              <i class="pi" [class.pi-check-circle]="doc.has_categories" [class.pi-circle]="!doc.has_categories"></i>
+            </span>
+            <span class="flag-item">
+              Сущности
+              <i class="pi" [class.pi-check-circle]="doc.has_entities" [class.pi-circle]="!doc.has_entities"></i>
+            </span>
+            <span class="flag-item">
+              Теги
+              <i class="pi" [class.pi-check-circle]="doc.has_tags" [class.pi-circle]="!doc.has_tags"></i>
+            </span>
+          </div>
+
+          <div class="document-statuses">
+            @if (doc.statuses.length) {
+              @for (status of doc.statuses; track status.code) {
+                <span class="status-chip">{{ status.name_ru }}</span>
+              }
+            } @else {
+              <span class="status-empty">Без статуса</span>
+            }
+          </div>
+        </article>
+      }
+    </div>
+  }
+</section>

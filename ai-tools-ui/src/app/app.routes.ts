@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 import { Translate } from './features/translate/translate';
 import { ArticleParser } from './features/article-parser/article-parser';
+import { Documents } from './features/documents/documents';
 import { Login } from './features/login/login';
 import { authGuard } from './core/auth/auth.guard';
 
@@ -22,6 +23,11 @@ export const routes: Routes = [
   {
     path: 'article-parser',
     component: ArticleParser,
+    canActivate: [authGuard],
+  },
+  {
+    path: 'documents',
+    component: Documents,
     canActivate: [authGuard],
   },
 ];

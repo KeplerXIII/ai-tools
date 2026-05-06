@@ -3,12 +3,13 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
-from sqlalchemy import delete, select
+from sqlalchemy import and_, delete, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,6 +23,7 @@ from app.api.error_mapping import map_app_error
 from app.domain.errors import AppError, ValidationError
 from app.infrastructure.db.models import Category, Document, DocumentCategory, DocumentStatus, DocumentStatusAssignment
 from app.infrastructure.db.models import DocumentEntity, DocumentTag, Entity, EntityType, PredictionSource, Tag, User
+from app.infrastructure.db.models import DocumentType
 from app.infrastructure.db.session import AsyncSessionLocal, get_db
 from app.schemas.documents import (
     DocumentCategorizeItem,
@@ -29,6 +31,8 @@ from app.schemas.documents import (
     DocumentCategoryAssignRequest,
     DocumentEntityAssignRequest,
     DocumentEntityItem,
+    DocumentListItem,
+    DocumentListResponse,
     DocumentStatusCatalogItem,
     DocumentExtractResponse,
     DocumentEntitiesExtractResponse,
@@ -44,6 +48,7 @@ from app.schemas.documents import (
     DocumentTagItem,
     DocumentTagRequest,
     DocumentTagsResponse,
+    DocumentTypeCatalogItem,
     DocumentTranslateRequest,
     DocumentUpdateRequest,
     ExtractUrlPersistRequest,
@@ -234,6 +239,110 @@ async def _get_document_categories(
     return out
 
 
+@router.get("", response_model=DocumentListResponse)
+async def list_documents(
+    status_code: str | None = Query(default=None, min_length=1, max_length=64),
+    document_type_code: str | None = Query(default=None, min_length=1, max_length=64),
+    date_from: datetime | None = Query(default=None),
+    date_to: datetime | None = Query(default=None),
+    use_published_date: bool = Query(default=False),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    db: AsyncSession = Depends(get_db),
+):
+    normalized_status = status_code.strip().lower() if status_code else None
+    normalized_type = document_type_code.strip().lower() if document_type_code else None
+    date_field = Document.published_at if use_published_date else Document.created_at
+
+    stmt = (
+        select(
+            Document.id,
+            Document.title,
+            Document.created_at,
+            Document.published_at,
+            DocumentType.code.label("document_type_code"),
+            DocumentType.name.label("document_type_name"),
+        )
+        .join(DocumentType, DocumentType.id == Document.document_type_id)
+    )
+
+    filters = []
+    if normalized_type:
+        filters.append(DocumentType.code == normalized_type)
+    if date_from:
+        filters.append(date_field >= date_from)
+    if date_to:
+        filters.append(date_field <= date_to)
+    if normalized_status:
+        filters.append(
+            select(DocumentStatusAssignment.document_id)
+            .join(DocumentStatus, DocumentStatus.id == DocumentStatusAssignment.status_id)
+            .where(
+                DocumentStatusAssignment.document_id == Document.id,
+                DocumentStatus.code == normalized_status,
+            )
+            .exists()
+        )
+    if filters:
+        stmt = stmt.where(and_(*filters))
+
+    total = await db.scalar(select(func.count()).select_from(stmt.subquery()))
+    rows = await db.execute(stmt.order_by(Document.created_at.desc()).offset(offset).limit(limit))
+    docs = list(rows)
+    if not docs:
+        return DocumentListResponse(total=total or 0, items=[])
+
+    doc_ids = [row.id for row in docs]
+
+    status_rows = await db.execute(
+        select(
+            DocumentStatusAssignment.document_id,
+            DocumentStatus.code,
+            DocumentStatus.name_ru,
+            DocumentStatus.description,
+            DocumentStatusAssignment.assigned_at,
+            DocumentStatusAssignment.assigned_by_id,
+        )
+        .join(DocumentStatus, DocumentStatus.id == DocumentStatusAssignment.status_id)
+        .where(DocumentStatusAssignment.document_id.in_(doc_ids))
+        .order_by(DocumentStatusAssignment.assigned_at.desc(), DocumentStatus.code.asc())
+    )
+    statuses_map: dict[UUID, list[DocumentStatusItem]] = {}
+    for row in status_rows:
+        statuses_map.setdefault(row.document_id, []).append(
+            DocumentStatusItem(
+                code=row.code,
+                name_ru=row.name_ru,
+                description=row.description,
+                assigned_at=row.assigned_at,
+                assigned_by_id=row.assigned_by_id,
+            )
+        )
+
+    category_ids = set(
+        await db.scalars(select(DocumentCategory.document_id).where(DocumentCategory.document_id.in_(doc_ids)))
+    )
+    entity_ids = set(await db.scalars(select(DocumentEntity.document_id).where(DocumentEntity.document_id.in_(doc_ids))))
+    tag_ids = set(await db.scalars(select(DocumentTag.document_id).where(DocumentTag.document_id.in_(doc_ids))))
+
+    items = [
+        DocumentListItem(
+            document_id=row.id,
+            title=row.title,
+            document_type_code=row.document_type_code,
+            document_type_name=row.document_type_name,
+            created_at=row.created_at,
+            published_at=row.published_at,
+            statuses=statuses_map.get(row.id, []),
+            has_categories=row.id in category_ids,
+            has_entities=row.id in entity_ids,
+            has_tags=row.id in tag_ids,
+        )
+        for row in docs
+    ]
+    return DocumentListResponse(total=total or 0, items=items)
+
+
 @router.post("/extract-url", response_model=DocumentExtractResponse)
 async def extract_url_persist(
     payload: ExtractUrlPersistRequest,
@@ -359,6 +468,23 @@ async def document_statuses_catalog(
         DocumentStatusCatalogItem(
             code=row.code,
             name_ru=row.name_ru,
+            description=row.description,
+        )
+        for row in rows
+    ]
+
+
+@router.get("/types/catalog", response_model=list[DocumentTypeCatalogItem])
+async def document_types_catalog(
+    db: AsyncSession = Depends(get_db),
+):
+    rows = await db.execute(
+        select(DocumentType.code, DocumentType.name, DocumentType.description).order_by(DocumentType.name.asc())
+    )
+    return [
+        DocumentTypeCatalogItem(
+            code=row.code,
+            name=row.name,
             description=row.description,
         )
         for row in rows

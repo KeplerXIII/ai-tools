@@ -112,9 +112,33 @@ class DocumentStatusCatalogItem(BaseModel):
     description: str | None = None
 
 
+class DocumentTypeCatalogItem(BaseModel):
+    code: str
+    name: str
+    description: str | None = None
+
+
 class DocumentStatusesResponse(BaseModel):
     document_id: uuid.UUID
     statuses: list[DocumentStatusItem]
+
+
+class DocumentListItem(BaseModel):
+    document_id: uuid.UUID
+    title: str
+    document_type_code: str
+    document_type_name: str
+    created_at: datetime
+    published_at: datetime | None = None
+    statuses: list[DocumentStatusItem] = []
+    has_categories: bool = False
+    has_entities: bool = False
+    has_tags: bool = False
+
+
+class DocumentListResponse(BaseModel):
+    total: int
+    items: list[DocumentListItem]
 
 
 class SummarySource(str, Enum):
