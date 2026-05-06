@@ -116,9 +116,11 @@ export class Documents implements OnInit {
   }
 
   categoryChipLabel(item: DocumentCategoryItem): string {
+    const parentTitle = (item.parent_name_ru || item.parent_name || item.parent_code || '').trim();
     const title = (item.name_ru || item.name || item.code).trim();
     const conf = Number.isFinite(item.confidence) ? `${Math.round(item.confidence * 100)}%` : '—';
-    return `${title} (${conf})`;
+    const label = parentTitle ? `${parentTitle} / ${title}` : title;
+    return `${label} (${conf})`;
   }
 
   entityChipLabel(item: DocumentEntityItem): string {

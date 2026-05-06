@@ -656,12 +656,14 @@ export class ArticleParser {
   }
 
   categoryChipLabel(cat: DocumentCategoryRef): string {
+    const parentTitle = (cat.parent_name_ru || cat.parent_name || cat.parent_code || '').trim();
     const title = (cat.name_ru || cat.name || cat.code).trim();
     const confPct =
       typeof cat.confidence === 'number' && !Number.isNaN(cat.confidence)
         ? `${Math.round(cat.confidence * 100)}%`
         : '—';
-    return `${title} (${confPct})`;
+    const label = parentTitle ? `${parentTitle} / ${title}` : title;
+    return `${label} (${confPct})`;
   }
 
   toggleCategoryPicker(): void {

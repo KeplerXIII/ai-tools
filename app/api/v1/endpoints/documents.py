@@ -13,6 +13,7 @@ from sqlalchemy import and_, delete, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
 from app.api.deps import (
     get_current_user,
@@ -207,24 +208,34 @@ async def _get_document_categories(
     db: AsyncSession,
     document_id: UUID,
 ) -> list[DocumentCategorizeItem]:
+    parent = aliased(Category)
     rows = await db.execute(
         select(
             Category.id,
             Category.code,
             Category.name,
             Category.name_ru,
+            Category.level,
+            parent.id.label("parent_id"),
+            parent.code.label("parent_code"),
+            parent.name.label("parent_name"),
+            parent.name_ru.label("parent_name_ru"),
             DocumentCategory.confidence,
             PredictionSource.code.label("prediction_source_code"),
         )
         .select_from(DocumentCategory)
         .join(Category, Category.id == DocumentCategory.category_id)
+        .outerjoin(parent, parent.id == Category.parent_id)
         .outerjoin(PredictionSource, PredictionSource.id == DocumentCategory.prediction_source_id)
-        .where(DocumentCategory.document_id == document_id)
+        .where(
+            DocumentCategory.document_id == document_id,
+            Category.level.in_((1, 2, 3)),
+        )
         .order_by(Category.sort_order.asc(), Category.code.asc())
     )
     out: list[DocumentCategorizeItem] = []
     for row in rows:
-        cid, code, name, name_ru, conf, ps_code = row
+        cid, code, name, name_ru, level, parent_id, parent_code, parent_name, parent_name_ru, conf, ps_code = row
         conf_f = float(conf) if conf is not None else 1.0
         conf_f = max(0.0, min(1.0, conf_f))
         out.append(
@@ -233,6 +244,11 @@ async def _get_document_categories(
                 code=code,
                 name=name,
                 name_ru=name_ru,
+                level=level,
+                parent_id=parent_id,
+                parent_code=parent_code,
+                parent_name=parent_name,
+                parent_name_ru=parent_name_ru,
                 confidence=conf_f,
                 prediction_source_code=ps_code or "unknown",
                 text_source=None,
@@ -333,6 +349,7 @@ async def list_documents(
     entity_ids = set(await db.scalars(select(DocumentEntity.document_id).where(DocumentEntity.document_id.in_(doc_ids))))
     tag_ids = set(await db.scalars(select(DocumentTag.document_id).where(DocumentTag.document_id.in_(doc_ids))))
 
+    parent = aliased(Category)
     category_rows = await db.execute(
         select(
             DocumentCategory.document_id,
@@ -340,12 +357,21 @@ async def list_documents(
             Category.code,
             Category.name,
             Category.name_ru,
+            Category.level,
+            parent.id.label("parent_id"),
+            parent.code.label("parent_code"),
+            parent.name.label("parent_name"),
+            parent.name_ru.label("parent_name_ru"),
             DocumentCategory.confidence,
             PredictionSource.code.label("prediction_source_code"),
         )
         .join(Category, Category.id == DocumentCategory.category_id)
+        .outerjoin(parent, parent.id == Category.parent_id)
         .outerjoin(PredictionSource, PredictionSource.id == DocumentCategory.prediction_source_id)
-        .where(DocumentCategory.document_id.in_(doc_ids))
+        .where(
+            DocumentCategory.document_id.in_(doc_ids),
+            Category.level.in_((1, 2, 3)),
+        )
         .order_by(Category.sort_order.asc(), Category.code.asc())
     )
     categories_map: dict[UUID, list[DocumentCategorizeItem]] = {}
@@ -358,6 +384,11 @@ async def list_documents(
                 code=row.code,
                 name=row.name,
                 name_ru=row.name_ru,
+                level=row.level,
+                parent_id=row.parent_id,
+                parent_code=row.parent_code,
+                parent_name=row.parent_name,
+                parent_name_ru=row.parent_name_ru,
                 confidence=conf_f,
                 prediction_source_code=row.prediction_source_code or "unknown",
                 text_source=None,
@@ -1063,7 +1094,10 @@ async def document_categories_catalog(
 
     stmt = (
         select(Category.id, Category.name, Category.name_ru)
-        .where(Category.is_active.is_(True))
+        .where(
+            Category.is_active.is_(True),
+            Category.level.in_((1, 2, 3)),
+        )
         .order_by(Category.sort_order.asc(), Category.code.asc())
     )
     if assigned_ids:
@@ -1087,6 +1121,8 @@ async def assign_document_category(
     cat = await db.get(Category, payload.category_id)
     if cat is None or not cat.is_active:
         raise HTTPException(status_code=404, detail="Категория не найдена")
+    if cat.level not in (1, 2, 3):
+        raise HTTPException(status_code=400, detail="Назначение категорий этого уровня запрещено")
 
     manual_id = await prediction_source_id(db, "manual")
     await _prepare_write_session(db)

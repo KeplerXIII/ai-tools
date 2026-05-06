@@ -27,6 +27,11 @@ class DocumentCategorizeItem(BaseModel):
     code: str
     name: str
     name_ru: str | None = None
+    level: int
+    parent_id: uuid.UUID | None = None
+    parent_code: str | None = None
+    parent_name: str | None = None
+    parent_name_ru: str | None = None
     confidence: float = Field(..., ge=0.0, le=1.0)
     prediction_source_code: str
     text_source: Literal["original", "translated"] | None = None

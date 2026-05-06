@@ -15,6 +15,11 @@ export interface DocumentCategoryItem {
   code: string;
   name: string;
   name_ru?: string | null;
+  level: number;
+  parent_id?: string | null;
+  parent_code?: string | null;
+  parent_name?: string | null;
+  parent_name_ru?: string | null;
   confidence: number;
   prediction_source_code: string;
   text_source?: 'original' | 'translated' | null;
