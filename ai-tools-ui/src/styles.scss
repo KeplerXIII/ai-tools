@@ -141,6 +141,46 @@ body {
     display: none !important;
   }
 
+  /* Some PrimeNG textarea wrappers may still render in print in some browsers.
+     Force-hide editable versions for Translation/Annotation, keeping only `.print-text-block`. */
+  .print-translation-middle,
+  .print-annotation-after-tags {
+    /* Ensure no hidden inputs “bleed through” into print preview */
+    position: relative !important;
+  }
+
+  /* Hard hide any editable/PrimeNG textarea UI inside these print sections */
+  .print-translation-middle p-floatlabel,
+  .print-translation-middle .prime-field,
+  .print-translation-middle .textarea-field,
+  .print-translation-middle .p-textarea,
+  .print-translation-middle .p-inputtextarea,
+  .print-translation-middle textarea,
+  .print-translation-middle #translated_text,
+  .print-annotation-after-tags p-floatlabel,
+  .print-annotation-after-tags .prime-field,
+  .print-annotation-after-tags .textarea-field,
+  .print-annotation-after-tags .p-textarea,
+  .print-annotation-after-tags .p-inputtextarea,
+  .print-annotation-after-tags textarea,
+  .print-annotation-after-tags #annotation {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    min-height: 0 !important;
+    max-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    overflow: hidden !important;
+  }
+
+  /* And, as a safety net: keep only title + print text inside these sections */
+  .print-translation-middle > :not(.title-wrapper):not(.print-text-block),
+  .print-annotation-after-tags > :not(.title-wrapper):not(.print-text-block) {
+    display: none !important;
+  }
+
   .print-text-block {
     display: block !important;
     white-space: pre-wrap;
