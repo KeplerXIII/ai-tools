@@ -275,6 +275,116 @@
         }
       </section>
 
+      <section class="panel categories-panel">
+        <div #categoriesBlock class="title-wrapper entities-title-row">
+          <h3 class="panel-title">Категории</h3>
+
+          <div class="entities-title-trailing">
+            <app-outline-button
+              text="Классифицировать"
+              size="large"
+              [variant]="ButtonVariant.Rounded"
+              [disabled]="isDisabled"
+              (clicked)="requestCategorize()"
+            />
+
+            <button
+              type="button"
+              class="block-edit-toggle no-print-field"
+              [class.block-edit-toggle--active]="isEditingCategoriesBlock"
+              [attr.aria-pressed]="isEditingCategoriesBlock"
+              [attr.aria-label]="
+                isEditingCategoriesBlock ? 'Завершить редактирование блока' : 'Редактировать блок'
+              "
+              (click)="toggleBlockEdit('categories')"
+            >
+              <i class="pi" [class.pi-pencil]="!isEditingCategoriesBlock" [class.pi-check]="isEditingCategoriesBlock"></i>
+            </button>
+          </div>
+        </div>
+
+        @if (categoriesError) {
+          <div class="field-error">{{ categoriesError }}</div>
+        }
+
+        @if (loadingCategories) {
+          <div class="entities-sceleton-wrapper">
+            <p-skeleton width="10rem" height="1rem" borderRadius="12px" />
+            <p-skeleton width="100%" height="1rem" borderRadius="12px" />
+            <p-skeleton width="100%" height="1rem" borderRadius="12px" />
+          </div>
+        }
+
+        @if (hasEmptyCategoriesResult && !isEditingCategoriesBlock) {
+          <p class="empty-entities-message">Классифицируйте текст или добавьте категории вручную.</p>
+        }
+
+        @if (
+          (state.categories && state.categories.length > 0) || (isEditingCategoriesBlock && state.categories !== null)
+        ) {
+          <div class="meta-tags meta-tags--entity-row">
+            <h4 class="entity-row-title">Тематика:</h4>
+
+            <div class="tags entity-tags-category">
+              @if (isEditingCategoriesBlock) {
+                <div class="entity-add-wrapper">
+                  <button
+                    type="button"
+                    class="entity-add-chip"
+                    [disabled]="loadingDocumentCategoriesMutation"
+                    (click)="toggleCategoryPicker()"
+                  >
+                    +
+                  </button>
+
+                  @if (categoryPickerOpen) {
+                    <div class="entity-picker-popover">
+                      <input
+                        type="search"
+                        class="entity-picker-search"
+                        name="category-picker-search"
+                        [(ngModel)]="categoryPickerSearch"
+                        placeholder="Поиск..."
+                        autocomplete="off"
+                      />
+                      @if (loadingCategoryPickerCatalog) {
+                        <div class="entity-picker-loading">Загрузка…</div>
+                      } @else {
+                        <div class="entity-picker-list">
+                          @for (item of filteredCategoryPickerItems; track item.id) {
+                            <button
+                              type="button"
+                              class="entity-picker-item"
+                              [disabled]="loadingDocumentCategoriesMutation"
+                              (click)="onCategoryPickerSelect(item)"
+                            >
+                              {{ item.name }}
+                            </button>
+                          }
+                        </div>
+                        @if (!filteredCategoryPickerItems.length) {
+                          <div class="entity-picker-empty">Нет вариантов</div>
+                        }
+                      }
+                    </div>
+                  }
+                </div>
+              }
+
+              @for (cat of rankedCategories; track cat.category_id) {
+                <p-chip
+                  [label]="categoryChipLabel(cat)"
+                  [attr.title]="'Источник: ' + cat.prediction_source_code"
+                  class="entity-chip-category chip-compact"
+                  [removable]="isEditingCategoriesBlock && !loadingDocumentCategoriesMutation"
+                  (onRemove)="removeCategoryChip(cat)"
+                />
+              }
+            </div>
+          </div>
+        }
+      </section>
+
       <section class="panel">
         <div #entitiesBlock class="title-wrapper entities-title-row">
           <h3 class="panel-title">Сущности</h3>

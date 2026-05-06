@@ -144,6 +144,7 @@ def document_to_extract_response(
     entities_military_equipment: list[DocumentEntityItem] | None = None,
     entities_manufacturers: list[DocumentEntityItem] | None = None,
     entities_contracts: list[DocumentEntityItem] | None = None,
+    categories: list[DocumentCategorizeItem] | None = None,
 ) -> DocumentExtractResponse:
     images: list[ImageInfo] = []
     for item in doc.extracted_images or []:
@@ -192,6 +193,7 @@ def document_to_extract_response(
         entities_military_equipment=list(entities_military_equipment or []),
         entities_manufacturers=list(entities_manufacturers or []),
         entities_contracts=list(entities_contracts or []),
+        categories=list(categories or []),
     )
 
 

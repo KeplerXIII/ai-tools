@@ -26,6 +26,12 @@
   border: 1px solid #d8b4fe;
 }
 
+:host ::ng-deep .entity-chip-category {
+  background-color: #ccfbf1;
+  color: #0f766e;
+  border: 1px solid #5eead4;
+}
+
 :host ::ng-deep .chip-compact.p-chip {
   padding: 0.125rem 0.45rem;
   gap: 0.2rem;

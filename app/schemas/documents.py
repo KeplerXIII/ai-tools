@@ -20,6 +20,28 @@ class DocumentTagItem(BaseModel):
     name: str
 
 
+class DocumentCategorizeItem(BaseModel):
+    """Назначенная категория: происхождение — prediction_sources.code (для LLM — «llm», ручное — «manual»)."""
+
+    category_id: uuid.UUID
+    code: str
+    name: str
+    name_ru: str | None = None
+    confidence: float = Field(..., ge=0.0, le=1.0)
+    prediction_source_code: str
+    text_source: Literal["original", "translated"] | None = None
+
+
+class DocumentCategorizeResponse(BaseModel):
+    ok: bool = True
+    document_id: uuid.UUID
+    categories: list[DocumentCategorizeItem]
+
+
+class DocumentCategoryAssignRequest(BaseModel):
+    category_id: uuid.UUID
+
+
 class DocumentExtractResponse(ExtractResponse):
     document_id: uuid.UUID
     from_cache: bool
@@ -38,6 +60,7 @@ class DocumentExtractResponse(ExtractResponse):
     entities_military_equipment: list[DocumentEntityItem] = []
     entities_manufacturers: list[DocumentEntityItem] = []
     entities_contracts: list[DocumentEntityItem] = []
+    categories: list[DocumentCategorizeItem] = []
 
 
 class DocumentTranslateRequest(BaseModel):
@@ -65,24 +88,6 @@ class DocumentEntitiesExtractResponse(BaseModel):
     military_equipment: list[DocumentEntityItem]
     manufacturers: list[DocumentEntityItem]
     contracts: list[DocumentEntityItem]
-
-
-class DocumentCategorizeItem(BaseModel):
-    """Назначенная категория: происхождение — prediction_sources.code (для LLM — «llm»)."""
-
-    category_id: uuid.UUID
-    code: str
-    name: str
-    name_ru: str | None = None
-    confidence: float = Field(..., ge=0.0, le=1.0)
-    prediction_source_code: str = "llm"
-    text_source: Literal["original", "translated"]
-
-
-class DocumentCategorizeResponse(BaseModel):
-    ok: bool = True
-    document_id: uuid.UUID
-    categories: list[DocumentCategorizeItem]
 
 
 class DocumentEntityAssignRequest(BaseModel):

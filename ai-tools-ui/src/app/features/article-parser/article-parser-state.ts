@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 
 import {
+  DocumentCategoryRef,
   DocumentTagRef,
   EntitiesResponse,
   ExtractResponse,
@@ -14,6 +15,7 @@ export class ArticleParserState {
 
   article: ExtractResponse | null = null;
   entities: EntitiesResponse | null = null;
+  categories: DocumentCategoryRef[] | null = null;
 
   originalTags: DocumentTagRef[] = [];
   translatedTags: DocumentTagRef[] = [];
@@ -27,6 +29,7 @@ export class ArticleParserState {
     this.url = '';
     this.article = null;
     this.entities = null;
+    this.categories = null;
     this.originalTags = [];
     this.translatedTags = [];
     this.translatedText = '';

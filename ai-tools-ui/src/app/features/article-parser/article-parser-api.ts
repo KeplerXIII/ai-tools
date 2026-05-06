@@ -17,6 +17,23 @@ export interface DocumentEntityRef {
 /** Совпадает с серверным DocumentTagItem (id + name). */
 export type DocumentTagRef = DocumentEntityRef;
 
+/** Назначенные категории документа (confidence, источник из prediction_sources). */
+export interface DocumentCategoryRef {
+  category_id: string;
+  code: string;
+  name: string;
+  name_ru?: string | null;
+  confidence: number;
+  prediction_source_code: string;
+  text_source?: 'original' | 'translated' | null;
+}
+
+export interface DocumentCategorizeResponse {
+  ok?: boolean;
+  document_id: string;
+  categories: DocumentCategoryRef[];
+}
+
 export interface ExtractResponse {
   title: string | null;
   author: string | null;
@@ -52,6 +69,7 @@ export interface ExtractResponse {
   entities_military_equipment?: DocumentEntityRef[];
   entities_manufacturers?: DocumentEntityRef[];
   entities_contracts?: DocumentEntityRef[];
+  categories?: DocumentCategoryRef[];
 }
 
 export interface DocumentStatusCatalogItem {
@@ -421,5 +439,27 @@ export class ArticleParserApi {
     return this.http.delete<{ ok?: boolean; document_id?: string; status_code?: string }>(
       `/api/v1/documents/${documentId}/statuses/${encodeURIComponent(code)}`,
     );
+  }
+
+  getDocumentCategories(documentId: string) {
+    return this.http.get<DocumentCategorizeResponse>(`/api/v1/documents/${documentId}/categories`);
+  }
+
+  categorizeDocument(documentId: string) {
+    return this.http.post<DocumentCategorizeResponse>(`/api/v1/documents/${documentId}/categorize`, {});
+  }
+
+  getCategoryCatalog(documentId: string) {
+    return this.http.get<DocumentEntityRef[]>(`/api/v1/documents/${documentId}/categories/catalog`);
+  }
+
+  assignDocumentCategory(documentId: string, categoryId: string) {
+    return this.http.post<{ ok?: boolean }>(`/api/v1/documents/${documentId}/categories/assign`, {
+      category_id: categoryId,
+    });
+  }
+
+  removeDocumentCategory(documentId: string, categoryId: string) {
+    return this.http.delete<{ ok?: boolean }>(`/api/v1/documents/${documentId}/categories/${categoryId}`);
   }
 }

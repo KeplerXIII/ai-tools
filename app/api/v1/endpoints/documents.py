@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from decimal import Decimal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -19,11 +20,13 @@ from app.api.deps import (
 )
 from app.api.error_mapping import map_app_error
 from app.domain.errors import AppError, ValidationError
-from app.infrastructure.db.models import Document, DocumentStatus, DocumentStatusAssignment, User
-from app.infrastructure.db.models import DocumentEntity, DocumentTag, Entity, EntityType, Tag
+from app.infrastructure.db.models import Category, Document, DocumentCategory, DocumentStatus, DocumentStatusAssignment
+from app.infrastructure.db.models import DocumentEntity, DocumentTag, Entity, EntityType, PredictionSource, Tag, User
 from app.infrastructure.db.session import AsyncSessionLocal, get_db
 from app.schemas.documents import (
+    DocumentCategorizeItem,
     DocumentCategorizeResponse,
+    DocumentCategoryAssignRequest,
     DocumentEntityAssignRequest,
     DocumentEntityItem,
     DocumentStatusCatalogItem,
@@ -191,6 +194,42 @@ async def _get_document_entities(
     return military_equipment, manufacturers, contracts
 
 
+async def _get_document_categories(
+    db: AsyncSession,
+    document_id: UUID,
+) -> list[DocumentCategorizeItem]:
+    rows = await db.execute(
+        select(
+            Category.id,
+            Category.code,
+            Category.name,
+            Category.name_ru,
+            DocumentCategory.confidence,
+            PredictionSource.code,
+        )
+        .select_from(DocumentCategory)
+        .join(Category, Category.id == DocumentCategory.category_id)
+        .outerjoin(PredictionSource, PredictionSource.id == DocumentCategory.prediction_source_id)
+        .where(DocumentCategory.document_id == document_id)
+        .order_by(Category.sort_order.asc(), Category.code.asc())
+    )
+    out: list[DocumentCategorizeItem] = []
+    for row in rows:
+        cid, code, name, name_ru, conf, ps_code = row
+        conf_f = float(conf) if conf is not None else 1.0
+        conf_f = max(0.0, min(1.0, conf_f))
+        out.append(
+            DocumentCategorizeItem(
+                category_id=cid,
+                code=code,
+                name=name,
+                name_ru=name_ru,
+                confidence=conf_f,
+                prediction_source_code=ps_code or "unknown",
+                text_source=None,
+            )
+        )
+    return out
 
 
 @router.post("/extract-url", response_model=DocumentExtractResponse)
@@ -222,6 +261,7 @@ async def extract_url_persist(
         entities_military_equipment, entities_manufacturers, entities_contracts = await _get_document_entities(
             db, existing.id
         )
+        categories = await _get_document_categories(db, existing.id)
         return document_to_extract_response(
             existing,
             from_cache=True,
@@ -231,6 +271,7 @@ async def extract_url_persist(
             entities_military_equipment=entities_military_equipment,
             entities_manufacturers=entities_manufacturers,
             entities_contracts=entities_contracts,
+            categories=categories,
         )
 
     t0 = time.perf_counter()
@@ -268,6 +309,7 @@ async def extract_url_persist(
             entities_military_equipment, entities_manufacturers, entities_contracts = await _get_document_entities(
                 db, existing2.id
             )
+            categories = await _get_document_categories(db, existing2.id)
             return document_to_extract_response(
                 existing2,
                 from_cache=True,
@@ -277,6 +319,7 @@ async def extract_url_persist(
                 entities_military_equipment=entities_military_equipment,
                 entities_manufacturers=entities_manufacturers,
                 entities_contracts=entities_contracts,
+                categories=categories,
             )
         raise
 
@@ -293,6 +336,7 @@ async def extract_url_persist(
         entities_military_equipment=[],
         entities_manufacturers=[],
         entities_contracts=[],
+        categories=[],
     )
 
 
@@ -772,6 +816,102 @@ async def document_entities(
         manufacturers=manufacturers,
         contracts=contracts,
     )
+
+
+@router.get("/{document_id}/categories", response_model=DocumentCategorizeResponse)
+async def get_document_categories_snapshot(
+    document_id: UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    doc = await db.get(Document, document_id)
+    if doc is None:
+        raise HTTPException(status_code=404, detail="Документ не найден")
+    categories = await _get_document_categories(db, document_id)
+    return DocumentCategorizeResponse(document_id=document_id, categories=categories)
+
+
+@router.get("/{document_id}/categories/catalog", response_model=list[DocumentEntityItem])
+async def document_categories_catalog(
+    document_id: UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    doc = await db.get(Document, document_id)
+    if doc is None:
+        raise HTTPException(status_code=404, detail="Документ не найден")
+
+    assigned_rows = await db.execute(
+        select(DocumentCategory.category_id).where(DocumentCategory.document_id == document_id)
+    )
+    assigned_ids = {row[0] for row in assigned_rows}
+
+    stmt = (
+        select(Category.id, Category.name, Category.name_ru)
+        .where(Category.is_active.is_(True))
+        .order_by(Category.sort_order.asc(), Category.code.asc())
+    )
+    if assigned_ids:
+        stmt = stmt.where(Category.id.not_in(assigned_ids))
+
+    rows = await db.execute(stmt)
+    return [DocumentEntityItem(id=row.id, name=(row.name_ru or row.name)) for row in rows]
+
+
+@router.post("/{document_id}/categories/assign")
+async def assign_document_category(
+    document_id: UUID,
+    payload: DocumentCategoryAssignRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    _ = user
+    doc = await db.get(Document, document_id)
+    if doc is None:
+        raise HTTPException(status_code=404, detail="Документ не найден")
+    cat = await db.get(Category, payload.category_id)
+    if cat is None or not cat.is_active:
+        raise HTTPException(status_code=404, detail="Категория не найдена")
+
+    manual_id = await prediction_source_id(db, "manual")
+    await _prepare_write_session(db)
+    async with db.begin():
+        stmt = insert(DocumentCategory).values(
+            document_id=document_id,
+            category_id=payload.category_id,
+            confidence=Decimal("1"),
+            prediction_source_id=manual_id,
+        )
+        stmt = stmt.on_conflict_do_update(
+            index_elements=[DocumentCategory.document_id, DocumentCategory.category_id],
+            set_={
+                "confidence": stmt.excluded.confidence,
+                "prediction_source_id": stmt.excluded.prediction_source_id,
+            },
+        )
+        await db.execute(stmt)
+    return {"ok": True, "document_id": str(document_id), "category_id": str(payload.category_id)}
+
+
+@router.delete("/{document_id}/categories/{category_id}")
+async def remove_document_category(
+    document_id: UUID,
+    category_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    _ = user
+    doc = await db.get(Document, document_id)
+    if doc is None:
+        raise HTTPException(status_code=404, detail="Документ не найден")
+
+    await _prepare_write_session(db)
+    async with db.begin():
+        await db.execute(
+            delete(DocumentCategory).where(
+                DocumentCategory.document_id == document_id,
+                DocumentCategory.category_id == category_id,
+            )
+        )
+    return {"ok": True, "document_id": str(document_id), "category_id": str(category_id)}
 
 
 @router.post("/{document_id}/categorize", response_model=DocumentCategorizeResponse)

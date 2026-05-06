@@ -13,6 +13,7 @@ import { ImageModule } from 'primeng/image';
 import { TextareaModule } from 'primeng/textarea';
 import {
   ArticleParserApi,
+  DocumentCategoryRef,
   DocumentEntityRef,
   DocumentTagRef,
   DocumentTagsResponse,
@@ -28,6 +29,7 @@ import { ArticleParserUrlFormComponent } from './article-parser-url-form/article
 export type ArticleParserBlock =
   | 'status'
   | 'meta'
+  | 'categories'
   | 'entities'
   | 'original'
   | 'translation'
@@ -62,16 +64,19 @@ export class ArticleParser {
   @ViewChild('translationSkeleton') translationSkeleton?: ElementRef;
   @ViewChild('annotationSkeleton') annotationSkeleton?: ElementRef;
   @ViewChild('entitiesBlock') entitiesBlock?: ElementRef;
+  @ViewChild('categoriesBlock') categoriesBlock?: ElementRef;
   @ViewChild('originalTextPreview') originalTextPreview?: ElementRef<HTMLElement>;
   @ViewChild('originalTextEditor') originalTextEditor?: ElementRef<HTMLElement>;
   readonly ButtonVariant = ButtonVariant;
   loadingArticle = false;
   loadingEntities = false;
+  loadingCategories = false;
   loadingTranslation = false;
   loadingSummary = false;
   loadingOriginalTags = false;
   loadingTranslatedTags = false;
   entitiesError = '';
+  categoriesError = '';
   articleError = '';
   originalTagsError = '';
   translationError = '';
@@ -89,6 +94,7 @@ export class ArticleParser {
   entityPickerCatalogItems: DocumentEntityRef[] = [];
   loadingEntityPickerCatalog = false;
   loadingDocumentEntitiesMutation = false;
+  loadingDocumentCategoriesMutation = false;
 
   tagPickerOpen: TagScope | null = null;
   tagPickerSearch = '';
@@ -96,8 +102,14 @@ export class ArticleParser {
   loadingTagPickerCatalog = false;
   loadingDocumentTagsMutation = false;
 
+  categoryPickerOpen = false;
+  categoryPickerSearch = '';
+  categoryPickerCatalogItems: DocumentEntityRef[] = [];
+  loadingCategoryPickerCatalog = false;
+
   isEditingStatusBlock = false;
   isEditingMetaBlock = false;
+  isEditingCategoriesBlock = false;
   isEditingEntitiesBlock = false;
   isEditingOriginalBlock = false;
   isEditingTranslationBlock = false;
@@ -131,10 +143,12 @@ export class ArticleParser {
     this.articleError = '';
     this.state.error = '';
     this.entitiesError = '';
+    this.categoriesError = '';
     this.originalTagsError = '';
     this.translationError = '';
     this.state.article = null;
     this.state.entities = null;
+    this.state.categories = null;
     this.state.translatedText = '';
     this.state.annotation = '';
     this.state.originalTags = [];
@@ -157,11 +171,32 @@ export class ArticleParser {
           manufacturers: response.entities_manufacturers || [],
           contracts: response.entities_contracts || [],
         };
+        this.state.categories = response.categories ?? [];
         this.loadingArticle = false;
       },
       error: () => {
         this.articleError = 'Ошибка при извлечении статьи';
         this.loadingArticle = false;
+      },
+    });
+  }
+
+  requestCategorize(): void {
+    if (!this.state.article?.document_id) return;
+
+    this.loadingCategories = true;
+    this.categoriesError = '';
+    this.state.categories = null;
+
+    this.api.categorizeDocument(this.state.article.document_id).subscribe({
+      next: (response) => {
+        this.state.categories = response.categories || [];
+        this.loadingCategories = false;
+        this.scrollToElement(() => this.categoriesBlock);
+      },
+      error: () => {
+        this.categoriesError = 'Ошибка при классификации категорий';
+        this.loadingCategories = false;
       },
     });
   }
@@ -250,6 +285,7 @@ export class ArticleParser {
     this.documentStatusError = '';
     this.isStatusPickerOpen = false;
     this.entitiesError = '';
+    this.categoriesError = '';
     this.articleError = '';
     this.originalTagsError = '';
     this.translationError = '';
@@ -319,6 +355,12 @@ export class ArticleParser {
       case 'meta':
         this.isEditingMetaBlock = !this.isEditingMetaBlock;
         break;
+      case 'categories':
+        this.isEditingCategoriesBlock = !this.isEditingCategoriesBlock;
+        if (!this.isEditingCategoriesBlock) {
+          this.closeCategoryPicker();
+        }
+        break;
       case 'entities':
         this.isEditingEntitiesBlock = !this.isEditingEntitiesBlock;
         if (!this.isEditingEntitiesBlock) {
@@ -349,6 +391,7 @@ export class ArticleParser {
   private resetBlockEditors(): void {
     this.isEditingStatusBlock = false;
     this.isEditingMetaBlock = false;
+    this.isEditingCategoriesBlock = false;
     this.isEditingEntitiesBlock = false;
     this.isEditingOriginalBlock = false;
     this.isEditingTranslationBlock = false;
@@ -356,6 +399,14 @@ export class ArticleParser {
     this.isStatusPickerOpen = false;
     this.closeEntityPicker();
     this.closeTagPicker();
+    this.closeCategoryPicker();
+  }
+
+  private closeCategoryPicker(): void {
+    this.categoryPickerOpen = false;
+    this.categoryPickerSearch = '';
+    this.categoryPickerCatalogItems = [];
+    this.loadingCategoryPickerCatalog = false;
   }
 
   private closeTagPicker(): void {
@@ -454,6 +505,116 @@ export class ArticleParser {
       error: () => {
         this.entitiesError = 'Не удалось обновить список сущностей';
         this.loadingDocumentEntitiesMutation = false;
+      },
+    });
+  }
+
+  get rankedCategories(): DocumentCategoryRef[] {
+    const list = this.state.categories || [];
+    return [...list].sort((a, b) => {
+      const ac = typeof a.confidence === 'number' && !Number.isNaN(a.confidence) ? a.confidence : 0;
+      const bc = typeof b.confidence === 'number' && !Number.isNaN(b.confidence) ? b.confidence : 0;
+      if (bc !== ac) return bc - ac;
+      return (a.name_ru || a.name || a.code).localeCompare(b.name_ru || b.name || b.code);
+    });
+  }
+
+  categoryChipLabel(cat: DocumentCategoryRef): string {
+    const title = (cat.name_ru || cat.name || cat.code).trim();
+    const confPct =
+      typeof cat.confidence === 'number' && !Number.isNaN(cat.confidence)
+        ? `${Math.round(cat.confidence * 100)}%`
+        : '—';
+    return `${title} (${confPct})`;
+  }
+
+  toggleCategoryPicker(): void {
+    if (!this.isEditingCategoriesBlock || !this.state.article?.document_id) {
+      return;
+    }
+
+    if (this.categoryPickerOpen) {
+      this.closeCategoryPicker();
+      return;
+    }
+
+    this.categoryPickerOpen = true;
+    this.categoryPickerSearch = '';
+    this.categoryPickerCatalogItems = [];
+    const docId = this.state.article.document_id;
+    this.loadingCategoryPickerCatalog = true;
+
+    this.api.getCategoryCatalog(docId).subscribe({
+      next: (items: DocumentEntityRef[]) => {
+        this.categoryPickerCatalogItems = items;
+        this.loadingCategoryPickerCatalog = false;
+      },
+      error: () => {
+        this.categoriesError = 'Не удалось загрузить каталог категорий';
+        this.loadingCategoryPickerCatalog = false;
+        this.closeCategoryPicker();
+      },
+    });
+  }
+
+  get filteredCategoryPickerItems(): DocumentEntityRef[] {
+    const q = this.categoryPickerSearch.trim().toLowerCase();
+    if (!q) {
+      return this.categoryPickerCatalogItems;
+    }
+    return this.categoryPickerCatalogItems.filter((item) => item.name.toLowerCase().includes(q));
+  }
+
+  onCategoryPickerSelect(item: DocumentEntityRef): void {
+    const docId = this.state.article?.document_id;
+    if (!docId || this.loadingDocumentCategoriesMutation) {
+      return;
+    }
+
+    this.loadingDocumentCategoriesMutation = true;
+    this.categoriesError = '';
+
+    this.api.assignDocumentCategory(docId, item.id).subscribe({
+      next: () => {
+        this.closeCategoryPicker();
+        this.refreshDocumentCategoriesFromServer(docId);
+      },
+      error: () => {
+        this.categoriesError = 'Не удалось добавить категорию';
+        this.loadingDocumentCategoriesMutation = false;
+      },
+    });
+  }
+
+  private refreshDocumentCategoriesFromServer(documentId: string): void {
+    this.api.getDocumentCategories(documentId).subscribe({
+      next: (res) => {
+        this.state.categories = res.categories || [];
+        this.loadingDocumentCategoriesMutation = false;
+      },
+      error: () => {
+        this.categoriesError = 'Не удалось обновить список категорий';
+        this.loadingDocumentCategoriesMutation = false;
+      },
+    });
+  }
+
+  removeCategoryChip(cat: DocumentCategoryRef): void {
+    const docId = this.state.article?.document_id;
+    if (!docId || this.loadingDocumentCategoriesMutation) {
+      return;
+    }
+
+    this.loadingDocumentCategoriesMutation = true;
+    this.categoriesError = '';
+
+    this.api.removeDocumentCategory(docId, cat.category_id).subscribe({
+      next: () => {
+        this.refreshDocumentCategoriesFromServer(docId);
+      },
+      error: () => {
+        this.categoriesError = 'Не удалось удалить категорию';
+        this.loadingDocumentCategoriesMutation = false;
       },
     });
   }
@@ -790,10 +951,20 @@ export class ArticleParser {
     );
   }
 
+  get hasEmptyCategoriesResult(): boolean {
+    return (
+      !!this.state.article &&
+      this.state.categories !== null &&
+      !this.loadingCategories &&
+      this.state.categories.length === 0
+    );
+  }
+
   get isLoading(): boolean {
     return (
       this.loadingArticle ||
       this.loadingEntities ||
+      this.loadingCategories ||
       this.loadingTranslation ||
       this.loadingSummary ||
       this.loadingOriginalTags ||
