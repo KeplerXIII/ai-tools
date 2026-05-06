@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <defs>
+    <style>
+      .st0 { fill: #2d4051; }
+    </style>
+  </defs>
+  <rect class="st0" x="10" y="162" width="180" height="14" rx="4" />
+  <path class="st0" d="M24 52h28v110H24V52Zm44-16h24v126H68V36Zm40 20h22v106H108V56Zm46-14h20v120H154V42Z" />
+</svg>
