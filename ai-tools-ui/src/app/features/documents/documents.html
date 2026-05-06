@@ -65,14 +65,23 @@
           <div class="document-row-top">
             <div class="row-cell row-cell_title">
               <div class="document-title-line">
-                <span class="document-row__meta document-row__meta_type">{{ doc.document_type_name }}</span>
-                <h3
-                  class="document-row__title"
-                  [class.document-row__title_link]="!!doc.source_url"
-                  (click)="openInArticleParser(doc)"
+                <div class="document-title-main">
+                  <span class="document-row__meta document-row__meta_type">{{ doc.document_type_name }}</span>
+                  <h3
+                    class="document-row__title"
+                    [class.document-row__title_link]="!!doc.source_url"
+                    (click)="openInArticleParser(doc)"
+                  >
+                    {{ doc.title }}
+                  </h3>
+                </div>
+                <time
+                  class="document-row__strip-date"
+                  [attr.datetime]="documentStripPrimaryIso(doc)"
+                  [attr.title]="documentStripDateTitle(doc)"
                 >
-                  {{ doc.title }}
-                </h3>
+                  {{ documentStripDateLabel(doc) }}
+                </time>
               </div>
             </div>
 
@@ -105,6 +114,17 @@
                   <span class="status-empty">Без статуса</span>
                 }
               </div>
+            </div>
+
+            <div class="row-cell row-cell_delete">
+              <button
+                class="delete-doc-btn"
+                type="button"
+                (click)="openDeleteConfirm(doc, $event)"
+                aria-label="Удалить документ"
+              >
+                Удалить
+              </button>
             </div>
 
             <button
@@ -230,6 +250,46 @@
           }
         </article>
       }
+    </div>
+  }
+
+  @if (deleteConfirmDocument) {
+    <div
+      class="delete-modal-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="delete-modal-title"
+      (click)="onDeleteModalBackdropClick($event)"
+    >
+      <div class="delete-modal" (click)="$event.stopPropagation()">
+        <h2 id="delete-modal-title" class="delete-modal__title">Удалить документ?</h2>
+        <p class="delete-modal__text">
+          Действие необратимо. Документ
+          <strong class="delete-modal__doc-title">{{ deleteConfirmDocument.title }}</strong>
+          будет удалён вместе со связанными данными.
+        </p>
+        @if (deleteError) {
+          <p class="delete-modal__error">{{ deleteError }}</p>
+        }
+        <div class="delete-modal__actions">
+          <button
+            type="button"
+            class="delete-modal__btn delete-modal__btn_secondary"
+            [disabled]="deleteSubmitting"
+            (click)="closeDeleteConfirm()"
+          >
+            Отмена
+          </button>
+          <button
+            type="button"
+            class="delete-modal__btn delete-modal__btn_danger"
+            [disabled]="deleteSubmitting"
+            (click)="confirmDeleteDocument()"
+          >
+            {{ deleteSubmitting ? 'Удаление…' : 'Удалить' }}
+          </button>
+        </div>
+      </div>
     </div>
   }
 </section>

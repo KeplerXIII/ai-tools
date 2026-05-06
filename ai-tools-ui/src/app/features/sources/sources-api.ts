@@ -52,6 +52,8 @@ export interface SourceCreateResponse {
 export interface ParseSourceRequestBody {
   source_id: string;
   days?: number;
+  /** По умолчанию true: не брать ссылки без даты и не сохранять без итоговой даты. */
+  skip_undated?: boolean;
 }
 
 export interface ParseSourceDocumentItem {

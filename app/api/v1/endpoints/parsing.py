@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID
 
@@ -38,15 +38,39 @@ from app.schemas.parsing import (
 )
 from app.services.documents.db_refs import document_type_id_by_code
 from app.services.documents.document_pipeline import (
+    _published_at_from_extract_date,
     create_document_after_extract,
     get_document_by_source_url,
 )
 from app.services.documents.url_norm import normalize_source_url
-from app.services.parsing.source_discovery import discover_source_news_urls
+from app.services.parsing.source_discovery import DiscoveredUrl, discover_source_news_urls
 
 router = APIRouter(prefix="/parsing", tags=["parsing"])
 PARSE_SOURCE_MAX_CONCURRENCY = 3
 PARSE_SOURCE_REQUEST_DELAY_SEC = 0.35
+
+
+def _published_at_from_parse_extract(extract_payload: dict) -> datetime | None:
+    raw_date = extract_payload.get("date")
+    extracted_date: str | None = None
+    if raw_date is not None:
+        ds = str(raw_date).strip()
+        if ds:
+            extracted_date = ds[:128]
+    return _published_at_from_extract_date(extracted_date)
+
+
+def _final_published_at_for_parse(item: DiscoveredUrl, extract_payload: dict) -> datetime | None:
+    if item.published_at is not None:
+        pub = item.published_at
+        return pub if pub.tzinfo else pub.replace(tzinfo=UTC)
+    return _published_at_from_parse_extract(extract_payload)
+
+
+def _published_at_within_depth(final_published_at: datetime, *, threshold_utc: datetime) -> bool:
+    pub = final_published_at if final_published_at.tzinfo else final_published_at.replace(tzinfo=UTC)
+    pub = pub.astimezone(UTC)
+    return pub >= threshold_utc
 
 
 async def _prepare_write_session(db: AsyncSession) -> None:
@@ -306,7 +330,13 @@ async def parse_source(
         raise HTTPException(status_code=500, detail="У источника не задан тип документа")
     document_type_code = doc_type_row[0]
 
-    discovered = await discover_source_news_urls(source.url, rss_url=source.rss_url, days=payload.days)
+    discovered = await discover_source_news_urls(
+        source.url,
+        rss_url=source.rss_url,
+        days=payload.days,
+        skip_undated=payload.skip_undated,
+    )
+    depth_threshold_utc = datetime.now(UTC) - timedelta(days=payload.days)
     created_by_id = user.id if user else None
 
     new_doc_ids: set[UUID] = set()
@@ -335,6 +365,15 @@ async def parse_source(
 
     for item, extracted in extracted_results:
         if extracted is None:
+            continue
+
+        final_pub = _final_published_at_for_parse(item, extracted)
+        if payload.skip_undated and final_pub is None:
+            continue
+        if final_pub is not None and not _published_at_within_depth(
+            final_pub,
+            threshold_utc=depth_threshold_utc,
+        ):
             continue
 
         await _prepare_write_session(db)

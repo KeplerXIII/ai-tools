@@ -9,7 +9,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
-from sqlalchemy import and_, delete, func, select
+from sqlalchemy import and_, delete, exists, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -470,6 +470,48 @@ async def list_documents(
         for row in docs
     ]
     return DocumentListResponse(total=total or 0, items=items)
+
+
+@router.delete("/{document_id}")
+async def delete_document(
+    document_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Удаление документа (CASCADE по связям документа).
+
+    Теги и сущности из справочников ``tags`` / ``entities`` удаляются только если после
+    удаления документа на них больше нет ни одной строки в ``document_tags`` / ``document_entities``.
+    Доступ: владелец документа или администратор.
+    """
+    await _prepare_write_session(db)
+    doc = await db.get(Document, document_id)
+    if doc is None:
+        raise HTTPException(status_code=404, detail="Документ не найден")
+    if not user.is_admin and doc.created_by_id != user.id:
+        raise HTTPException(status_code=403, detail="Нет права удалить этот документ")
+
+    tag_ids = list(
+        dict.fromkeys(
+            (await db.scalars(select(DocumentTag.tag_id).where(DocumentTag.document_id == document_id))).all(),
+        ),
+    )
+    entity_ids = list(
+        dict.fromkeys(
+            (await db.scalars(select(DocumentEntity.entity_id).where(DocumentEntity.document_id == document_id))).all(),
+        ),
+    )
+
+    async with db.begin():
+        await db.execute(delete(Document).where(Document.id == document_id))
+        if tag_ids:
+            still_linked = exists(select(1).where(DocumentTag.tag_id == Tag.id))
+            await db.execute(delete(Tag).where(Tag.id.in_(tag_ids), ~still_linked))
+        if entity_ids:
+            still_linked_ent = exists(select(1).where(DocumentEntity.entity_id == Entity.id))
+            await db.execute(delete(Entity).where(Entity.id.in_(entity_ids), ~still_linked_ent))
+
+    return {"ok": True, "document_id": str(document_id)}
 
 
 @router.post("/extract-url", response_model=DocumentExtractResponse)

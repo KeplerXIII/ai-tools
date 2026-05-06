@@ -1,4 +1,5 @@
 import { CommonModule } from '@angular/common';
+import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -35,6 +36,11 @@ export class Documents implements OnInit {
   dateTo = '';
   usePublishedDate = false;
   expandedDocumentId: string | null = null;
+
+  /** Документ, для которого открыто подтверждение удаления. */
+  deleteConfirmDocument: DocumentListItem | null = null;
+  deleteSubmitting = false;
+  deleteError = '';
 
   constructor(
     private readonly documentsApi: DocumentsApi,
@@ -139,6 +145,56 @@ export class Documents implements OnInit {
     });
   }
 
+  /** ISO для атрибута datetime: дата публикации или дата создания в системе. */
+  documentStripPrimaryIso(doc: DocumentListItem): string {
+    const pub = doc.published_at?.trim();
+    if (pub) {
+      return pub;
+    }
+    return doc.created_at;
+  }
+
+  /** Дата в полоске (дд.мм.гггг); источник см. во всплывающей подсказке. */
+  documentStripDateLabel(doc: DocumentListItem): string {
+    return this.formatRuDateShort(this.documentStripPrimaryIso(doc));
+  }
+
+  /** Подсказка: обе даты, если есть. */
+  documentStripDateTitle(doc: DocumentListItem): string {
+    const lines: string[] = [];
+    if (doc.published_at?.trim()) {
+      lines.push(`Публикация: ${this.formatRuDateTime(doc.published_at)}`);
+    }
+    lines.push(`Загружен в систему: ${this.formatRuDateTime(doc.created_at)}`);
+    return lines.join('\n');
+  }
+
+  private formatRuDateShort(iso: string): string {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) {
+      return iso.slice(0, 10);
+    }
+    return d.toLocaleDateString('ru-RU', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
+  }
+
+  private formatRuDateTime(iso: string): string {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) {
+      return iso;
+    }
+    return d.toLocaleString('ru-RU', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  }
+
   categoryChipLabel(item: DocumentCategoryItem): string {
     const parentTitle = (item.parent_name_ru || item.parent_name || item.parent_code || '').trim();
     const title = (item.name_ru || item.name || item.code).trim();
@@ -166,5 +222,55 @@ export class Documents implements OnInit {
     entityTypeCode: 'military_equipment' | 'manufacturer' | 'contract',
   ): DocumentEntityItem[] {
     return doc.entities.filter((item) => item.entity_type_code === entityTypeCode);
+  }
+
+  openDeleteConfirm(doc: DocumentListItem, event: Event): void {
+    event.stopPropagation();
+    event.preventDefault();
+    this.deleteConfirmDocument = doc;
+    this.deleteError = '';
+  }
+
+  closeDeleteConfirm(): void {
+    if (this.deleteSubmitting) {
+      return;
+    }
+    this.deleteConfirmDocument = null;
+    this.deleteError = '';
+  }
+
+  onDeleteModalBackdropClick(event: MouseEvent): void {
+    if (event.target === event.currentTarget) {
+      this.closeDeleteConfirm();
+    }
+  }
+
+  confirmDeleteDocument(): void {
+    const doc = this.deleteConfirmDocument;
+    if (!doc || this.deleteSubmitting) {
+      return;
+    }
+    this.deleteSubmitting = true;
+    this.deleteError = '';
+    this.documentsApi.deleteDocument(doc.document_id).subscribe({
+      next: () => {
+        this.deleteSubmitting = false;
+        this.deleteConfirmDocument = null;
+        if (this.expandedDocumentId === doc.document_id) {
+          this.expandedDocumentId = null;
+        }
+        this.documents = this.documents.filter((d) => d.document_id !== doc.document_id);
+      },
+      error: (err: HttpErrorResponse) => {
+        this.deleteSubmitting = false;
+        const detail = err.error?.detail;
+        this.deleteError =
+          typeof detail === 'string'
+            ? detail
+            : err.status === 403
+              ? 'Нет права удалить этот документ'
+              : 'Не удалось удалить документ';
+      },
+    });
   }
 }

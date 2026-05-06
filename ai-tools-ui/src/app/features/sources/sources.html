@@ -259,7 +259,8 @@
               <div class="source-parse">
                 <h4>Разбор ленты</h4>
                 <p class="source-parse__hint">
-                  Новые документы создаются с типом, заданным для источника. Глубина по дням — как в API парсинга (1–30).
+                  Новые документы создаются с типом, заданным для источника. Глубина (1–30 дней, UTC): отсекаются
+                  материалы старше порога после извлечения текста. Без даты — по чекбоксу ниже.
                 </p>
                 <div class="source-parse__row">
                   <label class="filter-item source-parse__days">
@@ -272,6 +273,15 @@
                       max="30"
                       [disabled]="!src.is_active || parsingSourceId === src.source_id"
                     />
+                  </label>
+                  <label class="filter-item source-parse__skip-undated">
+                    <input
+                      type="checkbox"
+                      name="parseSkipUndated_{{ src.source_id }}"
+                      [(ngModel)]="parseSkipUndated"
+                      [disabled]="!src.is_active || parsingSourceId === src.source_id"
+                    />
+                    <span>Не пропускать материалы без даты</span>
                   </label>
                   <button
                     class="submit-btn source-parse__btn"

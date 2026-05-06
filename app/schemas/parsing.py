@@ -34,6 +34,13 @@ class SourceCreateResponse(BaseModel):
 class ParseSourceRequest(BaseModel):
     source_id: uuid.UUID
     days: int = Field(default=3, ge=1, le=30)
+    skip_undated: bool = Field(
+        default=True,
+        description=(
+            "Не брать ссылки без даты при обходе RSS/HTML; после извлечения не сохранять документ, "
+            "если итоговая дата публикации неизвестна."
+        ),
+    )
 
 
 class ParseSourceDocumentItem(BaseModel):

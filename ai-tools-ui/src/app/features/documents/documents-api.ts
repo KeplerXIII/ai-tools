@@ -117,4 +117,8 @@ export class DocumentsApi {
   getDocumentTypesCatalog(): Observable<DocumentTypeCatalogItem[]> {
     return this.http.get<DocumentTypeCatalogItem[]>('/api/v1/documents/types/catalog');
   }
+
+  deleteDocument(documentId: string): Observable<{ ok: boolean; document_id: string }> {
+    return this.http.delete<{ ok: boolean; document_id: string }>(`/api/v1/documents/${documentId}`);
+  }
 }

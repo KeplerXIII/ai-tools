@@ -49,6 +49,8 @@ export class Sources implements OnInit {
   expandedSourceId: string | null = null;
 
   parseDays = 3;
+  /** Соответствует skip_undated в API: не брать материалы без даты (обход и после извлечения). */
+  parseSkipUndated = true;
   parsingSourceId: string | null = null;
   lastParsedSourceId: string | null = null;
   parseFeedback = '';
@@ -291,20 +293,26 @@ export class Sources implements OnInit {
     const days = Math.min(30, Math.max(1, Math.floor(Number(this.parseDays)) || 3));
     this.parseDays = days;
     this.parsingSourceId = src.source_id;
-    this.sourcesApi.parseSource({ source_id: src.source_id, days }).subscribe({
-      next: (res) => {
-        this.parsingSourceId = null;
-        this.lastParsedSourceId = src.source_id;
-        this.parseError = '';
-        this.parseFeedback = `Обработано ссылок: ${res.found_total}, создано документов: ${res.created_total}`;
-        this.loadSources();
-      },
-      error: (err: HttpErrorResponse) => {
-        this.parsingSourceId = null;
-        this.lastParsedSourceId = src.source_id;
-        this.parseError = this.formatParseError(err);
-      },
-    });
+    this.sourcesApi
+      .parseSource({
+        source_id: src.source_id,
+        days,
+        skip_undated: this.parseSkipUndated,
+      })
+      .subscribe({
+        next: (res) => {
+          this.parsingSourceId = null;
+          this.lastParsedSourceId = src.source_id;
+          this.parseError = '';
+          this.parseFeedback = `Обработано ссылок: ${res.found_total}, создано документов: ${res.created_total}`;
+          this.loadSources();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.parsingSourceId = null;
+          this.lastParsedSourceId = src.source_id;
+          this.parseError = this.formatParseError(err);
+        },
+      });
   }
 
   private formatParseError(err: HttpErrorResponse): string {

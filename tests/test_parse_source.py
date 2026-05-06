@@ -36,7 +36,7 @@ from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest import IsolatedAsyncioTestCase
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from fastapi import HTTPException
 
@@ -397,12 +397,147 @@ class ParseSourceEndpointTests(IsolatedAsyncioTestCase):
             ),
         ):
             await parse_source(
-                payload=ParseSourceRequest(source_id=source_id, days=7),
+                payload=ParseSourceRequest(source_id=source_id, days=7, skip_undated=False),
                 db=db,
                 user=None,
             )
 
         self.assertLessEqual(max_in_flight, 3)
+
+    async def test_parse_source_skips_when_extracted_date_older_than_depth(self):
+        """После trafilatura отсекаем документ, если итоговая дата старше окна (UTC)."""
+        source_id = uuid.uuid4()
+        source = SimpleNamespace(
+            id=source_id,
+            document_type_id=uuid.uuid4(),
+            url="https://example.com",
+            rss_url=None,
+            is_active=True,
+        )
+        db = _FakeDb(source=source)
+        discovered = [
+            DiscoveredUrl(url="https://example.com/news/old", published_at=None),
+        ]
+        fixed_now = datetime(2026, 5, 10, 12, 0, 0, tzinfo=UTC)
+
+        create_calls = 0
+
+        async def _create_doc(*args, **kwargs):
+            nonlocal create_calls
+            create_calls += 1
+            return SimpleNamespace(id=uuid.uuid4(), version=1, source_id=None, published_at=None)
+
+        with (
+            patch(
+                "app.api.v1.endpoints.parsing.discover_source_news_urls",
+                AsyncMock(return_value=discovered),
+            ),
+            patch(
+                "app.api.v1.endpoints.parsing.get_document_by_source_url",
+                AsyncMock(return_value=None),
+            ),
+            patch(
+                "app.api.v1.endpoints.parsing.datetime",
+            ) as mock_dt,
+            patch(
+                "app.api.v1.endpoints.parsing._extract_single_article_for_parse_source",
+                AsyncMock(
+                    return_value={
+                        "title": "n",
+                        "text": "body",
+                        "length": 4,
+                        "method": "m",
+                        "quality": "good",
+                        "needs_review": False,
+                        "date": "2026-04-01",
+                    }
+                ),
+            ),
+            patch(
+                "app.api.v1.endpoints.parsing.create_document_after_extract",
+                AsyncMock(side_effect=_create_doc),
+            ),
+            patch(
+                "app.api.v1.endpoints.parsing._list_unprocessed_by_source",
+                AsyncMock(return_value=[]),
+            ),
+        ):
+            mock_dt.now = MagicMock(return_value=fixed_now)
+            mock_dt.UTC = UTC
+            result = await parse_source(
+                payload=ParseSourceRequest(
+                    source_id=source_id,
+                    days=7,
+                    skip_undated=False,
+                ),
+                db=db,
+                user=None,
+            )
+
+        self.assertEqual(create_calls, 0)
+        self.assertEqual(result.created_total, 0)
+        self.assertEqual(result.found_total, 1)
+
+    async def test_parse_source_skips_when_skip_undated_and_no_final_date(self):
+        """При skip_undated не сохраняем документ без итоговой даты публикации."""
+        source_id = uuid.uuid4()
+        source = SimpleNamespace(
+            id=source_id,
+            document_type_id=uuid.uuid4(),
+            url="https://example.com",
+            rss_url=None,
+            is_active=True,
+        )
+        db = _FakeDb(source=source)
+        discovered = [
+            DiscoveredUrl(url="https://example.com/news/nodate", published_at=None),
+        ]
+        create_calls = 0
+
+        async def _create_doc(*args, **kwargs):
+            nonlocal create_calls
+            create_calls += 1
+            return SimpleNamespace(id=uuid.uuid4(), version=1, source_id=None, published_at=None)
+
+        with (
+            patch(
+                "app.api.v1.endpoints.parsing.discover_source_news_urls",
+                AsyncMock(return_value=discovered),
+            ),
+            patch(
+                "app.api.v1.endpoints.parsing.get_document_by_source_url",
+                AsyncMock(return_value=None),
+            ),
+            patch(
+                "app.api.v1.endpoints.parsing._extract_single_article_for_parse_source",
+                AsyncMock(
+                    return_value={
+                        "title": "n",
+                        "text": "body",
+                        "length": 4,
+                        "method": "m",
+                        "quality": "good",
+                        "needs_review": False,
+                    }
+                ),
+            ),
+            patch(
+                "app.api.v1.endpoints.parsing.create_document_after_extract",
+                AsyncMock(side_effect=_create_doc),
+            ),
+            patch(
+                "app.api.v1.endpoints.parsing._list_unprocessed_by_source",
+                AsyncMock(return_value=[]),
+            ),
+        ):
+            result = await parse_source(
+                payload=ParseSourceRequest(source_id=source_id, days=7, skip_undated=True),
+                db=db,
+                user=None,
+            )
+
+        self.assertEqual(create_calls, 0)
+        self.assertEqual(result.created_total, 0)
 
     async def test_create_source_happy_path(self):
         """Создание источника: моки справочников языка/страны, проверка полей ответа."""
