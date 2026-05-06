@@ -13,10 +13,13 @@ export interface DocumentStatusItem {
 export interface DocumentListItem {
   document_id: string;
   title: string;
+  source_url: string | null;
   document_type_code: string;
   document_type_name: string;
   created_at: string;
   published_at: string | null;
+  annotation: string | null;
+  main_image: string | null;
   statuses: DocumentStatusItem[];
   has_categories: boolean;
   has_entities: boolean;

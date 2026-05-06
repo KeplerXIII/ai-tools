@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 import { DocumentsApi, DocumentListItem, DocumentStatusCatalogItem, DocumentTypeCatalogItem } from './documents-api';
 
 @Component({
@@ -22,8 +23,12 @@ export class Documents implements OnInit {
   dateFrom = '';
   dateTo = '';
   usePublishedDate = false;
+  expandedDocumentId: string | null = null;
 
-  constructor(private readonly documentsApi: DocumentsApi) {}
+  constructor(
+    private readonly documentsApi: DocumentsApi,
+    private readonly router: Router,
+  ) {}
 
   ngOnInit(): void {
     this.loadFilters();
@@ -79,5 +84,26 @@ export class Documents implements OnInit {
     this.dateTo = '';
     this.usePublishedDate = false;
     this.loadDocuments();
+  }
+
+  toggleExpand(documentId: string): void {
+    this.expandedDocumentId = this.expandedDocumentId === documentId ? null : documentId;
+  }
+
+  isExpanded(documentId: string): boolean {
+    return this.expandedDocumentId === documentId;
+  }
+
+  openInArticleParser(doc: DocumentListItem): void {
+    if (!doc.source_url?.trim()) {
+      return;
+    }
+
+    void this.router.navigate(['/article-parser'], {
+      queryParams: {
+        url: doc.source_url,
+        autoload: '1',
+      },
+    });
   }
 }

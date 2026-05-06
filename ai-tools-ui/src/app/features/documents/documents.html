@@ -52,35 +52,78 @@
     <div class="documents-list">
       @for (doc of documents; track doc.document_id) {
         <article class="document-row">
-          <div class="document-main">
-            <h3 class="document-row__title">{{ doc.title }}</h3>
-            <div class="document-row__meta">{{ doc.document_type_name }}</div>
+          <div class="document-row-top">
+            <div class="row-cell row-cell_title">
+              <div class="document-title-line">
+                <span class="document-row__meta document-row__meta_type">{{ doc.document_type_name }}</span>
+                <h3
+                  class="document-row__title"
+                  [class.document-row__title_link]="!!doc.source_url"
+                  (click)="openInArticleParser(doc)"
+                >
+                  {{ doc.title }}
+                </h3>
+              </div>
+            </div>
+
+            <div class="row-cell row-cell_flag">
+              <span class="flag-item">
+                Категории
+                <i class="pi" [class.pi-check-circle]="doc.has_categories" [class.pi-circle]="!doc.has_categories"></i>
+              </span>
+            </div>
+            <div class="row-cell row-cell_flag">
+              <span class="flag-item">
+                Сущности
+                <i class="pi" [class.pi-check-circle]="doc.has_entities" [class.pi-circle]="!doc.has_entities"></i>
+              </span>
+            </div>
+            <div class="row-cell row-cell_flag">
+              <span class="flag-item">
+                Теги
+                <i class="pi" [class.pi-check-circle]="doc.has_tags" [class.pi-circle]="!doc.has_tags"></i>
+              </span>
+            </div>
+
+            <div class="row-cell row-cell_statuses">
+              <div class="document-statuses">
+                @if (doc.statuses.length) {
+                  @for (status of doc.statuses; track status.code) {
+                    <span class="status-chip">{{ status.name_ru }}</span>
+                  }
+                } @else {
+                  <span class="status-empty">Без статуса</span>
+                }
+              </div>
+            </div>
+
+            <button
+              class="expand-btn"
+              type="button"
+              [class.expand-btn_open]="isExpanded(doc.document_id)"
+              (click)="toggleExpand(doc.document_id)"
+              aria-label="Развернуть блок"
+            >
+              <i class="pi pi-chevron-down"></i>
+            </button>
           </div>
 
-          <div class="document-flags">
-            <span class="flag-item">
-              Категории
-              <i class="pi" [class.pi-check-circle]="doc.has_categories" [class.pi-circle]="!doc.has_categories"></i>
-            </span>
-            <span class="flag-item">
-              Сущности
-              <i class="pi" [class.pi-check-circle]="doc.has_entities" [class.pi-circle]="!doc.has_entities"></i>
-            </span>
-            <span class="flag-item">
-              Теги
-              <i class="pi" [class.pi-check-circle]="doc.has_tags" [class.pi-circle]="!doc.has_tags"></i>
-            </span>
-          </div>
-
-          <div class="document-statuses">
-            @if (doc.statuses.length) {
-              @for (status of doc.statuses; track status.code) {
-                <span class="status-chip">{{ status.name_ru }}</span>
-              }
-            } @else {
-              <span class="status-empty">Без статуса</span>
-            }
-          </div>
+          @if (isExpanded(doc.document_id)) {
+            <div class="document-expanded">
+              <div class="document-expanded__annotation">
+                <h4>Аннотация</h4>
+                <p>{{ doc.annotation || 'Аннотация отсутствует' }}</p>
+              </div>
+              <div class="document-expanded__image">
+                <h4>Фото</h4>
+                @if (doc.main_image) {
+                  <img [src]="doc.main_image" [alt]="doc.title" />
+                } @else {
+                  <div class="image-empty">Фото отсутствует</div>
+                }
+              </div>
+            </div>
+          }
         </article>
       }
     </div>

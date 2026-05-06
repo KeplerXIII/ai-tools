@@ -61,30 +61,94 @@
   padding: 14px 16px;
   background: #fff;
   display: flex;
-  gap: 16px;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.document-row-top {
+  display: grid;
+  width: 100%;
+  grid-template-columns: minmax(0, 1fr) 110px 110px 90px minmax(260px, 320px) 36px;
+  align-items: center;
+  gap: 10px;
+}
+
+.row-cell {
+  display: flex;
+  align-items: center;
+  min-height: 42px;
+}
+
+.row-cell_title {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: flex;
   align-items: center;
 }
 
-.document-main {
+.row-cell_flag {
+  justify-content: center;
+}
+
+.row-cell_statuses {
   min-width: 260px;
-  flex: 1;
+  flex: 1 1 320px;
+}
+
+.document-title-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
 }
 
 .document-row__title {
   margin: 0;
   font-size: 18px;
   line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.document-row__title_link {
+  cursor: pointer;
+  text-decoration: underline;
 }
 
 .document-row__meta {
-  margin-top: 4px;
   color: #64748b;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.document-row__meta_type {
+  flex-shrink: 0;
+}
+
+.expand-btn {
+  width: 36px;
+  height: 36px;
+  border: 1px solid #cbd5e1;
+  border-radius: 50%;
+  padding: 0;
+  background: #fff;
+  cursor: pointer;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #475569;
+  transition: transform 0.2s ease;
+}
+
+.expand-btn i {
   font-size: 13px;
 }
 
-.document-flags {
-  display: flex;
-  gap: 14px;
+.expand-btn_open i {
+  transform: rotate(180deg);
 }
 
 .flag-item {
@@ -92,6 +156,8 @@
   align-items: center;
   gap: 6px;
   color: #334155;
+  line-height: 1.1;
+  font-size: 13px;
 }
 
 .flag-item .pi-check-circle {
@@ -107,7 +173,7 @@
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 6px;
-  min-width: 240px;
+  width: 100%;
 }
 
 .status-chip {
@@ -118,6 +184,39 @@
 }
 
 .status-empty {
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+.document-expanded {
+  width: 100%;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 14px;
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: 16px;
+}
+
+.document-expanded h4 {
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+
+.document-expanded p {
+  margin: 0;
+  color: #334155;
+  white-space: pre-wrap;
+}
+
+.document-expanded__image img {
+  width: 100%;
+  max-height: 180px;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid #dbe3ee;
+}
+
+.image-empty {
   color: #94a3b8;
   font-size: 13px;
 }

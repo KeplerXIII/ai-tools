@@ -258,8 +258,12 @@ async def list_documents(
         select(
             Document.id,
             Document.title,
+            Document.source_url,
             Document.created_at,
             Document.published_at,
+            Document.extracted_main_image,
+            Document.original_summary,
+            Document.translated_summary,
             DocumentType.code.label("document_type_code"),
             DocumentType.name.label("document_type_name"),
         )
@@ -329,10 +333,13 @@ async def list_documents(
         DocumentListItem(
             document_id=row.id,
             title=row.title,
+            source_url=row.source_url,
             document_type_code=row.document_type_code,
             document_type_name=row.document_type_name,
             created_at=row.created_at,
             published_at=row.published_at,
+            annotation=(row.translated_summary or row.original_summary),
+            main_image=row.extracted_main_image,
             statuses=statuses_map.get(row.id, []),
             has_categories=row.id in category_ids,
             has_entities=row.id in entity_ids,

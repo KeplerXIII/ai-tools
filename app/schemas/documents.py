@@ -126,10 +126,13 @@ class DocumentStatusesResponse(BaseModel):
 class DocumentListItem(BaseModel):
     document_id: uuid.UUID
     title: str
+    source_url: str | None = None
     document_type_code: str
     document_type_name: str
     created_at: datetime
     published_at: datetime | None = None
+    annotation: str | None = None
+    main_image: str | None = None
     statuses: list[DocumentStatusItem] = []
     has_categories: bool = False
     has_entities: bool = False

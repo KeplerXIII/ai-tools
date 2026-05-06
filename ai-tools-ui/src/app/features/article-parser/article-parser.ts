@@ -1,4 +1,5 @@
 import { ChangeDetectorRef, Component, ElementRef, ViewChild } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { FloatLabelModule } from 'primeng/floatlabel';
 import { InputTextModule } from 'primeng/inputtext';
@@ -117,12 +118,29 @@ export class ArticleParser {
 
   private buffer = '';
   private originalTextViewportScroll = 0;
+  private lastAutoloadKey = '';
 
   constructor(
     private api: ArticleParserApi,
     public state: ArticleParserState,
     private cdr: ChangeDetectorRef,
+    private route: ActivatedRoute,
   ) {}
+
+  ngOnInit(): void {
+    this.route.queryParamMap.subscribe((params) => {
+      const url = (params.get('url') || '').trim();
+      const autoload = params.get('autoload') === '1';
+      const autoloadKey = `${autoload}:${url}`;
+      if (!autoload || !url || this.lastAutoloadKey === autoloadKey) {
+        return;
+      }
+
+      this.lastAutoloadKey = autoloadKey;
+      this.state.url = url;
+      this.extractArticle();
+    });
+  }
 
   openImage(url: string): void {
     this.imagePreview = url;
