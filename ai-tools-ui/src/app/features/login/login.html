@@ -1,3 +1,12 @@
+@if (celebrationVisible) {
+  <div class="login-celebration">
+    <button type="button" class="login-celebration__exit" (click)="logoutDuringCelebration()">Выход</button>
+    <div class="login-celebration__frame">
+      <img class="login-celebration__gif" [src]="celebrationGifSrc" alt="" />
+    </div>
+  </div>
+}
+
 <section class="login-shell">
   <div class="login-card">
     <h1 class="login-title">Вход</h1>
