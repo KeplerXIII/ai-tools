@@ -204,7 +204,7 @@ async def create_document_after_extract(
     norm_url: str,
     extract_payload: dict,
     created_by_id: uuid.UUID | None,
-    document_type_code: str = "article",
+    document_type_code: str = "undefined",
 ) -> Document:
     text = extract_payload["text"]
     lang_code = _map_lang_for_db(await asyncio.to_thread(detect_language, text))

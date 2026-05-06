@@ -27,7 +27,7 @@ class SourceCreateResponse(BaseModel):
 class ParseSourceRequest(BaseModel):
     source_id: uuid.UUID
     days: int = Field(default=3, ge=1, le=30)
-    document_type_code: str = "article"
+    document_type_code: str = "undefined"
 
 
 class ParseSourceDocumentItem(BaseModel):

@@ -158,6 +158,7 @@ export class ArticleParserApi {
   extractByUrl(url: string) {
     return this.http.post<ExtractResponse>('/api/v1/documents/extract-url', {
       url,
+      document_type_code: 'news',
     });
   }
 

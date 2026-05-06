@@ -238,4 +238,4 @@ class DocumentUpdateRequest(BaseModel):
 
 class ExtractUrlPersistRequest(BaseModel):
     url: HttpUrl
-    document_type_code: str = "article"
+    document_type_code: str = "undefined"
