@@ -76,6 +76,7 @@ export interface DocumentTypeCatalogItem {
 export interface ListDocumentsFilters {
   statusCode?: string;
   documentTypeCode?: string;
+  sourceId?: string;
   dateFrom?: string;
   dateTo?: string;
   usePublishedDate?: boolean;
@@ -94,6 +95,9 @@ export class DocumentsApi {
     }
     if (filters.documentTypeCode) {
       params = params.set('document_type_code', filters.documentTypeCode);
+    }
+    if (filters.sourceId) {
+      params = params.set('source_id', filters.sourceId);
     }
     if (filters.dateFrom) {
       params = params.set('date_from', `${filters.dateFrom}T00:00:00`);

@@ -23,7 +23,7 @@ from app.api.deps import (
 from app.api.error_mapping import map_app_error
 from app.domain.errors import AppError, ValidationError
 from app.infrastructure.db.models import Category, Document, DocumentCategory, DocumentStatus, DocumentStatusAssignment
-from app.infrastructure.db.models import DocumentEntity, DocumentTag, Entity, EntityType, PredictionSource, Tag, User
+from app.infrastructure.db.models import DocumentEntity, DocumentTag, Entity, EntityType, PredictionSource, Source, Tag, User
 from app.infrastructure.db.models import DocumentType
 from app.infrastructure.db.session import AsyncSessionLocal, get_db
 from app.schemas.documents import (
@@ -261,12 +261,14 @@ async def _get_document_categories(
 async def list_documents(
     status_code: str | None = Query(default=None, min_length=1, max_length=64),
     document_type_code: str | None = Query(default=None, min_length=1, max_length=64),
+    source_id: UUID | None = Query(default=None, description="Фильтр по источнику (RSS/URL); только свои источники"),
     date_from: datetime | None = Query(default=None),
     date_to: datetime | None = Query(default=None),
     use_published_date: bool = Query(default=False),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
 ):
     normalized_status = status_code.strip().lower() if status_code else None
     normalized_type = document_type_code.strip().lower() if document_type_code else None
@@ -291,6 +293,13 @@ async def list_documents(
     )
 
     filters = []
+    if source_id is not None:
+        src = await db.get(Source, source_id)
+        if src is None:
+            raise HTTPException(status_code=404, detail="Источник не найден")
+        if not user.is_admin and src.user_id != user.id:
+            raise HTTPException(status_code=403, detail="Нет доступа к источнику")
+        filters.append(Document.source_id == source_id)
     if normalized_type:
         filters.append(DocumentType.code == normalized_type)
     if date_from:

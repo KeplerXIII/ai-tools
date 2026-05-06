@@ -174,7 +174,7 @@ class CategoryAdmin(ModelView, model=Category):
 class SourceAdmin(ModelView, model=Source):
     name = "Источник (RSS/URL)"
     name_plural = "Источники"
-    column_list = [Source.id, Source.user_id, Source.name, Source.url, Source.is_active]
+    column_list = [Source.id, Source.user_id, Source.document_type_id, Source.name, Source.url, Source.is_active]
 
 
 class DocumentAdmin(ModelView, model=Document):

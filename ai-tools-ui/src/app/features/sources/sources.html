@@ -1,0 +1,298 @@
+<section class="sources-page">
+  <header class="sources-header">
+    <h1 class="sources-title">Источники</h1>
+
+    <div class="sources-filters">
+      @if (canFilterByAllUsers) {
+        <label class="filter-item">
+          <span>Пользователь</span>
+          <select [(ngModel)]="selectedUserId" (change)="onFiltersChanged()">
+            <option value="">Все</option>
+            @for (opt of contributorOptions; track opt.userId) {
+              <option [value]="opt.userId">{{ opt.label }}</option>
+            }
+          </select>
+        </label>
+      }
+
+      <label class="filter-item">
+        <span>Сортировка</span>
+        <select [(ngModel)]="sortMode" (change)="onFiltersChanged()">
+          <option value="created_desc">По дате добавления (сначала новые)</option>
+          <option value="created_asc">По дате добавления (сначала старые)</option>
+          <option value="user_asc">По пользователю (А–Я)</option>
+        </select>
+      </label>
+
+      <button class="reset-btn" type="button" (click)="resetFilters()">Сбросить</button>
+    </div>
+  </header>
+
+  <section
+    class="source-create"
+    [class.source-create_collapsed]="!createSectionOpen"
+    aria-labelledby="source-create-title"
+  >
+    <div class="source-create__header">
+      <button
+        type="button"
+        class="source-create__toggle"
+        (click)="toggleCreateSection()"
+        [attr.aria-expanded]="createSectionOpen"
+        aria-controls="source-create-panel"
+        id="source-create-title"
+      >
+        <span class="source-create__heading">Новый источник</span>
+        <span class="source-create__toggle-hint">{{ createSectionOpen ? 'Скрыть' : 'Показать форму' }}</span>
+        <i class="pi pi-chevron-down source-create__chevron" [class.source-create__chevron_open]="createSectionOpen"></i>
+      </button>
+    </div>
+
+    <div id="source-create-panel" class="source-create__panel" [hidden]="!createSectionOpen">
+      <p class="source-create__hint">
+        Обязателен только URL сайта. Язык, тип документа (для материалов при разборе) и страна — из справочников; страна
+        необязательна.
+      </p>
+      <form class="source-create__form" (ngSubmit)="submitCreate()">
+        <label class="filter-item source-create__field source-create__field_wide">
+          <span>URL сайта <span class="req">*</span></span>
+          <input type="url" name="url" [(ngModel)]="formUrl" placeholder="https://example.com/news" required />
+        </label>
+
+        <label class="filter-item source-create__field">
+          <span>Название</span>
+          <input
+            type="text"
+            name="name"
+            [(ngModel)]="formName"
+            maxlength="255"
+            placeholder="Краткое имя (необязательно)"
+          />
+        </label>
+
+        <label class="filter-item source-create__field">
+          <span>Язык</span>
+          <select
+            name="language_code"
+            [(ngModel)]="formLanguageCode"
+            [disabled]="!languagesCatalog.length || createSubmitting"
+          >
+            @for (lang of languagesCatalog; track lang.code) {
+              <option [value]="lang.code">{{ lang.name }} ({{ lang.code }})</option>
+            }
+          </select>
+        </label>
+
+        <label class="filter-item source-create__field">
+          <span>Страна</span>
+          <select
+            name="country_code"
+            [(ngModel)]="formCountryCode"
+            [disabled]="!countriesCatalog.length || createSubmitting"
+          >
+            <option value="">Не указано</option>
+            @for (c of countriesCatalog; track c.code) {
+              <option [value]="c.code">{{ c.name }} ({{ c.code }})</option>
+            }
+          </select>
+        </label>
+
+        <label class="filter-item source-create__field source-create__field_wide">
+          <span>Тип документа при разборе <span class="req">*</span></span>
+          <select
+            name="document_type_code"
+            [(ngModel)]="formDocumentTypeCode"
+            [disabled]="!documentTypesCatalog.length || createSubmitting"
+          >
+            @for (dt of documentTypesCatalog; track dt.code) {
+              <option [value]="dt.code">{{ dt.name }} ({{ dt.code }})</option>
+            }
+          </select>
+        </label>
+
+        <label class="filter-item source-create__field source-create__field_wide">
+          <span>URL RSS</span>
+          <input type="url" name="rss_url" [(ngModel)]="formRssUrl" placeholder="https://example.com/feed.xml" />
+        </label>
+
+        <div class="source-create__actions">
+          <button class="submit-btn" type="submit" [disabled]="createSubmitting">
+            {{ createSubmitting ? 'Сохранение…' : 'Добавить источник' }}
+          </button>
+          <button class="reset-btn" type="button" (click)="resetCreateForm()" [disabled]="createSubmitting">
+            Очистить форму
+          </button>
+        </div>
+      </form>
+    </div>
+
+    @if (languagesLoadError) {
+      <div class="state-message state-message_error source-create__message">{{ languagesLoadError }}</div>
+    }
+    @if (countriesLoadError) {
+      <div class="state-message state-message_error source-create__message">{{ countriesLoadError }}</div>
+    }
+    @if (documentTypesLoadError) {
+      <div class="state-message state-message_error source-create__message">{{ documentTypesLoadError }}</div>
+    }
+    @if (createError) {
+      <div class="state-message state-message_error source-create__message">{{ createError }}</div>
+    }
+    @if (createSuccess) {
+      <div class="state-message state-message_ok source-create__message">{{ createSuccess }}</div>
+    }
+  </section>
+
+  @if (listLoading) {
+    <div class="state-message">Загрузка источников...</div>
+  } @else if (listError) {
+    <div class="state-message state-message_error">{{ listError }}</div>
+  } @else if (!filteredAndSortedItems.length) {
+    <div class="state-message">Источники не найдены</div>
+  } @else {
+    <div class="sources-list">
+      @for (src of filteredAndSortedItems; track src.source_id) {
+        <article class="source-row">
+          <div class="source-row-top">
+            <div class="row-cell row-cell_title">
+              <div class="source-title-line">
+                <span class="source-row__meta"
+                  >{{ src.document_type_name }} · {{ src.language_code.toUpperCase() }}</span
+                >
+                <h3 class="source-row__title source-row__title_link">
+                  <a [href]="src.url" target="_blank" rel="noopener noreferrer">{{ displayTitle(src) }}</a>
+                </h3>
+              </div>
+            </div>
+
+            <div class="row-cell row-cell_user">
+              <span class="source-user-label">{{ src.added_by_username }}</span>
+            </div>
+
+            <div class="row-cell row-cell_date">
+              <span class="source-date">{{ formatDate(src.created_at) }}</span>
+            </div>
+
+            <div class="row-cell row-cell_statuses">
+              <div class="source-badges">
+                @if (src.is_active) {
+                  <span class="status-chip status-chip_active">Активен</span>
+                } @else {
+                  <span class="status-chip status-chip_inactive">Неактивен</span>
+                }
+                @if (src.rss_url) {
+                  <span class="status-chip status-chip_rss">RSS</span>
+                }
+              </div>
+            </div>
+
+            <button
+              class="expand-btn"
+              type="button"
+              [class.expand-btn_open]="isExpanded(src.source_id)"
+              (click)="toggleExpand(src.source_id)"
+              aria-label="Развернуть блок"
+            >
+              <i class="pi pi-chevron-down"></i>
+            </button>
+          </div>
+
+          @if (isExpanded(src.source_id)) {
+            <div class="source-expanded">
+              <div class="source-stats" aria-label="Статистика по документам источника">
+                <div class="source-stats__item">
+                  <span class="source-stats__label">Всего документов в базе</span>
+                  <span class="source-stats__value">{{ src.documents_total }}</span>
+                </div>
+                <div class="source-stats__item">
+                  <span class="source-stats__label">Создано при последнем разборе</span>
+                  <span class="source-stats__value">{{
+                    src.last_parse_created_total !== null && src.last_parse_created_total !== undefined
+                      ? src.last_parse_created_total
+                      : '—'
+                  }}</span>
+                </div>
+                <div class="source-stats__item">
+                  <span class="source-stats__label">Необработанных</span>
+                  <span class="source-stats__value">{{ src.documents_unprocessed }}</span>
+                </div>
+                @if (src.last_parse_at) {
+                  <div class="source-stats__item source-stats__item_wide">
+                    <span class="source-stats__label">Последний разбор</span>
+                    <span class="source-stats__value">{{ formatDate(src.last_parse_at) }}</span>
+                  </div>
+                }
+              </div>
+              <div class="source-expanded__block">
+                <h4>URL</h4>
+                <p>
+                  <a [href]="src.url" target="_blank" rel="noopener noreferrer">{{ src.url }}</a>
+                </p>
+              </div>
+              @if (src.rss_url) {
+                <div class="source-expanded__block">
+                  <h4>RSS</h4>
+                  <p>
+                    <a [href]="src.rss_url" target="_blank" rel="noopener noreferrer">{{ src.rss_url }}</a>
+                  </p>
+                </div>
+              }
+              <div class="source-expanded__grid">
+                <div class="source-expanded__block">
+                  <h4>Тип документа</h4>
+                  <p>{{ src.document_type_name }} ({{ src.document_type_code }})</p>
+                </div>
+                <div class="source-expanded__block">
+                  <h4>Страна</h4>
+                  <p>{{ src.country_code || '—' }}</p>
+                </div>
+                <div class="source-expanded__block">
+                  <h4>Добавил</h4>
+                  <p>{{ src.added_by_username }}</p>
+                </div>
+                <div class="source-expanded__block">
+                  <h4>Идентификатор</h4>
+                  <p class="source-id">{{ src.source_id }}</p>
+                </div>
+              </div>
+
+              <div class="source-parse">
+                <h4>Разбор ленты</h4>
+                <p class="source-parse__hint">
+                  Новые документы создаются с типом, заданным для источника. Глубина по дням — как в API парсинга (1–30).
+                </p>
+                <div class="source-parse__row">
+                  <label class="filter-item source-parse__days">
+                    <span>Дней назад</span>
+                    <input
+                      type="number"
+                      name="parseDays_{{ src.source_id }}"
+                      [(ngModel)]="parseDays"
+                      min="1"
+                      max="30"
+                      [disabled]="!src.is_active || parsingSourceId === src.source_id"
+                    />
+                  </label>
+                  <button
+                    class="submit-btn source-parse__btn"
+                    type="button"
+                    [disabled]="!src.is_active || parsingSourceId === src.source_id"
+                    (click)="runParse(src)"
+                  >
+                    {{ parsingSourceId === src.source_id ? 'Разбор…' : 'Разобрать' }}
+                  </button>
+                </div>
+                @if (parseError && lastParsedSourceId === src.source_id) {
+                  <div class="state-message state-message_error source-parse__message">{{ parseError }}</div>
+                }
+                @if (parseFeedback && lastParsedSourceId === src.source_id && !parseError) {
+                  <div class="state-message state-message_ok source-parse__message">{{ parseFeedback }}</div>
+                }
+              </div>
+            </div>
+          }
+        </article>
+      }
+    </div>
+  }
+</section>

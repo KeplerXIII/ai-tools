@@ -1,15 +1,16 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.api.error_mapping import map_app_error
 from app.domain.errors import ValidationError
-from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy import func, select, update
+from sqlalchemy.exc import IntegrityError, NoResultFound
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_current_user_optional
@@ -18,18 +19,24 @@ from app.infrastructure.db.models import (
     Document,
     DocumentStatus,
     DocumentStatusAssignment,
+    DocumentType,
     Language,
     Source,
     User,
 )
 from app.infrastructure.db.session import get_db
 from app.schemas.parsing import (
+    CountryCatalogItem,
+    LanguageCatalogItem,
     ParseSourceDocumentItem,
     ParseSourceRequest,
     ParseSourceResponse,
     SourceCreateRequest,
     SourceCreateResponse,
+    SourceListItem,
+    SourceListResponse,
 )
+from app.services.documents.db_refs import document_type_id_by_code
 from app.services.documents.document_pipeline import (
     create_document_after_extract,
     get_document_by_source_url,
@@ -59,6 +66,26 @@ async def _country_id_by_code(db: AsyncSession, code: str | None) -> UUID | None
     if not code:
         return None
     return await db.scalar(select(Country.id).where(Country.code == code.upper()))
+
+
+@router.get("/languages/catalog", response_model=list[LanguageCatalogItem])
+async def list_languages_catalog(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    result = await db.execute(select(Language).order_by(Language.name.asc()))
+    languages = result.scalars().all()
+    return [LanguageCatalogItem.model_validate(lang) for lang in languages]
+
+
+@router.get("/countries/catalog", response_model=list[CountryCatalogItem])
+async def list_countries_catalog(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    result = await db.execute(select(Country).order_by(Country.name.asc()))
+    countries = result.scalars().all()
+    return [CountryCatalogItem.model_validate(c) for c in countries]
 
 
 async def _list_unprocessed_by_source(
@@ -92,6 +119,82 @@ async def _list_unprocessed_by_source(
     ]
 
 
+@router.get("/sources", response_model=SourceListResponse)
+async def list_sources(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+    added_by_user_id: UUID | None = Query(
+        default=None,
+        description="Только для администратора: фильтр по пользователю, добавившему источник",
+    ),
+):
+    documents_total_sq = (
+        select(func.count())
+        .select_from(Document)
+        .where(Document.source_id == Source.id)
+        .scalar_subquery()
+    )
+    documents_unprocessed_sq = (
+        select(func.count())
+        .select_from(Document)
+        .join(DocumentStatusAssignment, DocumentStatusAssignment.document_id == Document.id)
+        .join(DocumentStatus, DocumentStatus.id == DocumentStatusAssignment.status_id)
+        .where(Document.source_id == Source.id, DocumentStatus.code == "unprocessed")
+        .scalar_subquery()
+    )
+    stmt = (
+        select(
+            Source,
+            User.username,
+            Language.code,
+            Country.code,
+            DocumentType.code,
+            DocumentType.name,
+            documents_total_sq,
+            documents_unprocessed_sq,
+        )
+        .join(User, User.id == Source.user_id)
+        .join(Language, Language.id == Source.language_id)
+        .join(DocumentType, DocumentType.id == Source.document_type_id)
+        .outerjoin(Country, Country.id == Source.country_id)
+    )
+    if user.is_admin:
+        if added_by_user_id is not None:
+            stmt = stmt.where(Source.user_id == added_by_user_id)
+    else:
+        stmt = stmt.where(Source.user_id == user.id)
+
+    stmt = stmt.order_by(Source.created_at.desc())
+    result = await db.execute(stmt)
+    rows = result.all()
+    items = [
+        SourceListItem(
+            source_id=src.id,
+            name=src.name,
+            url=src.url,
+            rss_url=src.rss_url,
+            language_code=lang_code or "en",
+            country_code=c_code,
+            document_type_code=dt_code,
+            document_type_name=dt_name,
+            is_active=src.is_active,
+            created_at=src.created_at,
+            added_by_user_id=src.user_id,
+            added_by_username=username,
+            documents_total=int(docs_total or 0),
+            documents_unprocessed=int(docs_unprocessed or 0),
+            last_parse_created_total=src.last_parse_created_total,
+            last_parse_at=src.last_parse_at,
+        )
+        for src, username, lang_code, c_code, dt_code, dt_name, docs_total, docs_unprocessed in rows
+    ]
+    return SourceListResponse(
+        total=len(items),
+        items=items,
+        can_filter_by_all_users=user.is_admin,
+    )
+
+
 async def _extract_single_article_for_parse_source(
     url: str,
     *,
@@ -115,9 +218,14 @@ async def create_source(
 ):
     language_id = await _language_id_by_code(db, payload.language_code)
     country_id = await _country_id_by_code(db, payload.country_code)
+    try:
+        dt_id = await document_type_id_by_code(db, payload.document_type_code.strip().lower())
+    except NoResultFound as exc:
+        raise HTTPException(status_code=400, detail="Неизвестный код типа документа") from exc
 
     source = Source(
         user_id=user.id,
+        document_type_id=dt_id,
         name=(payload.name.strip() if payload.name else None),
         url=normalize_source_url(str(payload.url)),
         country_id=country_id,
@@ -138,6 +246,12 @@ async def create_source(
 
     lang_code = await db.scalar(select(Language.code).where(Language.id == source.language_id))
     c_code = await db.scalar(select(Country.code).where(Country.id == source.country_id)) if source.country_id else None
+    dt_row = (
+        await db.execute(
+            select(DocumentType.code, DocumentType.name).where(DocumentType.id == source.document_type_id),
+        )
+    ).one()
+    dt_code, dt_name = dt_row[0], dt_row[1]
     return SourceCreateResponse(
         source_id=source.id,
         url=source.url,
@@ -146,6 +260,8 @@ async def create_source(
         country_code=c_code,
         rss_url=source.rss_url,
         is_active=source.is_active,
+        document_type_code=dt_code,
+        document_type_name=dt_name,
     )
 
 
@@ -182,6 +298,13 @@ async def parse_source(
     if not source.is_active:
         raise HTTPException(status_code=400, detail="Источник неактивен")
     source_id = source.id
+
+    doc_type_row = (
+        await db.execute(select(DocumentType.code).where(DocumentType.id == source.document_type_id))
+    ).one_or_none()
+    if doc_type_row is None:
+        raise HTTPException(status_code=500, detail="У источника не задан тип документа")
+    document_type_code = doc_type_row[0]
 
     discovered = await discover_source_news_urls(source.url, rss_url=source.rss_url, days=payload.days)
     created_by_id = user.id if user else None
@@ -222,7 +345,7 @@ async def parse_source(
                     norm_url=normalize_source_url(item.url),
                     extract_payload=extracted,
                     created_by_id=created_by_id,
-                    document_type_code=payload.document_type_code,
+                    document_type_code=document_type_code,
                 )
                 doc.source_id = source_id
                 if item.published_at is not None:
@@ -242,6 +365,15 @@ async def parse_source(
         source_id=source_id,
         document_ids=new_doc_ids,
     )
+    await db.execute(
+        update(Source)
+        .where(Source.id == source_id)
+        .values(
+            last_parse_at=datetime.now(UTC),
+            last_parse_created_total=len(new_doc_ids),
+        ),
+    )
+    await db.commit()
     return ParseSourceResponse(
         source_id=source_id,
         found_total=len(discovered),

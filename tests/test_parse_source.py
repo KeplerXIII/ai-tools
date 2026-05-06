@@ -40,7 +40,14 @@ from unittest.mock import AsyncMock, patch
 
 from fastapi import HTTPException
 
-from app.api.v1.endpoints.parsing import create_source, deactivate_source, parse_source
+from app.api.v1.endpoints.parsing import (
+    create_source,
+    deactivate_source,
+    list_countries_catalog,
+    list_languages_catalog,
+    list_sources,
+    parse_source,
+)
 from app.schemas.parsing import ParseSourceRequest, SourceCreateRequest
 from app.services.parsing.source_discovery import DiscoveredUrl
 
@@ -73,6 +80,19 @@ class _FakeDb:
 
     async def execute(self, statement):
         self.insert_calls += 1
+        text = str(statement).lower()
+        if "document_types" in text and "name" in text and "code" in text:
+            class _DocTypeRow:
+                def one(self):
+                    return ("news", "Новость")
+
+            return _DocTypeRow()
+        if "document_types" in text and "code" in text:
+            class _DocTypeCode:
+                def one_or_none(self):
+                    return ("news",)
+
+            return _DocTypeCode()
         _ = statement
         return _FakeResult()
 
@@ -102,6 +122,52 @@ class _FakeDb:
     @asynccontextmanager
     async def begin(self):
         yield self
+
+
+class _FakeExecuteResult:
+    """Результат ``execute`` со списком строк для ``list_sources``."""
+
+    def __init__(self, rows):
+        self._rows = rows
+
+    def all(self):
+        return self._rows
+
+
+class _FakeDbListSources:
+    """Сессия, возвращающая заранее заданные строки выборки источников."""
+
+    def __init__(self, rows):
+        self._rows = rows
+
+    async def execute(self, statement):
+        _ = statement
+        return _FakeExecuteResult(self._rows)
+
+
+class _FakeScalarsLang:
+    def __init__(self, items):
+        self._items = items
+
+    def all(self):
+        return self._items
+
+
+class _FakeExecLang:
+    def __init__(self, items):
+        self._items = items
+
+    def scalars(self):
+        return _FakeScalarsLang(self._items)
+
+
+class _FakeDbLangCatalog:
+    def __init__(self, items):
+        self._items = items
+
+    async def execute(self, statement):
+        _ = statement
+        return _FakeExecLang(self._items)
 
 
 class ParseSourceEndpointTests(IsolatedAsyncioTestCase):
@@ -167,6 +233,7 @@ class ParseSourceEndpointTests(IsolatedAsyncioTestCase):
         source_id = uuid.uuid4()
         source = SimpleNamespace(
             id=source_id,
+            document_type_id=uuid.uuid4(),
             url="https://example.com",
             rss_url=None,
             is_active=True,
@@ -182,9 +249,11 @@ class ParseSourceEndpointTests(IsolatedAsyncioTestCase):
         ]
 
         docs_created: list[SimpleNamespace] = []
+        create_doc_kwargs: list[dict] = []
 
         async def _create_doc(*args, **kwargs):
             _ = args
+            create_doc_kwargs.append(kwargs)
             doc = SimpleNamespace(
                 id=uuid.uuid4(),
                 version=1,
@@ -192,7 +261,6 @@ class ParseSourceEndpointTests(IsolatedAsyncioTestCase):
                 published_at=None,
             )
             docs_created.append(doc)
-            _ = kwargs
             return doc
 
         async def _list_unprocessed(_db, *, source_id, document_ids=None):
@@ -255,12 +323,18 @@ class ParseSourceEndpointTests(IsolatedAsyncioTestCase):
         self.assertEqual(result.created_total, 2)
         self.assertEqual(len(result.existing_unprocessed_by_source), 2)
         self.assertEqual(len(result.new_unprocessed_by_source), 2)
+        self.assertEqual(len(create_doc_kwargs), 2)
+        for kw in create_doc_kwargs:
+            self.assertEqual(kw.get("document_type_code"), "news")
+        for doc in docs_created:
+            self.assertEqual(doc.source_id, source_id)
 
     async def test_parse_source_respects_extract_concurrency_limit(self):
         """Параллельные «извлечения» не превышают ожидаемый лимит (отслеживание через stub)."""
         source_id = uuid.uuid4()
         source = SimpleNamespace(
             id=source_id,
+            document_type_id=uuid.uuid4(),
             url="https://example.com",
             rss_url=None,
             is_active=True,
@@ -340,13 +414,97 @@ class ParseSourceEndpointTests(IsolatedAsyncioTestCase):
             language_code="en",
             country_code=None,
             rss_url="https://example.com/rss",
+            document_type_code="news",
         )
         with (
             patch("app.api.v1.endpoints.parsing._language_id_by_code", AsyncMock(return_value=uuid.uuid4())),
             patch("app.api.v1.endpoints.parsing._country_id_by_code", AsyncMock(return_value=None)),
+            patch(
+                "app.api.v1.endpoints.parsing.document_type_id_by_code",
+                AsyncMock(return_value=uuid.uuid4()),
+            ),
         ):
             result = await create_source(payload=payload, db=db, user=user)
 
         self.assertEqual(result.url, "https://example.com/")
         self.assertEqual(result.rss_url, "https://example.com/rss")
         self.assertEqual(result.language_code, "en")
+        self.assertEqual(result.document_type_code, "news")
+        self.assertEqual(result.document_type_name, "Новость")
+
+    async def test_list_sources_non_admin_response_shape(self):
+        """Список источников для обычного пользователя: поля элемента и флаг фильтра."""
+        uid = uuid.uuid4()
+        sid = uuid.uuid4()
+        created = datetime.now(UTC)
+        src = SimpleNamespace(
+            id=sid,
+            user_id=uid,
+            name="News",
+            url="https://news.example/",
+            rss_url="https://news.example/rss",
+            is_active=True,
+            created_at=created,
+            last_parse_created_total=2,
+            last_parse_at=datetime.now(UTC),
+        )
+        db = _FakeDbListSources([(src, "alice", "de", "DE", "news", "Новость", 12, 3)])
+        user = SimpleNamespace(id=uid, is_admin=False)
+        result = await list_sources(db=db, user=user, added_by_user_id=None)
+        self.assertFalse(result.can_filter_by_all_users)
+        self.assertEqual(result.total, 1)
+        self.assertEqual(result.items[0].source_id, sid)
+        self.assertEqual(result.items[0].added_by_username, "alice")
+        self.assertEqual(result.items[0].language_code, "de")
+        self.assertEqual(result.items[0].country_code, "DE")
+        self.assertEqual(result.items[0].document_type_code, "news")
+        self.assertEqual(result.items[0].document_type_name, "Новость")
+        self.assertEqual(result.items[0].documents_total, 12)
+        self.assertEqual(result.items[0].documents_unprocessed, 3)
+        self.assertEqual(result.items[0].last_parse_created_total, 2)
+
+    async def test_list_sources_admin_sets_filter_flag(self):
+        """Администратор получает возможность фильтрации по всем пользователям (флаг в ответе)."""
+        uid = uuid.uuid4()
+        src = SimpleNamespace(
+            id=uuid.uuid4(),
+            user_id=uid,
+            name=None,
+            url="https://a.test/",
+            rss_url=None,
+            is_active=False,
+            created_at=datetime.now(UTC),
+            last_parse_created_total=None,
+            last_parse_at=None,
+        )
+        db = _FakeDbListSources([(src, "bob", "en", None, "article", "Статья", 0, 0)])
+        user = SimpleNamespace(id=uuid.uuid4(), is_admin=True)
+        result = await list_sources(db=db, user=user, added_by_user_id=None)
+        self.assertTrue(result.can_filter_by_all_users)
+        self.assertFalse(result.items[0].is_active)
+
+    async def test_list_languages_catalog_maps_rows(self):
+        """Каталог языков: код и имя из строк ORM (порядок как отдал ``execute``)."""
+        items = [
+            SimpleNamespace(code="ru", name="Russian"),
+            SimpleNamespace(code="en", name="English"),
+        ]
+        db = _FakeDbLangCatalog(items)
+        result = await list_languages_catalog(db=db)
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result[0].code, "ru")
+        self.assertEqual(result[0].name, "Russian")
+        self.assertEqual(result[1].code, "en")
+
+    async def test_list_countries_catalog_maps_rows(self):
+        """Каталог стран: код и имя из строк ORM."""
+        items = [
+            SimpleNamespace(code="DE", name="Germany"),
+            SimpleNamespace(code="US", name="United States"),
+        ]
+        db = _FakeDbLangCatalog(items)
+        result = await list_countries_catalog(db=db)
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result[0].code, "DE")
+        self.assertEqual(result[0].name, "Germany")
+        self.assertEqual(result[1].code, "US")

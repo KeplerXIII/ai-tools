@@ -24,6 +24,16 @@
       </label>
 
       <label class="filter-item">
+        <span>Источник (ресурс)</span>
+        <select [(ngModel)]="selectedSourceId" (change)="onFiltersChanged()">
+          <option value="">Все</option>
+          @for (src of sources; track src.source_id) {
+            <option [value]="src.source_id">{{ sourceFilterLabel(src) }}</option>
+          }
+        </select>
+      </label>
+
+      <label class="filter-item">
         <span>Дата от</span>
         <input type="date" [(ngModel)]="dateFrom" (change)="onFiltersChanged()" />
       </label>

@@ -3,6 +3,7 @@ import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { ChipModule } from 'primeng/chip';
+import { SourceListItem, SourcesApi } from '../sources/sources-api';
 import {
   DocumentCategoryItem,
   DocumentEntityItem,
@@ -23,11 +24,13 @@ export class Documents implements OnInit {
   documents: DocumentListItem[] = [];
   statuses: DocumentStatusCatalogItem[] = [];
   documentTypes: DocumentTypeCatalogItem[] = [];
+  sources: SourceListItem[] = [];
   loading = false;
   error = '';
 
   selectedStatusCode = '';
   selectedDocumentTypeCode = '';
+  selectedSourceId = '';
   dateFrom = '';
   dateTo = '';
   usePublishedDate = false;
@@ -35,6 +38,7 @@ export class Documents implements OnInit {
 
   constructor(
     private readonly documentsApi: DocumentsApi,
+    private readonly sourcesApi: SourcesApi,
     private readonly router: Router,
   ) {}
 
@@ -55,6 +59,12 @@ export class Documents implements OnInit {
         this.documentTypes = items;
       },
     });
+
+    this.sourcesApi.listSources().subscribe({
+      next: (response) => {
+        this.sources = response.items;
+      },
+    });
   }
 
   loadDocuments(): void {
@@ -65,6 +75,7 @@ export class Documents implements OnInit {
       .listDocuments({
         statusCode: this.selectedStatusCode || undefined,
         documentTypeCode: this.selectedDocumentTypeCode || undefined,
+        sourceId: this.selectedSourceId || undefined,
         dateFrom: this.dateFrom || undefined,
         dateTo: this.dateTo || undefined,
         usePublishedDate: this.usePublishedDate,
@@ -88,10 +99,23 @@ export class Documents implements OnInit {
   resetFilters(): void {
     this.selectedStatusCode = '';
     this.selectedDocumentTypeCode = '';
+    this.selectedSourceId = '';
     this.dateFrom = '';
     this.dateTo = '';
     this.usePublishedDate = false;
     this.loadDocuments();
+  }
+
+  sourceFilterLabel(src: SourceListItem): string {
+    const name = src.name?.trim();
+    if (name) {
+      return name;
+    }
+    try {
+      return new URL(src.url).hostname;
+    } catch {
+      return src.url;
+    }
   }
 
   toggleExpand(documentId: string): void {
