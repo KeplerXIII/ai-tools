@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 from enum import Enum
+from typing import Literal
 
 from pydantic import BaseModel, Field, HttpUrl, model_validator
 
@@ -64,6 +65,24 @@ class DocumentEntitiesExtractResponse(BaseModel):
     military_equipment: list[DocumentEntityItem]
     manufacturers: list[DocumentEntityItem]
     contracts: list[DocumentEntityItem]
+
+
+class DocumentCategorizeItem(BaseModel):
+    """Назначенная категория: происхождение — prediction_sources.code (для LLM — «llm»)."""
+
+    category_id: uuid.UUID
+    code: str
+    name: str
+    name_ru: str | None = None
+    confidence: float = Field(..., ge=0.0, le=1.0)
+    prediction_source_code: str = "llm"
+    text_source: Literal["original", "translated"]
+
+
+class DocumentCategorizeResponse(BaseModel):
+    ok: bool = True
+    document_id: uuid.UUID
+    categories: list[DocumentCategorizeItem]
 
 
 class DocumentEntityAssignRequest(BaseModel):

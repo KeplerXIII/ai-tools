@@ -4,6 +4,7 @@ import asyncio
 import uuid
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from typing import Literal
 
 from sqlalchemy import delete, or_, select
 from sqlalchemy.dialects.postgresql import insert
@@ -27,6 +28,7 @@ from app.infrastructure.db.models import (
     Tag,
 )
 from app.schemas.documents import (
+    DocumentCategorizeItem,
     DocumentEntityItem,
     DocumentExtractResponse,
     DocumentStatusItem,
@@ -618,22 +620,46 @@ async def run_categorize_document(
     *,
     document_id: uuid.UUID,
     started_by_id: uuid.UUID | None,
-) -> Document:
+) -> tuple[Document, list[DocumentCategorizeItem]]:
     doc = await session.get(Document, document_id)
     if doc is None:
         raise NotFoundError("Документ не найден")
-    src = doc.original_content
-    if not src.strip():
-        raise ValidationError("Пустой исходный текст")
+
+    translated = (doc.translated_content or "").strip()
+    original = (doc.original_content or "").strip()
+    if translated:
+        src = doc.translated_content or ""
+        text_source: Literal["original", "translated"] = "translated"
+    elif original:
+        src = doc.original_content
+        text_source = "original"
+    else:
+        raise ValidationError("Пустой текст документа")
 
     q = await session.execute(
-        select(Category.code, Category.name, Category.name_ru).where(Category.is_active.is_(True)),
+        select(
+            Category.id,
+            Category.code,
+            Category.name,
+            Category.name_ru,
+            Category.description,
+            Category.description_ru,
+        ).where(Category.is_active.is_(True)),
     )
-    pairs = []
-    for code, name, name_ru in q.all():
+    pairs: list[tuple[str, str]] = []
+    meta_by_code: dict[str, tuple[uuid.UUID, str, str | None]] = {}
+    for cid, code, name, name_ru, description, description_ru in q.all():
         label = f"{name_ru} — {name}" if name_ru else name
+        desc = (description_ru or description or "").strip()
+        if desc:
+            if len(desc) > 320:
+                desc = desc[:317] + "..."
+            label = f"{label}. {desc}"
         pairs.append((code, label))
+        meta_by_code[code] = (cid, name, name_ru)
+
     llm_ps = await _llm_ps_id(session)
+    assigned: list[DocumentCategorizeItem] = []
 
     async with processing_job(
         session,
@@ -648,10 +674,12 @@ async def run_categorize_document(
         items = await categorize_text(src, pairs)
         for it in items:
             code = it["code"]
-            cid = await session.scalar(select(Category.id).where(Category.code == code))
-            if cid is None:
+            meta = meta_by_code.get(code)
+            if meta is None:
                 continue
-            conf = Decimal(str(it.get("confidence", 0.5)))
+            cid, name, name_ru = meta
+            conf_f = float(it.get("confidence", 0.5))
+            conf = Decimal(str(conf_f))
             session.add(
                 DocumentCategory(
                     document_id=document_id,
@@ -660,7 +688,20 @@ async def run_categorize_document(
                     prediction_source_id=llm_ps,
                 ),
             )
-    return doc
+            assigned.append(
+                DocumentCategorizeItem(
+                    category_id=cid,
+                    code=code,
+                    name=name,
+                    name_ru=name_ru,
+                    confidence=conf_f,
+                    prediction_source_code="llm",
+                    text_source=text_source,
+                ),
+            )
+
+    assigned.sort(key=lambda x: x.confidence, reverse=True)
+    return doc, assigned
 
 
 async def persist_document_refined_summary(

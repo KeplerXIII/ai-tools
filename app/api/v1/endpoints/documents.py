@@ -23,6 +23,7 @@ from app.infrastructure.db.models import Document, DocumentStatus, DocumentStatu
 from app.infrastructure.db.models import DocumentEntity, DocumentTag, Entity, EntityType, Tag
 from app.infrastructure.db.session import AsyncSessionLocal, get_db
 from app.schemas.documents import (
+    DocumentCategorizeResponse,
     DocumentEntityAssignRequest,
     DocumentEntityItem,
     DocumentStatusCatalogItem,
@@ -773,7 +774,7 @@ async def document_entities(
     )
 
 
-@router.post("/{document_id}/categorize")
+@router.post("/{document_id}/categorize", response_model=DocumentCategorizeResponse)
 async def document_categorize(
     document_id: UUID,
     db: AsyncSession = Depends(get_db),
@@ -783,14 +784,14 @@ async def document_categorize(
     try:
         await _prepare_write_session(db)
         async with db.begin():
-            await run_categorize_document(
+            _, categories = await run_categorize_document(
                 db,
                 document_id=document_id,
                 started_by_id=started_by_id,
             )
     except AppError as exc:
         _handle(exc)
-    return {"ok": True, "document_id": str(document_id)}
+    return DocumentCategorizeResponse(document_id=document_id, categories=categories)
 
 
 @router.post("/{document_id}/summary/refine", response_model=DocumentRefineSummaryResponse)
