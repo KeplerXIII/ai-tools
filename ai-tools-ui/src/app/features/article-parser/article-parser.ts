@@ -10,6 +10,8 @@ import { SkeletonModule } from 'primeng/skeleton';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { ChipModule } from 'primeng/chip';
 import { ImageModule } from 'primeng/image';
+import { MenuItem } from 'primeng/api';
+import { SpeedDialModule } from 'primeng/speeddial';
 import { TextareaModule } from 'primeng/textarea';
 import {
   ArticleParserApi,
@@ -54,6 +56,7 @@ export type TagScope = 'original' | 'translated';
     ArticleParserUrlFormComponent,
     ChipModule,
     ImageModule,
+    SpeedDialModule,
     SkeletonModule,
     TextareaModule,
   ],
@@ -87,7 +90,6 @@ export class ArticleParser {
   documentStatusTags: { code: string; label: string }[] = [];
   loadingDocumentStatuses = false;
   documentStatusError = '';
-  isStatusPickerOpen = false;
 
   entityPickerOpen: EntitySection | null = null;
   entityPickerSearch = '';
@@ -163,7 +165,11 @@ export class ArticleParser {
         this.syncDocumentStatusTagsFromArticle();
         this.loadAvailableDocumentStatuses();
         this.state.translatedText = response.translated_content?.trim() || '';
-        this.state.annotation = (response.translated_summary || response.original_summary || '').trim();
+        this.state.annotation = (
+          response.translated_summary ||
+          response.original_summary ||
+          ''
+        ).trim();
         this.state.originalTags = response.original_tags || [];
         this.state.translatedTags = response.translated_tags || [];
         this.state.entities = {
@@ -283,7 +289,6 @@ export class ArticleParser {
     this.documentStatusTags = [];
     this.loadingDocumentStatuses = false;
     this.documentStatusError = '';
-    this.isStatusPickerOpen = false;
     this.entitiesError = '';
     this.categoriesError = '';
     this.articleError = '';
@@ -348,9 +353,6 @@ export class ArticleParser {
     switch (block) {
       case 'status':
         this.isEditingStatusBlock = !this.isEditingStatusBlock;
-        if (!this.isEditingStatusBlock) {
-          this.isStatusPickerOpen = false;
-        }
         break;
       case 'meta':
         if (!this.isEditingMetaBlock) {
@@ -417,8 +419,7 @@ export class ArticleParser {
           }
         }
         if (!this.isEditingOriginalBlock) {
-          this.originalTextViewportScroll =
-            this.originalTextPreview?.nativeElement?.scrollTop ?? 0;
+          this.originalTextViewportScroll = this.originalTextPreview?.nativeElement?.scrollTop ?? 0;
         } else {
           const ta = this.getOriginalTextTextarea();
           this.originalTextViewportScroll = ta?.scrollTop ?? 0;
@@ -493,7 +494,12 @@ export class ArticleParser {
             const hasTranslation = !!this.state.translatedText?.trim();
             this.state.error = '';
             this.api
-              .saveDocument(docId, hasTranslation ? { translated_summary: this.state.annotation ?? '' } : { original_summary: this.state.annotation ?? '' })
+              .saveDocument(
+                docId,
+                hasTranslation
+                  ? { translated_summary: this.state.annotation ?? '' }
+                  : { original_summary: this.state.annotation ?? '' },
+              )
               .subscribe({
                 error: () => {
                   this.state.error = 'Не удалось сохранить аннотацию';
@@ -514,7 +520,6 @@ export class ArticleParser {
     this.isEditingOriginalBlock = false;
     this.isEditingTranslationBlock = false;
     this.isEditingAnnotationBlock = false;
-    this.isStatusPickerOpen = false;
     this.closeEntityPicker();
     this.closeTagPicker();
     this.closeCategoryPicker();
@@ -927,7 +932,6 @@ export class ArticleParser {
     this.api.assignDocumentStatus(documentId, code).subscribe({
       next: () => {
         this.pendingStatusCode = '';
-        this.isStatusPickerOpen = false;
         this.refreshDocumentStatuses(documentId);
       },
       error: () => {
@@ -1034,21 +1038,20 @@ export class ArticleParser {
 
   pendingStatusCode = '';
 
-  toggleStatusPicker(): void {
-    if (
-      !this.isEditingStatusBlock ||
-      this.loadingDocumentStatuses ||
-      !this.unassignedDocumentStatuses.length
-    ) {
-      return;
-    }
-
-    this.isStatusPickerOpen = !this.isStatusPickerOpen;
-  }
-
-  get unassignedDocumentStatuses(): { code: string; name_ru: string; description: string | null }[] {
+  get unassignedDocumentStatuses(): {
+    code: string;
+    name_ru: string;
+    description: string | null;
+  }[] {
     const assigned = new Set(this.documentStatusTags.map((status) => status.code));
     return this.availableDocumentStatuses.filter((status) => !assigned.has(status.code));
+  }
+
+  get statusSpeedDialItems(): MenuItem[] {
+    return this.unassignedDocumentStatuses.map((status) => ({
+      label: status.name_ru,
+      command: () => this.onDocumentStatusSelected(status.code),
+    }));
   }
 
   onImageLoad(): void {
@@ -1124,11 +1127,7 @@ export class ArticleParser {
     return result.replace(/\n/g, '<br>');
   }
 
-  private applyEntityHighlights(
-    html: string,
-    entities: string[],
-    className: string,
-  ): string {
+  private applyEntityHighlights(html: string, entities: string[], className: string): string {
     let result = html;
 
     for (const entity of entities) {

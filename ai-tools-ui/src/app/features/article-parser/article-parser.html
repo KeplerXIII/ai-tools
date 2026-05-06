@@ -73,42 +73,42 @@
 
           <div class="status-title-trailing">
             <div class="tags status-tags">
-            @if (isEditingStatusBlock) {
-              <div class="status-add-wrapper">
-                <button
-                  type="button"
-                  class="status-add-chip"
-                  [disabled]="loadingDocumentStatuses || !unassignedDocumentStatuses.length"
-                  (click)="toggleStatusPicker()"
-                >
-                  +
-                </button>
+              @if (isEditingStatusBlock) {
+                <div class="status-add-wrapper">
+                  @if (unassignedDocumentStatuses.length) {
+                    <p-speeddial
+                      [model]="statusSpeedDialItems"
+                      direction="left"
+                      [style]="{
+                        position: 'absolute',
+                        top: '50%',
+                        right: 0,
+                        transform: 'translateY(-35%)',
+                      }"
+                      [disabled]="loadingDocumentStatuses"
+                    >
+                      <ng-template #item let-item let-toggleCallback="toggleCallback">
+                        <button
+                          type="button"
+                          class="status-speed-dial-item"
+                          (click)="toggleCallback($event, item)"
+                        >
+                          {{ item.label }}
+                        </button>
+                      </ng-template>
+                    </p-speeddial>
+                  }
+                </div>
+              }
 
-                @if (isStatusPickerOpen) {
-                  <div class="status-picker-popover">
-                    @for (status of unassignedDocumentStatuses; track status.code) {
-                      <button
-                        type="button"
-                        class="status-picker-item"
-                        [disabled]="loadingDocumentStatuses"
-                        (click)="onDocumentStatusSelected(status.code)"
-                      >
-                        {{ status.name_ru }}
-                      </button>
-                    }
-                  </div>
-                }
-              </div>
-            }
-
-            @for (status of documentStatusTags; track status.code) {
-              <p-chip
-                [label]="status.label"
-                class="chip-item status-chip"
-                [removable]="isEditingStatusBlock && !loadingDocumentStatuses"
-                (onRemove)="removeDocumentStatusTag(status.code)"
-              />
-            }
+              @for (status of documentStatusTags; track status.code) {
+                <p-chip
+                  [label]="status.label"
+                  class="chip-item status-chip"
+                  [removable]="isEditingStatusBlock && !loadingDocumentStatuses"
+                  (onRemove)="removeDocumentStatusTag(status.code)"
+                />
+              }
             </div>
 
             <button
@@ -116,10 +116,16 @@
               class="block-edit-toggle no-print-field"
               [class.block-edit-toggle--active]="isEditingStatusBlock"
               [attr.aria-pressed]="isEditingStatusBlock"
-              [attr.aria-label]="isEditingStatusBlock ? 'Завершить редактирование блока' : 'Редактировать блок'"
+              [attr.aria-label]="
+                isEditingStatusBlock ? 'Завершить редактирование блока' : 'Редактировать блок'
+              "
               (click)="toggleBlockEdit('status')"
             >
-              <i class="pi" [class.pi-pencil]="!isEditingStatusBlock" [class.pi-check]="isEditingStatusBlock"></i>
+              <i
+                class="pi"
+                [class.pi-pen-to-square]="!isEditingStatusBlock"
+                [class.pi-check-square]="isEditingStatusBlock"
+              ></i>
             </button>
           </div>
         </div>
@@ -138,11 +144,11 @@
               <div class="meta-chips-with-edit">
                 <div class="chips-wrapper">
                   @if (state.article.length) {
-                    <p-chip label="Длина: {{ state.article.length }}" class="chip-item" />
+                    <p-chip label="Длина: {{ state.article.length }}" class="chip-item length-chip" />
                   }
 
                   @if (state.article.quality) {
-                    <p-chip label="Качество: {{ state.article.quality }}" class="chip-item" />
+                    <p-chip label="Качество: {{ state.article.quality }}" class="chip-item length-chip" />
                   }
 
                   @if (
@@ -150,7 +156,7 @@
                   ) {
                     <p-chip
                       [label]="'Проверка: ' + (state.article.needs_review ? 'да' : 'нет')"
-                      class="chip-item"
+                      class="chip-item length-chip"
                     />
                   }
                 </div>
@@ -160,10 +166,16 @@
                   class="block-edit-toggle no-print-field"
                   [class.block-edit-toggle--active]="isEditingMetaBlock"
                   [attr.aria-pressed]="isEditingMetaBlock"
-                  [attr.aria-label]="isEditingMetaBlock ? 'Завершить редактирование блока' : 'Редактировать блок'"
+                  [attr.aria-label]="
+                    isEditingMetaBlock ? 'Завершить редактирование блока' : 'Редактировать блок'
+                  "
                   (click)="toggleBlockEdit('meta')"
                 >
-                  <i class="pi" [class.pi-pencil]="!isEditingMetaBlock" [class.pi-check]="isEditingMetaBlock"></i>
+                  <i
+                    class="pi"
+                    [class.pi-pencil]="!isEditingMetaBlock"
+                    [class.pi-check]="isEditingMetaBlock"
+                  ></i>
                 </button>
               </div>
             </div>
@@ -177,7 +189,9 @@
                   id="article_title"
                   name="article_title"
                   [ngModel]="
-                    isEditingMetaBlock ? state.article.title : state.article.title || 'Нет информации'
+                    isEditingMetaBlock
+                      ? state.article.title
+                      : state.article.title || 'Нет информации'
                   "
                   (ngModelChange)="
                     isEditingMetaBlock && state.article && (state.article.title = $event)
@@ -193,7 +207,9 @@
                   id="article_author"
                   name="article_author"
                   [ngModel]="
-                    isEditingMetaBlock ? state.article.author : state.article.author || 'Нет информации'
+                    isEditingMetaBlock
+                      ? state.article.author
+                      : state.article.author || 'Нет информации'
                   "
                   (ngModelChange)="
                     isEditingMetaBlock && state.article && (state.article.author = $event)
@@ -298,7 +314,11 @@
               "
               (click)="toggleBlockEdit('categories')"
             >
-              <i class="pi" [class.pi-pencil]="!isEditingCategoriesBlock" [class.pi-check]="isEditingCategoriesBlock"></i>
+              <i
+                class="pi"
+                [class.pi-pencil]="!isEditingCategoriesBlock"
+                [class.pi-check]="isEditingCategoriesBlock"
+              ></i>
             </button>
           </div>
         </div>
@@ -316,11 +336,14 @@
         }
 
         @if (hasEmptyCategoriesResult && !isEditingCategoriesBlock) {
-          <p class="empty-entities-message">Классифицируйте текст или добавьте категории вручную.</p>
+          <p class="empty-entities-message">
+            Классифицируйте текст или добавьте категории вручную.
+          </p>
         }
 
         @if (
-          (state.categories && state.categories.length > 0) || (isEditingCategoriesBlock && state.categories !== null)
+          (state.categories && state.categories.length > 0) ||
+          (isEditingCategoriesBlock && state.categories !== null)
         ) {
           <div class="meta-tags meta-tags--entity-row">
             <h4 class="entity-row-title">Тематика:</h4>
@@ -403,10 +426,16 @@
               class="block-edit-toggle no-print-field"
               [class.block-edit-toggle--active]="isEditingEntitiesBlock"
               [attr.aria-pressed]="isEditingEntitiesBlock"
-              [attr.aria-label]="isEditingEntitiesBlock ? 'Завершить редактирование блока' : 'Редактировать блок'"
+              [attr.aria-label]="
+                isEditingEntitiesBlock ? 'Завершить редактирование блока' : 'Редактировать блок'
+              "
               (click)="toggleBlockEdit('entities')"
             >
-              <i class="pi" [class.pi-pencil]="!isEditingEntitiesBlock" [class.pi-check]="isEditingEntitiesBlock"></i>
+              <i
+                class="pi"
+                [class.pi-pencil]="!isEditingEntitiesBlock"
+                [class.pi-check]="isEditingEntitiesBlock"
+              ></i>
             </button>
           </div>
         </div>
@@ -431,344 +460,344 @@
         }
 
         @if (state.entities?.military_equipment?.length) {
-            <div class="meta-tags meta-tags--entity-row">
-              <h4 class="entity-row-title">Упоминания образцов ВВТ:</h4>
+          <div class="meta-tags meta-tags--entity-row">
+            <h4 class="entity-row-title">Упоминания образцов ВВТ:</h4>
 
-              <div class="tags entity-tags-military">
-                @if (isEditingEntitiesBlock) {
-                  <div class="entity-add-wrapper">
-                    <button
-                      type="button"
-                      class="entity-add-chip"
-                      [disabled]="loadingDocumentEntitiesMutation"
-                      (click)="toggleEntityPicker('military_equipment')"
-                    >
-                      +
-                    </button>
+            <div class="tags entity-tags-military">
+              @if (isEditingEntitiesBlock) {
+                <div class="entity-add-wrapper">
+                  <button
+                    type="button"
+                    class="entity-add-chip"
+                    [disabled]="loadingDocumentEntitiesMutation"
+                    (click)="toggleEntityPicker('military_equipment')"
+                  >
+                    +
+                  </button>
 
-                    @if (entityPickerOpen === 'military_equipment') {
-                      <div class="entity-picker-popover">
-                        <input
-                          type="search"
-                          class="entity-picker-search"
-                          name="entity-picker-search-military"
-                          [(ngModel)]="entityPickerSearch"
-                          placeholder="Поиск..."
-                          autocomplete="off"
-                        />
-                        @if (loadingEntityPickerCatalog) {
-                          <div class="entity-picker-loading">Загрузка…</div>
-                        } @else {
-                          <div class="entity-picker-list">
-                            @for (item of filteredEntityPickerItems; track item.id) {
-                              <button
-                                type="button"
-                                class="entity-picker-item"
-                                [disabled]="loadingDocumentEntitiesMutation"
-                                (click)="onEntityPickerSelect(item)"
-                              >
-                                {{ item.name }}
-                              </button>
-                            }
-                          </div>
-                          @if (!filteredEntityPickerItems.length) {
-                            <div class="entity-picker-empty">Нет вариантов</div>
+                  @if (entityPickerOpen === 'military_equipment') {
+                    <div class="entity-picker-popover">
+                      <input
+                        type="search"
+                        class="entity-picker-search"
+                        name="entity-picker-search-military"
+                        [(ngModel)]="entityPickerSearch"
+                        placeholder="Поиск..."
+                        autocomplete="off"
+                      />
+                      @if (loadingEntityPickerCatalog) {
+                        <div class="entity-picker-loading">Загрузка…</div>
+                      } @else {
+                        <div class="entity-picker-list">
+                          @for (item of filteredEntityPickerItems; track item.id) {
+                            <button
+                              type="button"
+                              class="entity-picker-item"
+                              [disabled]="loadingDocumentEntitiesMutation"
+                              (click)="onEntityPickerSelect(item)"
+                            >
+                              {{ item.name }}
+                            </button>
                           }
+                        </div>
+                        @if (!filteredEntityPickerItems.length) {
+                          <div class="entity-picker-empty">Нет вариантов</div>
                         }
-                      </div>
-                    }
-                  </div>
-                }
+                      }
+                    </div>
+                  }
+                </div>
+              }
 
-                @for (item of state.entities!.military_equipment; track item.id) {
-                  <p-chip
-                    [label]="item.name"
-                    class="entity-chip-military chip-compact"
-                    [removable]="isEditingEntitiesBlock && !loadingDocumentEntitiesMutation"
-                    (onRemove)="removeEntityItem(item)"
-                  />
-                }
-              </div>
+              @for (item of state.entities!.military_equipment; track item.id) {
+                <p-chip
+                  [label]="item.name"
+                  class="entity-chip-military chip-compact"
+                  [removable]="isEditingEntitiesBlock && !loadingDocumentEntitiesMutation"
+                  (onRemove)="removeEntityItem(item)"
+                />
+              }
             </div>
-          }
+          </div>
+        }
 
-          @if (state.entities?.manufacturers?.length) {
-            <div class="meta-tags meta-tags--entity-row">
-              <h4 class="entity-row-title">Производители:</h4>
+        @if (state.entities?.manufacturers?.length) {
+          <div class="meta-tags meta-tags--entity-row">
+            <h4 class="entity-row-title">Производители:</h4>
 
-              <div class="tags entity-tags-manufacturer">
-                @if (isEditingEntitiesBlock) {
-                  <div class="entity-add-wrapper">
-                    <button
-                      type="button"
-                      class="entity-add-chip"
-                      [disabled]="loadingDocumentEntitiesMutation"
-                      (click)="toggleEntityPicker('manufacturers')"
-                    >
-                      +
-                    </button>
+            <div class="tags entity-tags-manufacturer">
+              @if (isEditingEntitiesBlock) {
+                <div class="entity-add-wrapper">
+                  <button
+                    type="button"
+                    class="entity-add-chip"
+                    [disabled]="loadingDocumentEntitiesMutation"
+                    (click)="toggleEntityPicker('manufacturers')"
+                  >
+                    +
+                  </button>
 
-                    @if (entityPickerOpen === 'manufacturers') {
-                      <div class="entity-picker-popover">
-                        <input
-                          type="search"
-                          class="entity-picker-search"
-                          name="entity-picker-search-manufacturers"
-                          [(ngModel)]="entityPickerSearch"
-                          placeholder="Поиск..."
-                          autocomplete="off"
-                        />
-                        @if (loadingEntityPickerCatalog) {
-                          <div class="entity-picker-loading">Загрузка…</div>
-                        } @else {
-                          <div class="entity-picker-list">
-                            @for (item of filteredEntityPickerItems; track item.id) {
-                              <button
-                                type="button"
-                                class="entity-picker-item"
-                                [disabled]="loadingDocumentEntitiesMutation"
-                                (click)="onEntityPickerSelect(item)"
-                              >
-                                {{ item.name }}
-                              </button>
-                            }
-                          </div>
-                          @if (!filteredEntityPickerItems.length) {
-                            <div class="entity-picker-empty">Нет вариантов</div>
+                  @if (entityPickerOpen === 'manufacturers') {
+                    <div class="entity-picker-popover">
+                      <input
+                        type="search"
+                        class="entity-picker-search"
+                        name="entity-picker-search-manufacturers"
+                        [(ngModel)]="entityPickerSearch"
+                        placeholder="Поиск..."
+                        autocomplete="off"
+                      />
+                      @if (loadingEntityPickerCatalog) {
+                        <div class="entity-picker-loading">Загрузка…</div>
+                      } @else {
+                        <div class="entity-picker-list">
+                          @for (item of filteredEntityPickerItems; track item.id) {
+                            <button
+                              type="button"
+                              class="entity-picker-item"
+                              [disabled]="loadingDocumentEntitiesMutation"
+                              (click)="onEntityPickerSelect(item)"
+                            >
+                              {{ item.name }}
+                            </button>
                           }
+                        </div>
+                        @if (!filteredEntityPickerItems.length) {
+                          <div class="entity-picker-empty">Нет вариантов</div>
                         }
-                      </div>
-                    }
-                  </div>
-                }
+                      }
+                    </div>
+                  }
+                </div>
+              }
 
-                @for (item of state.entities!.manufacturers; track item.id) {
-                  <p-chip
-                    [label]="item.name"
-                    class="entity-chip-manufacturer chip-compact"
-                    [removable]="isEditingEntitiesBlock && !loadingDocumentEntitiesMutation"
-                    (onRemove)="removeEntityItem(item)"
-                  />
-                }
-              </div>
+              @for (item of state.entities!.manufacturers; track item.id) {
+                <p-chip
+                  [label]="item.name"
+                  class="entity-chip-manufacturer chip-compact"
+                  [removable]="isEditingEntitiesBlock && !loadingDocumentEntitiesMutation"
+                  (onRemove)="removeEntityItem(item)"
+                />
+              }
             </div>
-          }
+          </div>
+        }
 
-          @if (state.entities?.contracts?.length) {
-            <div class="meta-tags meta-tags--entity-row">
-              <h4 class="entity-row-title">Контракты:</h4>
+        @if (state.entities?.contracts?.length) {
+          <div class="meta-tags meta-tags--entity-row">
+            <h4 class="entity-row-title">Контракты:</h4>
 
-              <div class="tags entity-tags-contract">
-                @if (isEditingEntitiesBlock) {
-                  <div class="entity-add-wrapper">
-                    <button
-                      type="button"
-                      class="entity-add-chip"
-                      [disabled]="loadingDocumentEntitiesMutation"
-                      (click)="toggleEntityPicker('contracts')"
-                    >
-                      +
-                    </button>
+            <div class="tags entity-tags-contract">
+              @if (isEditingEntitiesBlock) {
+                <div class="entity-add-wrapper">
+                  <button
+                    type="button"
+                    class="entity-add-chip"
+                    [disabled]="loadingDocumentEntitiesMutation"
+                    (click)="toggleEntityPicker('contracts')"
+                  >
+                    +
+                  </button>
 
-                    @if (entityPickerOpen === 'contracts') {
-                      <div class="entity-picker-popover">
-                        <input
-                          type="search"
-                          class="entity-picker-search"
-                          name="entity-picker-search-contracts"
-                          [(ngModel)]="entityPickerSearch"
-                          placeholder="Поиск..."
-                          autocomplete="off"
-                        />
-                        @if (loadingEntityPickerCatalog) {
-                          <div class="entity-picker-loading">Загрузка…</div>
-                        } @else {
-                          <div class="entity-picker-list">
-                            @for (item of filteredEntityPickerItems; track item.id) {
-                              <button
-                                type="button"
-                                class="entity-picker-item"
-                                [disabled]="loadingDocumentEntitiesMutation"
-                                (click)="onEntityPickerSelect(item)"
-                              >
-                                {{ item.name }}
-                              </button>
-                            }
-                          </div>
-                          @if (!filteredEntityPickerItems.length) {
-                            <div class="entity-picker-empty">Нет вариантов</div>
+                  @if (entityPickerOpen === 'contracts') {
+                    <div class="entity-picker-popover">
+                      <input
+                        type="search"
+                        class="entity-picker-search"
+                        name="entity-picker-search-contracts"
+                        [(ngModel)]="entityPickerSearch"
+                        placeholder="Поиск..."
+                        autocomplete="off"
+                      />
+                      @if (loadingEntityPickerCatalog) {
+                        <div class="entity-picker-loading">Загрузка…</div>
+                      } @else {
+                        <div class="entity-picker-list">
+                          @for (item of filteredEntityPickerItems; track item.id) {
+                            <button
+                              type="button"
+                              class="entity-picker-item"
+                              [disabled]="loadingDocumentEntitiesMutation"
+                              (click)="onEntityPickerSelect(item)"
+                            >
+                              {{ item.name }}
+                            </button>
                           }
+                        </div>
+                        @if (!filteredEntityPickerItems.length) {
+                          <div class="entity-picker-empty">Нет вариантов</div>
                         }
-                      </div>
-                    }
-                  </div>
-                }
+                      }
+                    </div>
+                  }
+                </div>
+              }
 
-                @for (item of state.entities!.contracts; track item.id) {
-                  <p-chip
-                    [label]="item.name"
-                    class="entity-chip-contract chip-compact"
-                    [removable]="isEditingEntitiesBlock && !loadingDocumentEntitiesMutation"
-                    (onRemove)="removeEntityItem(item)"
-                  />
-                }
-              </div>
+              @for (item of state.entities!.contracts; track item.id) {
+                <p-chip
+                  [label]="item.name"
+                  class="entity-chip-contract chip-compact"
+                  [removable]="isEditingEntitiesBlock && !loadingDocumentEntitiesMutation"
+                  (onRemove)="removeEntityItem(item)"
+                />
+              }
             </div>
-          }
+          </div>
+        }
 
-          @if (loadingOriginalTags) {
-            <p-skeleton width="8rem" height="1rem" borderRadius="12px" />
+        @if (loadingOriginalTags) {
+          <p-skeleton width="8rem" height="1rem" borderRadius="12px" />
 
-            <div class="loading-original-tag-wrapper-btn">
-              <p-skeleton height="2rem" width="7rem" borderRadius="20px" />
-              <p-skeleton height="2rem" width="7rem" borderRadius="20px" />
-              <p-skeleton height="2rem" width="7rem" borderRadius="20px" />
-              <p-skeleton height="2rem" width="7rem" borderRadius="20px" />
-              <p-skeleton height="2rem" width="7rem" borderRadius="20px" />
-              <p-skeleton height="2rem" width="7rem" borderRadius="20px" />
-              <p-skeleton height="2rem" width="7rem" borderRadius="20px" />
-              <p-skeleton height="2rem" width="7rem" borderRadius="20px" />
-            </div>
-          }
+          <div class="loading-original-tag-wrapper-btn">
+            <p-skeleton height="2rem" width="7rem" borderRadius="20px" />
+            <p-skeleton height="2rem" width="7rem" borderRadius="20px" />
+            <p-skeleton height="2rem" width="7rem" borderRadius="20px" />
+            <p-skeleton height="2rem" width="7rem" borderRadius="20px" />
+            <p-skeleton height="2rem" width="7rem" borderRadius="20px" />
+            <p-skeleton height="2rem" width="7rem" borderRadius="20px" />
+            <p-skeleton height="2rem" width="7rem" borderRadius="20px" />
+            <p-skeleton height="2rem" width="7rem" borderRadius="20px" />
+          </div>
+        }
 
-          @if (state.originalTags.length) {
-            <div class="meta-tags meta-tags--entity-row">
-              <h4 class="entity-row-title">Теги (оригинал):</h4>
+        @if (state.originalTags.length) {
+          <div class="meta-tags meta-tags--entity-row">
+            <h4 class="entity-row-title">Теги (оригинал):</h4>
 
-              <div class="tags original">
-                @if (isEditingEntitiesBlock) {
-                  <div class="entity-add-wrapper">
-                    <button
-                      type="button"
-                      class="entity-add-chip"
-                      [disabled]="loadingDocumentTagsMutation"
-                      (click)="toggleTagPicker('original')"
-                    >
-                      +
-                    </button>
+            <div class="tags original">
+              @if (isEditingEntitiesBlock) {
+                <div class="entity-add-wrapper">
+                  <button
+                    type="button"
+                    class="entity-add-chip"
+                    [disabled]="loadingDocumentTagsMutation"
+                    (click)="toggleTagPicker('original')"
+                  >
+                    +
+                  </button>
 
-                    @if (tagPickerOpen === 'original') {
-                      <div class="entity-picker-popover">
-                        <input
-                          type="search"
-                          class="entity-picker-search"
-                          name="tag-picker-search-original"
-                          [(ngModel)]="tagPickerSearch"
-                          placeholder="Поиск..."
-                          autocomplete="off"
-                        />
-                        @if (loadingTagPickerCatalog) {
-                          <div class="entity-picker-loading">Загрузка…</div>
-                        } @else {
-                          <div class="entity-picker-list">
-                            @for (item of filteredTagPickerItems; track item.id) {
-                              <button
-                                type="button"
-                                class="entity-picker-item"
-                                [disabled]="loadingDocumentTagsMutation"
-                                (click)="onTagPickerSelect(item)"
-                              >
-                                {{ item.name }}
-                              </button>
-                            }
-                          </div>
-                          @if (!filteredTagPickerItems.length) {
-                            <div class="entity-picker-empty">Нет вариантов</div>
+                  @if (tagPickerOpen === 'original') {
+                    <div class="entity-picker-popover">
+                      <input
+                        type="search"
+                        class="entity-picker-search"
+                        name="tag-picker-search-original"
+                        [(ngModel)]="tagPickerSearch"
+                        placeholder="Поиск..."
+                        autocomplete="off"
+                      />
+                      @if (loadingTagPickerCatalog) {
+                        <div class="entity-picker-loading">Загрузка…</div>
+                      } @else {
+                        <div class="entity-picker-list">
+                          @for (item of filteredTagPickerItems; track item.id) {
+                            <button
+                              type="button"
+                              class="entity-picker-item"
+                              [disabled]="loadingDocumentTagsMutation"
+                              (click)="onTagPickerSelect(item)"
+                            >
+                              {{ item.name }}
+                            </button>
                           }
+                        </div>
+                        @if (!filteredTagPickerItems.length) {
+                          <div class="entity-picker-empty">Нет вариантов</div>
                         }
-                      </div>
-                    }
-                  </div>
-                }
+                      }
+                    </div>
+                  }
+                </div>
+              }
 
-                @for (tag of state.originalTags; track tag.id) {
-                  <p-chip
-                    [label]="tag.name"
-                    class="original-chip chip-compact"
-                    [removable]="isEditingEntitiesBlock && !loadingDocumentTagsMutation"
-                    (onRemove)="removeOriginalTag(tag)"
-                  />
-                }
-              </div>
+              @for (tag of state.originalTags; track tag.id) {
+                <p-chip
+                  [label]="tag.name"
+                  class="original-chip chip-compact"
+                  [removable]="isEditingEntitiesBlock && !loadingDocumentTagsMutation"
+                  (onRemove)="removeOriginalTag(tag)"
+                />
+              }
             </div>
-          }
+          </div>
+        }
 
-          @if (loadingTranslatedTags) {
-            <p-skeleton width="8rem" height="1rem" borderRadius="12px" style="margin-top: 10px" />
+        @if (loadingTranslatedTags) {
+          <p-skeleton width="8rem" height="1rem" borderRadius="12px" style="margin-top: 10px" />
 
-            <div class="loading-original-tag-wrapper-btn">
-              <p-skeleton height="2rem" width="7rem" borderRadius="20px" />
-              <p-skeleton height="2rem" width="7rem" borderRadius="20px" />
-              <p-skeleton height="2rem" width="7rem" borderRadius="20px" />
-              <p-skeleton height="2rem" width="7rem" borderRadius="20px" />
-              <p-skeleton height="2rem" width="7rem" borderRadius="20px" />
-              <p-skeleton height="2rem" width="7rem" borderRadius="20px" />
-              <p-skeleton height="2rem" width="7rem" borderRadius="20px" />
-              <p-skeleton height="2rem" width="7rem" borderRadius="20px" />
-            </div>
-          }
+          <div class="loading-original-tag-wrapper-btn">
+            <p-skeleton height="2rem" width="7rem" borderRadius="20px" />
+            <p-skeleton height="2rem" width="7rem" borderRadius="20px" />
+            <p-skeleton height="2rem" width="7rem" borderRadius="20px" />
+            <p-skeleton height="2rem" width="7rem" borderRadius="20px" />
+            <p-skeleton height="2rem" width="7rem" borderRadius="20px" />
+            <p-skeleton height="2rem" width="7rem" borderRadius="20px" />
+            <p-skeleton height="2rem" width="7rem" borderRadius="20px" />
+            <p-skeleton height="2rem" width="7rem" borderRadius="20px" />
+          </div>
+        }
 
-          @if (state.translatedTags.length) {
-            <div class="meta-tags meta-tags--entity-row">
-              <h4 class="entity-row-title">Теги (русский):</h4>
+        @if (state.translatedTags.length) {
+          <div class="meta-tags meta-tags--entity-row">
+            <h4 class="entity-row-title">Теги (русский):</h4>
 
-              <div class="tags translated">
-                @if (isEditingEntitiesBlock) {
-                  <div class="entity-add-wrapper">
-                    <button
-                      type="button"
-                      class="entity-add-chip"
-                      [disabled]="loadingDocumentTagsMutation"
-                      (click)="toggleTagPicker('translated')"
-                    >
-                      +
-                    </button>
+            <div class="tags translated">
+              @if (isEditingEntitiesBlock) {
+                <div class="entity-add-wrapper">
+                  <button
+                    type="button"
+                    class="entity-add-chip"
+                    [disabled]="loadingDocumentTagsMutation"
+                    (click)="toggleTagPicker('translated')"
+                  >
+                    +
+                  </button>
 
-                    @if (tagPickerOpen === 'translated') {
-                      <div class="entity-picker-popover">
-                        <input
-                          type="search"
-                          class="entity-picker-search"
-                          name="tag-picker-search-translated"
-                          [(ngModel)]="tagPickerSearch"
-                          placeholder="Поиск..."
-                          autocomplete="off"
-                        />
-                        @if (loadingTagPickerCatalog) {
-                          <div class="entity-picker-loading">Загрузка…</div>
-                        } @else {
-                          <div class="entity-picker-list">
-                            @for (item of filteredTagPickerItems; track item.id) {
-                              <button
-                                type="button"
-                                class="entity-picker-item"
-                                [disabled]="loadingDocumentTagsMutation"
-                                (click)="onTagPickerSelect(item)"
-                              >
-                                {{ item.name }}
-                              </button>
-                            }
-                          </div>
-                          @if (!filteredTagPickerItems.length) {
-                            <div class="entity-picker-empty">Нет вариантов</div>
+                  @if (tagPickerOpen === 'translated') {
+                    <div class="entity-picker-popover">
+                      <input
+                        type="search"
+                        class="entity-picker-search"
+                        name="tag-picker-search-translated"
+                        [(ngModel)]="tagPickerSearch"
+                        placeholder="Поиск..."
+                        autocomplete="off"
+                      />
+                      @if (loadingTagPickerCatalog) {
+                        <div class="entity-picker-loading">Загрузка…</div>
+                      } @else {
+                        <div class="entity-picker-list">
+                          @for (item of filteredTagPickerItems; track item.id) {
+                            <button
+                              type="button"
+                              class="entity-picker-item"
+                              [disabled]="loadingDocumentTagsMutation"
+                              (click)="onTagPickerSelect(item)"
+                            >
+                              {{ item.name }}
+                            </button>
                           }
+                        </div>
+                        @if (!filteredTagPickerItems.length) {
+                          <div class="entity-picker-empty">Нет вариантов</div>
                         }
-                      </div>
-                    }
-                  </div>
-                }
+                      }
+                    </div>
+                  }
+                </div>
+              }
 
-                @for (tag of state.translatedTags; track tag.id) {
-                  <p-chip
-                    [label]="tag.name"
-                    class="translated-chip chip-compact"
-                    [removable]="isEditingEntitiesBlock && !loadingDocumentTagsMutation"
-                    (onRemove)="removeTranslatedTag(tag)"
-                  />
-                }
-              </div>
+              @for (tag of state.translatedTags; track tag.id) {
+                <p-chip
+                  [label]="tag.name"
+                  class="translated-chip chip-compact"
+                  [removable]="isEditingEntitiesBlock && !loadingDocumentTagsMutation"
+                  (onRemove)="removeTranslatedTag(tag)"
+                />
+              }
             </div>
-          }
+          </div>
+        }
       </section>
     </div>
 
@@ -812,10 +841,16 @@
             class="block-edit-toggle no-print-field"
             [class.block-edit-toggle--active]="isEditingOriginalBlock"
             [attr.aria-pressed]="isEditingOriginalBlock"
-            [attr.aria-label]="isEditingOriginalBlock ? 'Завершить редактирование блока' : 'Редактировать блок'"
+            [attr.aria-label]="
+              isEditingOriginalBlock ? 'Завершить редактирование блока' : 'Редактировать блок'
+            "
             (click)="toggleBlockEdit('original')"
           >
-            <i class="pi" [class.pi-pencil]="!isEditingOriginalBlock" [class.pi-check]="isEditingOriginalBlock"></i>
+            <i
+              class="pi"
+              [class.pi-pencil]="!isEditingOriginalBlock"
+              [class.pi-check]="isEditingOriginalBlock"
+            ></i>
           </button>
         </div>
       </div>
@@ -883,10 +918,16 @@
               class="block-edit-toggle no-print-field"
               [class.block-edit-toggle--active]="isEditingTranslationBlock"
               [attr.aria-pressed]="isEditingTranslationBlock"
-              [attr.aria-label]="isEditingTranslationBlock ? 'Завершить редактирование блока' : 'Редактировать блок'"
+              [attr.aria-label]="
+                isEditingTranslationBlock ? 'Завершить редактирование блока' : 'Редактировать блок'
+              "
               (click)="toggleBlockEdit('translation')"
             >
-              <i class="pi" [class.pi-pencil]="!isEditingTranslationBlock" [class.pi-check]="isEditingTranslationBlock"></i>
+              <i
+                class="pi"
+                [class.pi-pencil]="!isEditingTranslationBlock"
+                [class.pi-check]="isEditingTranslationBlock"
+              ></i>
             </button>
           </div>
         </div>
@@ -931,10 +972,16 @@
             class="block-edit-toggle no-print-field"
             [class.block-edit-toggle--active]="isEditingAnnotationBlock"
             [attr.aria-pressed]="isEditingAnnotationBlock"
-            [attr.aria-label]="isEditingAnnotationBlock ? 'Завершить редактирование блока' : 'Редактировать блок'"
+            [attr.aria-label]="
+              isEditingAnnotationBlock ? 'Завершить редактирование блока' : 'Редактировать блок'
+            "
             (click)="toggleBlockEdit('annotation')"
           >
-            <i class="pi" [class.pi-pencil]="!isEditingAnnotationBlock" [class.pi-check]="isEditingAnnotationBlock"></i>
+            <i
+              class="pi"
+              [class.pi-pencil]="!isEditingAnnotationBlock"
+              [class.pi-check]="isEditingAnnotationBlock"
+            ></i>
           </button>
         </div>
 
