@@ -820,7 +820,7 @@
         </div>
       </div>
 
-      <div class="print-text-block">{{ state.article.text }}</div>
+      <div class="print-text-block" [innerHTML]="highlightedArticleText"></div>
       @if (isEditingOriginalBlock) {
         <div #originalTextEditor class="article-original-editor no-print-field">
           <textarea
