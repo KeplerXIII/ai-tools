@@ -173,6 +173,11 @@
 .prime-field {
   display: block;
   width: 100%;
+  --p-floatlabel-focus-color: var(--primary-text-color-light);
+}
+
+.prime-field input {
+  width: 100%;
 }
 
 :host ::ng-deep .prime-field textarea.p-inputtextarea {
@@ -557,104 +562,6 @@
   }
 }
 
-:host ::ng-deep .main-image-preview {
-  display: inline-block;
-}
-
-:host ::ng-deep .main-image-preview .p-image {
-  display: inline-block;
-}
-
-:host ::ng-deep .p-image-preview-indicator {
-  inset: 0;
-}
-
-:host ::ng-deep .main-image-preview img {
-  max-height: 260px;
-  border-radius: 12px;
-}
-
-:host ::ng-deep .p-image {
-  position: relative;
-  overflow: hidden;
-  border-radius: 12px;
-}
-
-:host ::ng-deep .p-image-preview-indicator {
-  background: rgba(0, 0, 0, 0);
-  opacity: 0;
-  transition: all 0.25s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-:host ::ng-deep .p-image:hover .p-image-preview-indicator {
-  background: rgba(0, 0, 0, 0.4);
-  opacity: 1;
-}
-
-:host ::ng-deep .p-image-preview-indicator i {
-  transform: scale(0.8);
-  opacity: 0;
-  transition: all 0.25s ease;
-}
-
-:host ::ng-deep .p-image:hover .p-image-preview-indicator i {
-  transform: scale(1);
-  opacity: 1;
-}
-
-.main-image {
-  display: block;
-  max-height: 280px;
-  width: auto;
-  max-width: 100%;
-  object-fit: cover;
-  border-radius: 12px;
-  margin-top: 8px;
-}
-
-.main-image.clickable {
-  cursor: zoom-in;
-  transition: transform 0.2s ease;
-}
-
-.main-image.clickable:hover {
-  transform: scale(1.02);
-}
-
-/* overlay */
-
-.image-overlay {
-  position: fixed;
-  top: 0;
-  left: 72px; /* отступ под сайдбар */
-  width: calc(100vw - 72px);
-  height: 100vh;
-
-  background: rgba(0, 0, 0, 0.88);
-
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  z-index: 9999;
-  padding: 24px;
-  box-sizing: border-box;
-}
-
-.image-full {
-  max-width: calc(100vw - 640px);
-  max-height: 90vh;
-  object-fit: contain;
-  border-radius: 12px;
-}
-
-.main-image.clickable {
-  cursor: zoom-in;
-}
-
 .meta-block-one {
   display: flex;
   flex-direction: column;
@@ -674,13 +581,6 @@
 
 .meta-block-one-text {
   color: var(--light-grey-text-color);
-}
-
-.chips-wrapper {
-  display: flex;
-  gap: 10px;
-  border-right: 1px solid var(--light-grey-text-color);
-  padding-right: 10px;
 }
 
 .status-tags {
@@ -710,21 +610,6 @@
   border: 1px solid var(--light-grey-text-color);
   padding: 7px;
   border-radius: 20px;
-}
-
-.prew-image-title {
-  font-size: var(--font-size-prewiew);
-  font-weight: var(--font-weight-medium);
-}
-
-.prime-field {
-  display: block;
-  width: 100%;
-  --p-floatlabel-focus-color: var(--primary-text-color-light);
-}
-
-.prime-field input {
-  width: 100%;
 }
 
 .title-wrapper {
@@ -774,7 +659,6 @@
 }
 
 .status-title-trailing,
-.meta-title-trailing,
 .entities-title-trailing,
 .original-title-trailing,
 .translation-title-trailing {
@@ -792,83 +676,8 @@
   justify-content: flex-end;
 }
 
-.meta-title-row {
-  gap: 8px;
-  min-width: 0;
-  margin-bottom: 20px;
-}
-
-.meta-title-row .panel-title,
 .annotation-title-row .panel-title {
   margin-bottom: 0;
-}
-
-.meta-title-row .panel-title {
-  flex-shrink: 0;
-  font-size: var(--font-size-medium);
-  line-height: 1.25;
-}
-
-.meta-title-trailing {
-  flex-wrap: nowrap;
-  flex: 1;
-  min-width: 0;
-}
-
-.meta-chips-with-edit {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: nowrap;
-  min-width: 0;
-  max-width: 100%;
-}
-
-.meta-chips-with-edit .chips-wrapper {
-  flex: 1 1 auto;
-  min-width: 0;
-  gap: 6px;
-  flex-wrap: nowrap;
-}
-
-:host ::ng-deep .meta-chips-with-edit .chips-wrapper > p-chip.chip-item {
-  min-width: 0;
-  flex: 0 1 auto;
-}
-
-.meta-chips-with-edit .block-edit-toggle {
-  width: 2.125rem;
-  height: 2.125rem;
-  flex-shrink: 0;
-
-  .pi {
-    font-size: 1.4rem;
-    line-height: 1;
-  }
-}
-
-:host ::ng-deep .meta-chips-with-edit .p-chip {
-  font-size: 14px;
-  line-height: 1.2;
-  padding-block: 0.2rem;
-  padding-inline: 0.45rem;
-  gap: 0.25rem;
-  border-radius: 999px;
-  min-height: 1.65rem;
-}
-
-:host ::ng-deep .meta-chips-with-edit .p-chip-label {
-  padding: 0;
-  line-height: 1.2;
-  max-width: 9.5rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-:host ::ng-deep .meta-chips-with-edit .length-chip .p-chip-label {
-  padding: 4px;
 }
 
 .translation-title-row .panel-title,
@@ -1026,9 +835,4 @@
   width: 0;
   height: 0;
   background: transparent;
-}
-
-.image-preview-icon {
-  font-size: 2rem;
-  color: var(---light-grey-text-color);
 }

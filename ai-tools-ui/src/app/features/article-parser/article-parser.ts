@@ -9,10 +9,10 @@ import { MatInputModule } from '@angular/material/input';
 import { SkeletonModule } from 'primeng/skeleton';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { ChipModule } from 'primeng/chip';
-import { ImageModule } from 'primeng/image';
 import { TextareaModule } from 'primeng/textarea';
 import { ArticleParserUrlFormComponent } from './ui/article-parser-url-form/article-parser-url-form';
 import { ArticleParserStatusComponent } from './ui/article-parser-status/article-parser-status';
+import { ArticleParserMetaComponent } from './ui/article-parser-meta/article-parser-meta';
 import {
   ArticleParserApi,
   DocumentCategoryRef,
@@ -27,9 +27,9 @@ import {
   OutlineButtonComponent,
 } from '../../shared/ui/outline-button/outline-button.component';
 import { buildHighlightedArticleTextByGroups } from './lib/article-highlighter';
+import { scrollToElement } from './lib/scroll-to-element';
 
 export type ArticleParserBlock =
-  | 'meta'
   | 'categories'
   | 'entities'
   | 'original'
@@ -54,8 +54,8 @@ export type TagScope = 'original' | 'translated';
     OutlineButtonComponent,
     ArticleParserUrlFormComponent,
     ArticleParserStatusComponent,
+    ArticleParserMetaComponent,
     ChipModule,
-    ImageModule,
     SkeletonModule,
     TextareaModule,
   ],
@@ -84,7 +84,6 @@ export class ArticleParser {
   translationError = '';
   translatedTagsError = '';
   summaryError = '';
-  imagePreview: string | null = null;
 
   entityPickerOpen: EntitySection | null = null;
   entityPickerSearch = '';
@@ -104,7 +103,6 @@ export class ArticleParser {
   categoryPickerCatalogItems: DocumentEntityRef[] = [];
   loadingCategoryPickerCatalog = false;
 
-  isEditingMetaBlock = false;
   isEditingCategoriesBlock = false;
   isEditingEntitiesBlock = false;
   isEditingOriginalBlock = false;
@@ -119,14 +117,6 @@ export class ArticleParser {
     public state: ArticleParserState,
     private cdr: ChangeDetectorRef,
   ) {}
-
-  openImage(url: string): void {
-    this.imagePreview = url;
-  }
-
-  closeImage(): void {
-    this.imagePreview = null;
-  }
 
   // =========================
   // ОСНОВНОЕ
@@ -190,7 +180,7 @@ export class ArticleParser {
       next: (response) => {
         this.state.categories = response.categories || [];
         this.loadingCategories = false;
-        this.scrollToElement(() => this.categoriesBlock);
+        scrollToElement(() => this.categoriesBlock, this.cdr);
       },
       error: () => {
         this.categoriesError = 'Ошибка при классификации категорий';
@@ -232,7 +222,7 @@ export class ArticleParser {
     this.state.annotation = '';
     this.state.translatedTags = [];
 
-    this.scrollToElement(() => this.translationSkeleton);
+    scrollToElement(() => this.translationSkeleton, this.cdr);
 
     this.api.translateToRussianStream(this.state.article.document_id).subscribe({
       next: (chunk) => {
@@ -257,7 +247,7 @@ export class ArticleParser {
     this.state.annotation = '';
     this.buffer = '';
 
-    this.scrollToElement(() => this.annotationSkeleton);
+    scrollToElement(() => this.annotationSkeleton, this.cdr);
 
     this.api.summarizeStream(this.state.article.document_id, 'translated').subscribe({
       next: (chunk) => {
@@ -336,44 +326,6 @@ export class ArticleParser {
 
   toggleBlockEdit(block: ArticleParserBlock): void {
     switch (block) {
-      case 'meta':
-        if (!this.isEditingMetaBlock) {
-          const docId = this.state.article?.document_id;
-          if (docId) {
-            this.state.error = '';
-            this.api.lockDocument(docId).subscribe({
-              error: () => {
-                this.state.error = 'Не удалось заблокировать документ для редактирования';
-                this.cdr.detectChanges();
-              },
-            });
-          }
-        }
-        this.isEditingMetaBlock = !this.isEditingMetaBlock;
-        if (!this.isEditingMetaBlock) {
-          const doc = this.state.article;
-          const docId = doc?.document_id;
-          if (docId && doc) {
-            const sourceUrl = (doc.url || '').trim();
-            this.state.error = '';
-            this.api
-              .updateDocumentMetadata(docId, {
-                title: doc.title ?? '',
-                author: doc.author ?? '',
-                date: doc.date ?? '',
-                main_image: doc.main_image ?? '',
-                images: doc.images ?? [],
-                ...(sourceUrl ? { source_url: sourceUrl } : {}),
-              })
-              .subscribe({
-                error: () => {
-                  this.state.error = 'Не удалось сохранить метаданные';
-                  this.cdr.detectChanges();
-                },
-              });
-          }
-        }
-        break;
       case 'categories':
         this.isEditingCategoriesBlock = !this.isEditingCategoriesBlock;
         if (!this.isEditingCategoriesBlock) {
@@ -495,7 +447,6 @@ export class ArticleParser {
   }
 
   private resetBlockEditors(): void {
-    this.isEditingMetaBlock = false;
     this.isEditingCategoriesBlock = false;
     this.isEditingEntitiesBlock = false;
     this.isEditingOriginalBlock = false;
@@ -824,7 +775,7 @@ export class ArticleParser {
         this.loadingOriginalTags = false;
         this.loadingTranslatedTags = false;
         this.cdr.detectChanges();
-        this.scrollToElement(() => this.entitiesBlock);
+        scrollToElement(() => this.entitiesBlock, this.cdr);
       },
       error: () => {
         if (kind === 'original') {
@@ -909,18 +860,6 @@ export class ArticleParser {
     textarea.style.height = `${textarea.scrollHeight}px`;
   }
 
-  get mainImageUrl(): string {
-    return this.state.article?.main_image?.trim() || '';
-  }
-
-  onImageLoad(): void {
-    console.log('Картинка загрузилась:', this.mainImageUrl);
-  }
-
-  onImageError(event: Event): void {
-    console.log('Ошибка загрузки картинки:', this.mainImageUrl, event);
-  }
-
   get hasEmptyEntitiesResult(): boolean {
     return (
       !!this.state.entities &&
@@ -979,17 +918,6 @@ export class ArticleParser {
       { className: 'highlighted-entity-manufacturer', entities: manufacturers },
       { className: 'highlighted-entity-contract', entities: contracts },
     ]);
-  }
-
-  private scrollToElement(getElement: () => ElementRef | undefined): void {
-    setTimeout(() => {
-      this.cdr.detectChanges();
-
-      getElement()?.nativeElement.scrollIntoView({
-        behavior: 'smooth',
-        block: 'start',
-      });
-    }, 0);
   }
 
   private getOriginalTextTextarea(): HTMLTextAreaElement | null {
