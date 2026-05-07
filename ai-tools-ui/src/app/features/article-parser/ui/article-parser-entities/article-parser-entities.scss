@@ -31,10 +31,9 @@
 }
 
 :host ::ng-deep .chip-compact.p-chip {
-  padding: 0.125rem 0.45rem;
-  gap: 0.2rem;
+  padding: 5px 10px;
   min-height: 1.375rem;
-  font-size: 12px;
+  font-size: 15px;
 }
 
 :host ::ng-deep .chip-compact.p-chip .p-chip-label {
@@ -64,8 +63,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: var(--font-size-xxl);
-  font-weight: 600;
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
   color: var(--primary-text-color);
   margin-bottom: 10px;
 }
@@ -277,6 +276,8 @@
   column-gap: 10px;
   row-gap: 8px;
   align-items: start;
+  border-bottom: 1px solid var(--super-light-grey-text-color);
+  padding-bottom: 10px;
 }
 
 .meta-tags--entity-row .entity-row-title {
@@ -308,6 +309,11 @@
   margin-top: 10px;
   display: flex;
   gap: 10px;
+}
+
+.entities-title-trailing-buttons {
+  padding-right: 10px;
+  border-right: 1px solid var(--light-grey-text-color);
 }
 
 @media (max-width: 640px) {

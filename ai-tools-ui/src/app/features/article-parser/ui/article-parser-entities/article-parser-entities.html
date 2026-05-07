@@ -3,13 +3,15 @@
     <h3 class="panel-title">Сущности</h3>
 
     <div class="entities-title-trailing">
-      <app-outline-button
-        text="Извлечь"
-        size="large"
-        [variant]="ButtonVariant.Rounded"
-        [disabled]="buttonsDisabled"
-        (clicked)="requestEntities()"
-      />
+      <div class="entities-title-trailing-buttons">
+        <app-outline-button
+          text="Извлечь"
+          size="large"
+          [variant]="ButtonVariant.Rounded"
+          [disabled]="buttonsDisabled"
+          (clicked)="requestEntities()"
+        />
+      </div>
 
       <button
         type="button"
@@ -21,7 +23,11 @@
         "
         (click)="toggleBlockEdit()"
       >
-        <i class="pi" [class.pi-pencil]="!isEditingEntitiesBlock" [class.pi-check]="isEditingEntitiesBlock"></i>
+        <i
+          class="pi"
+          [class.pi-pen-to-square]="!isEditingEntitiesBlock"
+          [class.pi-check-square]="isEditingEntitiesBlock"
+        ></i>
       </button>
     </div>
   </div>

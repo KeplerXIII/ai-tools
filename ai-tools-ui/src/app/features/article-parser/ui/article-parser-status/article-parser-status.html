@@ -19,7 +19,11 @@
                 [disabled]="loadingDocumentStatuses"
               >
                 <ng-template #item let-item let-toggleCallback="toggleCallback">
-                  <button type="button" class="status-speed-dial-item" (click)="toggleCallback($event, item)">
+                  <button
+                    type="button"
+                    class="status-speed-dial-item"
+                    (click)="toggleCallback($event, item)"
+                  >
                     {{ item.label }}
                   </button>
                 </ng-template>
@@ -43,10 +47,16 @@
         class="block-edit-toggle no-print-field"
         [class.block-edit-toggle--active]="isEditingStatusBlock"
         [attr.aria-pressed]="isEditingStatusBlock"
-        [attr.aria-label]="isEditingStatusBlock ? 'Завершить редактирование блока' : 'Редактировать блок'"
+        [attr.aria-label]="
+          isEditingStatusBlock ? 'Завершить редактирование блока' : 'Редактировать блок'
+        "
         (click)="toggleEdit()"
       >
-        <i class="pi" [class.pi-pen-to-square]="!isEditingStatusBlock" [class.pi-check-square]="isEditingStatusBlock"></i>
+        <i
+          class="pi"
+          [class.pi-pen-to-square]="!isEditingStatusBlock"
+          [class.pi-check-square]="isEditingStatusBlock"
+        ></i>
       </button>
     </div>
   </div>
