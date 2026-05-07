@@ -259,12 +259,6 @@
   gap: 20px;
 }
 
-.status-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
 .status-add-chip,
 .entity-add-chip {
   border: 1px dashed #93c5fd;
@@ -685,6 +679,8 @@
 .chips-wrapper {
   display: flex;
   gap: 10px;
+  border-right: 1px solid var(--light-grey-text-color);
+  padding-right: 10px;
 }
 
 .status-tags {
@@ -694,11 +690,6 @@
   align-items: center;
   border-right: 1px solid var(--light-grey-text-color);
   padding-right: 10px;
-}
-
-.status-title-row {
-  align-items: flex-start;
-  gap: 8px;
 }
 
 .status-title-row .panel-title {
@@ -852,7 +843,8 @@
   flex-shrink: 0;
 
   .pi {
-    font-size: 0.875rem;
+    font-size: 1.4rem;
+    line-height: 1;
   }
 }
 

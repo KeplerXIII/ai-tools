@@ -10,9 +10,9 @@ import { SkeletonModule } from 'primeng/skeleton';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { ChipModule } from 'primeng/chip';
 import { ImageModule } from 'primeng/image';
-import { MenuItem } from 'primeng/api';
-import { SpeedDialModule } from 'primeng/speeddial';
 import { TextareaModule } from 'primeng/textarea';
+import { ArticleParserUrlFormComponent } from './ui/article-parser-url-form/article-parser-url-form';
+import { ArticleParserStatusComponent } from './ui/article-parser-status/article-parser-status';
 import {
   ArticleParserApi,
   DocumentCategoryRef,
@@ -26,10 +26,9 @@ import {
   ButtonVariant,
   OutlineButtonComponent,
 } from '../../shared/ui/outline-button/outline-button.component';
-import { ArticleParserUrlFormComponent } from './article-parser-url-form/article-parser-url-form';
+import { buildHighlightedArticleTextByGroups } from './lib/article-highlighter';
 
 export type ArticleParserBlock =
-  | 'status'
   | 'meta'
   | 'categories'
   | 'entities'
@@ -54,9 +53,9 @@ export type TagScope = 'original' | 'translated';
     InputTextModule,
     OutlineButtonComponent,
     ArticleParserUrlFormComponent,
+    ArticleParserStatusComponent,
     ChipModule,
     ImageModule,
-    SpeedDialModule,
     SkeletonModule,
     TextareaModule,
   ],
@@ -86,10 +85,6 @@ export class ArticleParser {
   translatedTagsError = '';
   summaryError = '';
   imagePreview: string | null = null;
-  availableDocumentStatuses: { code: string; name_ru: string; description: string | null }[] = [];
-  documentStatusTags: { code: string; label: string }[] = [];
-  loadingDocumentStatuses = false;
-  documentStatusError = '';
 
   entityPickerOpen: EntitySection | null = null;
   entityPickerSearch = '';
@@ -109,7 +104,6 @@ export class ArticleParser {
   categoryPickerCatalogItems: DocumentEntityRef[] = [];
   loadingCategoryPickerCatalog = false;
 
-  isEditingStatusBlock = false;
   isEditingMetaBlock = false;
   isEditingCategoriesBlock = false;
   isEditingEntitiesBlock = false;
@@ -162,8 +156,6 @@ export class ArticleParser {
     this.api.extractByUrl(value).subscribe({
       next: (response) => {
         this.state.article = response;
-        this.syncDocumentStatusTagsFromArticle();
-        this.loadAvailableDocumentStatuses();
         this.state.translatedText = response.translated_content?.trim() || '';
         this.state.annotation = (
           response.translated_summary ||
@@ -286,9 +278,6 @@ export class ArticleParser {
   clear(): void {
     this.resetBlockEditors();
     this.state.clear();
-    this.documentStatusTags = [];
-    this.loadingDocumentStatuses = false;
-    this.documentStatusError = '';
     this.entitiesError = '';
     this.categoriesError = '';
     this.articleError = '';
@@ -341,19 +330,12 @@ export class ArticleParser {
   // ПОДСВЕТКА СУЩНОСТЕЙ
   // =========================
 
-  private escapeRegExp(value: string): string {
-    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  }
-
   // =========================
   // РЕДАКТИРОВАНИЕ
   // =========================
 
   toggleBlockEdit(block: ArticleParserBlock): void {
     switch (block) {
-      case 'status':
-        this.isEditingStatusBlock = !this.isEditingStatusBlock;
-        break;
       case 'meta':
         if (!this.isEditingMetaBlock) {
           const docId = this.state.article?.document_id;
@@ -513,7 +495,6 @@ export class ArticleParser {
   }
 
   private resetBlockEditors(): void {
-    this.isEditingStatusBlock = false;
     this.isEditingMetaBlock = false;
     this.isEditingCategoriesBlock = false;
     this.isEditingEntitiesBlock = false;
@@ -921,59 +902,6 @@ export class ArticleParser {
     });
   }
 
-  addDocumentStatus(): void {
-    const documentId = this.state.article?.document_id;
-    const code = this.pendingStatusCode.trim();
-    if (!documentId || !code) return;
-
-    this.loadingDocumentStatuses = true;
-    this.documentStatusError = '';
-
-    this.api.assignDocumentStatus(documentId, code).subscribe({
-      next: () => {
-        this.pendingStatusCode = '';
-        this.refreshDocumentStatuses(documentId);
-      },
-      error: () => {
-        this.documentStatusError = 'Не удалось добавить статус';
-        this.loadingDocumentStatuses = false;
-      },
-    });
-  }
-
-  onDocumentStatusSelected(code: string | null | undefined): void {
-    if (!code || this.loadingDocumentStatuses) {
-      return;
-    }
-
-    const alreadyAssigned = this.documentStatusTags.some((status) => status.code === code);
-    if (alreadyAssigned) {
-      this.pendingStatusCode = '';
-      return;
-    }
-
-    this.pendingStatusCode = code;
-    this.addDocumentStatus();
-  }
-
-  removeDocumentStatusTag(code: string): void {
-    const documentId = this.state.article?.document_id;
-    if (!documentId) return;
-
-    this.loadingDocumentStatuses = true;
-    this.documentStatusError = '';
-
-    this.api.removeDocumentStatus(documentId, code).subscribe({
-      next: () => {
-        this.refreshDocumentStatuses(documentId);
-      },
-      error: () => {
-        this.documentStatusError = 'Не удалось удалить статус';
-        this.loadingDocumentStatuses = false;
-      },
-    });
-  }
-
   autoResize(event: Event): void {
     const textarea = event.target as HTMLTextAreaElement;
 
@@ -981,77 +909,8 @@ export class ArticleParser {
     textarea.style.height = `${textarea.scrollHeight}px`;
   }
 
-  private escapeHtml(value: string): string {
-    return value
-      .replaceAll('&', '&amp;')
-      .replaceAll('<', '&lt;')
-      .replaceAll('>', '&gt;')
-      .replaceAll('"', '&quot;')
-      .replaceAll("'", '&#039;');
-  }
-
   get mainImageUrl(): string {
     return this.state.article?.main_image?.trim() || '';
-  }
-
-  private syncDocumentStatusTagsFromArticle(): void {
-    if (!this.state.article) {
-      this.documentStatusTags = [];
-      return;
-    }
-
-    const statusItems = this.state.article.statuses || [];
-    this.documentStatusTags = statusItems
-      .map((status) => ({
-        code: status.code,
-        label: status.name_ru || status.code,
-      }))
-      .filter((status) => !!status.code);
-  }
-
-  private loadAvailableDocumentStatuses(): void {
-    this.api.getAvailableDocumentStatuses().subscribe({
-      next: (statuses) => {
-        this.availableDocumentStatuses = statuses;
-      },
-      error: () => {
-        this.documentStatusError = 'Не удалось загрузить справочник статусов';
-      },
-    });
-  }
-
-  private refreshDocumentStatuses(documentId: string): void {
-    this.api.getDocumentStatuses(documentId).subscribe({
-      next: (response) => {
-        if (this.state.article) {
-          this.state.article.statuses = response.statuses;
-        }
-        this.syncDocumentStatusTagsFromArticle();
-        this.loadingDocumentStatuses = false;
-      },
-      error: () => {
-        this.documentStatusError = 'Статусы обновлены, но не удалось получить актуальный список';
-        this.loadingDocumentStatuses = false;
-      },
-    });
-  }
-
-  pendingStatusCode = '';
-
-  get unassignedDocumentStatuses(): {
-    code: string;
-    name_ru: string;
-    description: string | null;
-  }[] {
-    const assigned = new Set(this.documentStatusTags.map((status) => status.code));
-    return this.availableDocumentStatuses.filter((status) => !assigned.has(status.code));
-  }
-
-  get statusSpeedDialItems(): MenuItem[] {
-    return this.unassignedDocumentStatuses.map((status) => ({
-      label: status.name_ru,
-      command: () => this.onDocumentStatusSelected(status.code),
-    }));
   }
 
   onImageLoad(): void {
@@ -1115,43 +974,11 @@ export class ArticleParser {
       .filter(Boolean)
       .sort(sortDesc);
 
-    if (!military.length && !manufacturers.length && !contracts.length) {
-      return this.escapeHtml(text).replace(/\n/g, '<br>');
-    }
-
-    let result = this.escapeHtml(text);
-    result = this.applyEntityHighlights(result, military, 'highlighted-entity-military');
-    result = this.applyEntityHighlights(result, manufacturers, 'highlighted-entity-manufacturer');
-    result = this.applyEntityHighlights(result, contracts, 'highlighted-entity-contract');
-
-    return result.replace(/\n/g, '<br>');
-  }
-
-  private applyEntityHighlights(html: string, entities: string[], className: string): string {
-    let result = html;
-
-    for (const entity of entities) {
-      const escapedEntity = this.escapeHtml(entity.trim());
-      const pattern = this.createFlexibleEntityPattern(escapedEntity);
-
-      result = result.replace(pattern, (match) => {
-        if (match.includes('highlighted-entity')) {
-          return match;
-        }
-
-        return `<span class="${className}">${match}</span>`;
-      });
-    }
-
-    return result;
-  }
-
-  private createFlexibleEntityPattern(value: string): RegExp {
-    const escaped = value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
-    const flexible = escaped.replace(/\\ /g, '\\s+').replace(/-/g, '[-–—-]?');
-
-    return new RegExp(flexible, 'gi');
+    return buildHighlightedArticleTextByGroups(text, [
+      { className: 'highlighted-entity-military', entities: military },
+      { className: 'highlighted-entity-manufacturer', entities: manufacturers },
+      { className: 'highlighted-entity-contract', entities: contracts },
+    ]);
   }
 
   private scrollToElement(getElement: () => ElementRef | undefined): void {
