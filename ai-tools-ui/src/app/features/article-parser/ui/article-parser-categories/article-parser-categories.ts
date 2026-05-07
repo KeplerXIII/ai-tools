@@ -11,6 +11,7 @@ import {
   ViewChild,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { forkJoin } from 'rxjs';
 import { ChipModule } from 'primeng/chip';
 import { SkeletonModule } from 'primeng/skeleton';
 import {
@@ -64,7 +65,7 @@ export class ArticleParserCategoriesComponent implements OnChanges, OnDestroy {
   isEditingCategoriesBlock = false;
 
   categoryTreeNodes: TreeNode<DocumentEntityRef>[] = [];
-  selectedCategoryNodes: Record<string, boolean> = {};
+  selectedCategoryNodes: TreeNode<DocumentEntityRef>[] = [];
 
   constructor(
     private api: ArticleParserApi,
@@ -78,6 +79,7 @@ export class ArticleParserCategoriesComponent implements OnChanges, OnDestroy {
       this.categoriesError = '';
       this.closeCategoryPicker();
       this.categorizationLoadingChange.emit(false);
+      this.syncSelectedNodesFromAssignedCategories();
     }
   }
 
@@ -110,9 +112,13 @@ export class ArticleParserCategoriesComponent implements OnChanges, OnDestroy {
 
   toggleBlockEdit(): void {
     this.isEditingCategoriesBlock = !this.isEditingCategoriesBlock;
-    if (!this.isEditingCategoriesBlock) {
-      this.closeCategoryPicker();
+
+    if (this.isEditingCategoriesBlock) {
+      this.loadCategoryCatalog();
+      return;
     }
+
+    this.closeCategoryPicker();
   }
 
   get hasEmptyCategoriesResult(): boolean {
@@ -159,6 +165,7 @@ export class ArticleParserCategoriesComponent implements OnChanges, OnDestroy {
       next: (items: DocumentEntityRef[]) => {
         this.categoryPickerCatalogItems = items;
         this.categoryTreeNodes = [...this.mapCategoriesToTreeNodes(items)];
+        this.syncSelectedNodesFromAssignedCategories();
         this.loadingCategoryPickerCatalog = false;
 
         this.cdr.detectChanges();
@@ -181,23 +188,42 @@ export class ArticleParserCategoriesComponent implements OnChanges, OnDestroy {
     }));
   }
 
-  onCategoryTreeSelectChange(value: Record<string, boolean>): void {
-    const selectedId = Object.keys(value || {}).find((key) => value[key]);
+  onCategoryTreeSelectChange(
+    value: TreeNode<DocumentEntityRef>[] | null,
+  ): void {
+    this.selectedCategoryNodes = value ?? [];
+  }
 
-    if (!selectedId) {
+  onCategoryTreeHide(): void {
+    const docId = this.article?.document_id;
+    if (!docId || this.loadingDocumentCategoriesMutation) {
       return;
     }
 
-    const selectedItem = this.categoryPickerCatalogItems.find(
-      (item) => String(item.id) === selectedId,
+    const selectedIds = new Set(
+      (this.selectedCategoryNodes || [])
+        .map((node) => String(node?.key || node?.data?.id || ''))
+        .filter(Boolean),
     );
+    const existingIds = new Set((this.state.categories || []).map((cat) => String(cat.category_id)));
 
-    if (!selectedItem) {
+    const idsToAdd = [...selectedIds].filter((id) => !existingIds.has(id));
+    if (!idsToAdd.length) {
       return;
     }
 
-    this.onCategoryPickerSelect(selectedItem);
-    this.selectedCategoryNodes = {};
+    this.loadingDocumentCategoriesMutation = true;
+    this.categoriesError = '';
+
+    forkJoin(idsToAdd.map((id) => this.api.assignDocumentCategory(docId, id))).subscribe({
+      next: () => {
+        this.refreshDocumentCategoriesFromServer(docId, true);
+      },
+      error: () => {
+        this.categoriesError = 'Не удалось добавить категории';
+        this.loadingDocumentCategoriesMutation = false;
+      },
+    });
   }
 
   get filteredCategoryPickerItems(): DocumentEntityRef[] {
@@ -219,7 +245,7 @@ export class ArticleParserCategoriesComponent implements OnChanges, OnDestroy {
 
     this.api.assignDocumentCategory(docId, item.id).subscribe({
       next: () => {
-        this.selectedCategoryNodes = {};
+        this.selectedCategoryNodes = [];
         this.refreshDocumentCategoriesFromServer(docId);
       },
       error: () => {
@@ -229,10 +255,15 @@ export class ArticleParserCategoriesComponent implements OnChanges, OnDestroy {
     });
   }
 
-  private refreshDocumentCategoriesFromServer(documentId: string): void {
+  private refreshDocumentCategoriesFromServer(documentId: string, resetTreeSelect = false): void {
     this.api.getDocumentCategories(documentId).subscribe({
       next: (res) => {
         this.state.categories = res.categories || [];
+        if (resetTreeSelect) {
+          this.selectedCategoryNodes = [];
+        } else {
+          this.syncSelectedNodesFromAssignedCategories();
+        }
         this.loadingDocumentCategoriesMutation = false;
       },
       error: () => {
@@ -267,8 +298,15 @@ export class ArticleParserCategoriesComponent implements OnChanges, OnDestroy {
     this.categoryPickerSearch = '';
     this.categoryPickerCatalogItems = [];
     this.categoryTreeNodes = [];
-    this.selectedCategoryNodes = {};
+    this.selectedCategoryNodes = [];
     this.loadingCategoryPickerCatalog = false;
+  }
+
+  private syncSelectedNodesFromAssignedCategories(): void {
+    const selectedIds = new Set((this.state.categories || []).map((cat) => String(cat.category_id)));
+    this.selectedCategoryNodes = this.categoryTreeNodes.filter((node) =>
+      selectedIds.has(String(node.key || node.data?.id)),
+    );
   }
 
   categoryKnobValue(cat: DocumentCategoryRef): number {

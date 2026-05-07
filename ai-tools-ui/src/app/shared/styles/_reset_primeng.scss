@@ -157,6 +157,10 @@
   border-color: var(--primary-text-color-light) !important;
 }
 
+.p-treeselect:not(.p-disabled).p-focus {
+  border-color: var(--primary-text-color) !important;
+}
+
 .p-iconfield .p-inputtext:enabled:focus {
   border-color: var(--primary-text-color-light);
 }
@@ -495,4 +499,8 @@
 
 .p-tree {
   width: 440px !important;
+}
+
+.p-disabled {
+  opacity: 1 !important;
 }

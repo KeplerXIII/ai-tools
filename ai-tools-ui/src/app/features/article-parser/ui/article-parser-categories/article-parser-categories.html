@@ -3,13 +3,34 @@
     <h3 class="categories-panel-title">Категории</h3>
 
     <div class="categories-title-trailing">
-      <app-outline-button
-        text="Классифицировать"
-        size="large"
-        [variant]="ButtonVariant.Rounded"
-        [disabled]="buttonsDisabled"
-        (clicked)="requestCategorize()"
-      />
+      <div class="categories-title-trailing-buttons">
+        @if (!isEditingCategoriesBlock) {
+          <app-outline-button
+            text="Классифицировать"
+            size="large"
+            [variant]="ButtonVariant.Rounded"
+            [disabled]="buttonsDisabled"
+            (clicked)="requestCategorize()"
+          />
+        } @else {
+          <p-treeselect
+            class="categories-treeselect"
+            [(ngModel)]="selectedCategoryNodes"
+            [options]="categoryTreeNodes"
+            display="chip"
+            [metaKeySelection]="false"
+            selectionMode="checkbox"
+            placeholder="Добавить категорию"
+            [filter]="true"
+            [loading]="loadingCategoryPickerCatalog"
+            [disabled]="loadingDocumentCategoriesMutation"
+            [virtualScrollItemSize]="35"
+            [virtualScrollOptions]="{ scrollHeight: '200px' }"
+            (ngModelChange)="onCategoryTreeSelectChange($event)"
+            (onHide)="onCategoryTreeHide()"
+          />
+        }
+      </div>
 
       <button
         type="button"
@@ -54,25 +75,6 @@
       <h4 class="categories-row-title">Тематика:</h4>
 
       <div class="categories-tags">
-        @if (isEditingCategoriesBlock) {
-          <p-treeselect
-            class="categories-treeselect"
-            [(ngModel)]="selectedCategoryNodes"
-            [options]="categoryTreeNodes"
-            display="chip"
-            [metaKeySelection]="false"
-            selectionMode="checkbox"
-            placeholder="Добавить категорию"
-            [filter]="true"
-            [loading]="loadingCategoryPickerCatalog"
-            [disabled]="loadingDocumentCategoriesMutation"
-            [virtualScrollItemSize]="35"
-            [virtualScrollOptions]="{ scrollHeight: '200px' }"
-            (onShow)="loadCategoryCatalog()"
-            (ngModelChange)="onCategoryTreeSelectChange($event)"
-          />
-        }
-
         @for (cat of rankedCategories; track cat.category_id) {
           <div
             class="categories-knob-item"
@@ -81,7 +83,7 @@
             <p-knob
               [ngModel]="categoryKnobValue(cat)"
               [disabled]="true"
-              [size]="80"
+              [size]="65"
               [strokeWidth]="8"
               [showValue]="true"
               valueTemplate="{value}%"

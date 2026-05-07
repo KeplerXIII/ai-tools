@@ -3,11 +3,18 @@
 }
 
 :host ::ng-deep .p-knob {
-  --p-knob-value-background: var(--primary-text-color);
+  --p-knob-value-background: var(--accent-color-success);
 }
 
 :host ::ng-deep .categories-treeselect {
-  min-width: 240px;
+  max-width: 240px;
+}
+
+:host ::ng-deep .categories-treeselect .p-treeselect-label {
+  width: 100% !important;
+  min-height: 2.25rem;
+  display: flex;
+  align-items: center;
 }
 
 :host ::ng-deep .p-tree-node-leaf > .p-tree-node-content .p-tree-node-toggle-button {
@@ -146,7 +153,7 @@
   flex-wrap: wrap;
   margin-top: 0;
   gap: 10px;
-  align-items: center;
+  align-items: flex-start;
   align-content: start;
 }
 
@@ -293,6 +300,8 @@
   border-radius: 16px;
   color: var(--dark-text-color);
   width: 140px;
+  min-height: 153px;
+  height: fit-content;
   padding-bottom: 20px;
   box-shadow:
   0 1px 2px rgba(0, 0, 0, 0.05),
@@ -300,10 +309,9 @@
 }
 
 .categories-knob-label {
-  font-size: 12px;
-  font-weight: var(--font-weight-light);
+  font-size: 14px;
+  font-weight: var(--font-weight-medium);
   text-align: center;
-  height: 20px;
 }
 
 .categories-knob-remove {
@@ -326,3 +334,9 @@
 .categories-knob-remove:hover {
   opacity: 1;
 }
+
+.categories-title-trailing-buttons {
+  padding-right: 10px;
+  border-right: 1px solid var(--light-grey-text-color);
+}
+
