@@ -33,6 +33,18 @@ export interface DocumentCategoryRef {
   text_source?: 'original' | 'translated' | null;
 }
 
+export interface DocumentCategoryCatalogRef {
+  category_id: string;
+  code: string;
+  name: string;
+  name_ru?: string | null;
+  level: number;
+  parent_id?: string | null;
+  parent_code?: string | null;
+  parent_name?: string | null;
+  parent_name_ru?: string | null;
+}
+
 export interface DocumentCategorizeResponse {
   ok?: boolean;
   document_id: string;
@@ -508,7 +520,9 @@ export class ArticleParserApi {
   }
 
   getCategoryCatalog(documentId: string) {
-    return this.http.get<DocumentEntityRef[]>(`/api/v1/documents/${documentId}/categories/catalog`);
+    return this.http.get<DocumentCategoryCatalogRef[]>(
+      `/api/v1/documents/${documentId}/categories/catalog`,
+    );
   }
 
   assignDocumentCategory(documentId: string, categoryId: string) {

@@ -1,4 +1,5 @@
-import { ChangeDetectorRef, Component, ElementRef, ViewChild } from '@angular/core';
+import { ChangeDetectorRef, Component, DestroyRef, ElementRef, OnInit, ViewChild } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { FloatLabelModule } from 'primeng/floatlabel';
@@ -55,7 +56,7 @@ export type ArticleParserBlock =
   templateUrl: './article-parser.html',
   styleUrl: './article-parser.scss',
 })
-export class ArticleParser {
+export class ArticleParser implements OnInit {
   @ViewChild('translationSkeleton') translationSkeleton?: ElementRef;
   @ViewChild('annotationSkeleton') annotationSkeleton?: ElementRef;
   @ViewChild('originalTextPreview') originalTextPreview?: ElementRef<HTMLElement>;
@@ -87,11 +88,32 @@ export class ArticleParser {
     public state: ArticleParserState,
     private cdr: ChangeDetectorRef,
     private route: ActivatedRoute,
+    private destroyRef: DestroyRef,
   ) {}
 
   // =========================
   // ОСНОВНОЕ
   // =========================
+
+  ngOnInit(): void {
+    this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
+      const url = params.get('url')?.trim() || '';
+      const autoload = params.get('autoload') === '1';
+
+      if (!url) {
+        return;
+      }
+
+      this.state.url = url;
+
+      if (!autoload || this.lastAutoloadKey === url) {
+        return;
+      }
+
+      this.lastAutoloadKey = url;
+      this.extractArticle();
+    });
+  }
 
   extractArticle(): void {
     const value = this.state.url.trim();

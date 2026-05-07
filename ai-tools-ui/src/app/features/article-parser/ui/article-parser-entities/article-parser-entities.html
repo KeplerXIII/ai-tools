@@ -68,33 +68,19 @@
 
             @if (entityPickerOpen === 'military_equipment') {
               <div class="entity-picker-popover">
-                <input
-                  type="search"
-                  class="entity-picker-search"
-                  name="entity-picker-search-military"
-                  [(ngModel)]="entityPickerSearch"
-                  placeholder="Поиск..."
-                  autocomplete="off"
+                <p-select
+                  #entityPickerSelect
+                  class="entity-picker-select"
+                  [options]="entityPickerCatalogItems"
+                  [(ngModel)]="selectedEntityPickerItem"
+                  optionLabel="name"
+                  placeholder="Выберите сущность"
+                  [filter]="true"
+                  [loading]="loadingEntityPickerCatalog"
+                  [disabled]="loadingDocumentEntitiesMutation"
+                  appendTo="body"
+                  (ngModelChange)="onEntityPickerSelect($event)"
                 />
-                @if (loadingEntityPickerCatalog) {
-                  <div class="entity-picker-loading">Загрузка…</div>
-                } @else {
-                  <div class="entity-picker-list">
-                    @for (item of filteredEntityPickerItems; track item.id) {
-                      <button
-                        type="button"
-                        class="entity-picker-item"
-                        [disabled]="loadingDocumentEntitiesMutation"
-                        (click)="onEntityPickerSelect(item)"
-                      >
-                        {{ item.name }}
-                      </button>
-                    }
-                  </div>
-                  @if (!filteredEntityPickerItems.length) {
-                    <div class="entity-picker-empty">Нет вариантов</div>
-                  }
-                }
               </div>
             }
           </div>
@@ -128,33 +114,19 @@
             </button>
             @if (entityPickerOpen === 'manufacturers') {
               <div class="entity-picker-popover">
-                <input
-                  type="search"
-                  class="entity-picker-search"
-                  name="entity-picker-search-manufacturers"
-                  [(ngModel)]="entityPickerSearch"
-                  placeholder="Поиск..."
-                  autocomplete="off"
+                <p-select
+                  #entityPickerSelect
+                  class="entity-picker-select"
+                  [options]="entityPickerCatalogItems"
+                  [(ngModel)]="selectedEntityPickerItem"
+                  optionLabel="name"
+                  placeholder="Выберите сущность"
+                  [filter]="true"
+                  [loading]="loadingEntityPickerCatalog"
+                  [disabled]="loadingDocumentEntitiesMutation"
+                  appendTo="body"
+                  (ngModelChange)="onEntityPickerSelect($event)"
                 />
-                @if (loadingEntityPickerCatalog) {
-                  <div class="entity-picker-loading">Загрузка…</div>
-                } @else {
-                  <div class="entity-picker-list">
-                    @for (item of filteredEntityPickerItems; track item.id) {
-                      <button
-                        type="button"
-                        class="entity-picker-item"
-                        [disabled]="loadingDocumentEntitiesMutation"
-                        (click)="onEntityPickerSelect(item)"
-                      >
-                        {{ item.name }}
-                      </button>
-                    }
-                  </div>
-                  @if (!filteredEntityPickerItems.length) {
-                    <div class="entity-picker-empty">Нет вариантов</div>
-                  }
-                }
               </div>
             }
           </div>
@@ -187,33 +159,19 @@
             </button>
             @if (entityPickerOpen === 'contracts') {
               <div class="entity-picker-popover">
-                <input
-                  type="search"
-                  class="entity-picker-search"
-                  name="entity-picker-search-contracts"
-                  [(ngModel)]="entityPickerSearch"
-                  placeholder="Поиск..."
-                  autocomplete="off"
+                <p-select
+                  #entityPickerSelect
+                  class="entity-picker-select"
+                  [options]="entityPickerCatalogItems"
+                  [(ngModel)]="selectedEntityPickerItem"
+                  optionLabel="name"
+                  placeholder="Выберите сущность"
+                  [filter]="true"
+                  [loading]="loadingEntityPickerCatalog"
+                  [disabled]="loadingDocumentEntitiesMutation"
+                  appendTo="body"
+                  (ngModelChange)="onEntityPickerSelect($event)"
                 />
-                @if (loadingEntityPickerCatalog) {
-                  <div class="entity-picker-loading">Загрузка…</div>
-                } @else {
-                  <div class="entity-picker-list">
-                    @for (item of filteredEntityPickerItems; track item.id) {
-                      <button
-                        type="button"
-                        class="entity-picker-item"
-                        [disabled]="loadingDocumentEntitiesMutation"
-                        (click)="onEntityPickerSelect(item)"
-                      >
-                        {{ item.name }}
-                      </button>
-                    }
-                  </div>
-                  @if (!filteredEntityPickerItems.length) {
-                    <div class="entity-picker-empty">Нет вариантов</div>
-                  }
-                }
               </div>
             }
           </div>
@@ -260,33 +218,18 @@
             </button>
             @if (tagPickerOpen === 'original') {
               <div class="entity-picker-popover">
-                <input
-                  type="search"
-                  class="entity-picker-search"
-                  name="tag-picker-search-original"
-                  [(ngModel)]="tagPickerSearch"
-                  placeholder="Поиск..."
-                  autocomplete="off"
+                <p-select
+                  class="entity-picker-select"
+                  [options]="tagPickerCatalogItems"
+                  [(ngModel)]="selectedTagPickerItem"
+                  optionLabel="name"
+                  placeholder="Выберите тег"
+                  [filter]="true"
+                  [loading]="loadingTagPickerCatalog"
+                  [disabled]="loadingDocumentTagsMutation"
+                  appendTo="body"
+                  (ngModelChange)="onTagPickerSelect($event)"
                 />
-                @if (loadingTagPickerCatalog) {
-                  <div class="entity-picker-loading">Загрузка…</div>
-                } @else {
-                  <div class="entity-picker-list">
-                    @for (item of filteredTagPickerItems; track item.id) {
-                      <button
-                        type="button"
-                        class="entity-picker-item"
-                        [disabled]="loadingDocumentTagsMutation"
-                        (click)="onTagPickerSelect(item)"
-                      >
-                        {{ item.name }}
-                      </button>
-                    }
-                  </div>
-                  @if (!filteredTagPickerItems.length) {
-                    <div class="entity-picker-empty">Нет вариантов</div>
-                  }
-                }
               </div>
             }
           </div>
@@ -334,33 +277,18 @@
             </button>
             @if (tagPickerOpen === 'translated') {
               <div class="entity-picker-popover">
-                <input
-                  type="search"
-                  class="entity-picker-search"
-                  name="tag-picker-search-translated"
-                  [(ngModel)]="tagPickerSearch"
-                  placeholder="Поиск..."
-                  autocomplete="off"
+                <p-select
+                  class="entity-picker-select"
+                  [options]="tagPickerCatalogItems"
+                  [(ngModel)]="selectedTagPickerItem"
+                  optionLabel="name"
+                  placeholder="Выберите тег"
+                  [filter]="true"
+                  [loading]="loadingTagPickerCatalog"
+                  [disabled]="loadingDocumentTagsMutation"
+                  appendTo="body"
+                  (ngModelChange)="onTagPickerSelect($event)"
                 />
-                @if (loadingTagPickerCatalog) {
-                  <div class="entity-picker-loading">Загрузка…</div>
-                } @else {
-                  <div class="entity-picker-list">
-                    @for (item of filteredTagPickerItems; track item.id) {
-                      <button
-                        type="button"
-                        class="entity-picker-item"
-                        [disabled]="loadingDocumentTagsMutation"
-                        (click)="onTagPickerSelect(item)"
-                      >
-                        {{ item.name }}
-                      </button>
-                    }
-                  </div>
-                  @if (!filteredTagPickerItems.length) {
-                    <div class="entity-picker-empty">Нет вариантов</div>
-                  }
-                }
               </div>
             }
           </div>

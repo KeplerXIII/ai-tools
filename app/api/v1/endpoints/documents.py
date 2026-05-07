@@ -27,6 +27,7 @@ from app.infrastructure.db.models import DocumentEntity, DocumentTag, Entity, En
 from app.infrastructure.db.models import DocumentType
 from app.infrastructure.db.session import AsyncSessionLocal, get_db
 from app.schemas.documents import (
+    DocumentCategoryCatalogItem,
     DocumentCategorizeItem,
     DocumentCategorizeResponse,
     DocumentCategoryAssignRequest,
@@ -1131,7 +1132,7 @@ async def get_document_categories_snapshot(
     return DocumentCategorizeResponse(document_id=document_id, categories=categories)
 
 
-@router.get("/{document_id}/categories/catalog", response_model=list[DocumentEntityItem])
+@router.get("/{document_id}/categories/catalog", response_model=list[DocumentCategoryCatalogItem])
 async def document_categories_catalog(
     document_id: UUID,
     db: AsyncSession = Depends(get_db),
@@ -1145,19 +1146,44 @@ async def document_categories_catalog(
     )
     assigned_ids = {row[0] for row in assigned_rows}
 
+    parent = aliased(Category)
     stmt = (
-        select(Category.id, Category.name, Category.name_ru)
+        select(
+            Category.id,
+            Category.code,
+            Category.name,
+            Category.name_ru,
+            Category.level,
+            parent.id.label("parent_id"),
+            parent.code.label("parent_code"),
+            parent.name.label("parent_name"),
+            parent.name_ru.label("parent_name_ru"),
+        )
         .where(
             Category.is_active.is_(True),
             Category.level.in_((1, 2, 3)),
         )
+        .outerjoin(parent, parent.id == Category.parent_id)
         .order_by(Category.sort_order.asc(), Category.code.asc())
     )
     if assigned_ids:
         stmt = stmt.where(Category.id.not_in(assigned_ids))
 
     rows = await db.execute(stmt)
-    return [DocumentEntityItem(id=row.id, name=(row.name_ru or row.name)) for row in rows]
+    return [
+        DocumentCategoryCatalogItem(
+            category_id=row.id,
+            code=row.code,
+            name=row.name,
+            name_ru=row.name_ru,
+            level=row.level,
+            parent_id=row.parent_id,
+            parent_code=row.parent_code,
+            parent_name=row.parent_name,
+            parent_name_ru=row.parent_name_ru,
+        )
+        for row in rows
+    ]
 
 
 @router.post("/{document_id}/categories/assign")

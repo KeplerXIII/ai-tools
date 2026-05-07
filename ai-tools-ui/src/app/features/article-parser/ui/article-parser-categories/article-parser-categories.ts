@@ -16,8 +16,8 @@ import { ChipModule } from 'primeng/chip';
 import { SkeletonModule } from 'primeng/skeleton';
 import {
   ArticleParserApi,
+  DocumentCategoryCatalogRef,
   DocumentCategoryRef,
-  DocumentEntityRef,
   ExtractResponse,
 } from '../../api/article-parser-api';
 import { ArticleParserState } from '../../model/article-parser-state';
@@ -59,13 +59,13 @@ export class ArticleParserCategoriesComponent implements OnChanges, OnDestroy {
 
   categoryPickerOpen = false;
   categoryPickerSearch = '';
-  categoryPickerCatalogItems: DocumentEntityRef[] = [];
+  categoryPickerCatalogItems: DocumentCategoryCatalogRef[] = [];
   loadingCategoryPickerCatalog = false;
 
   isEditingCategoriesBlock = false;
 
-  categoryTreeNodes: TreeNode<DocumentEntityRef>[] = [];
-  selectedCategoryNodes: TreeNode<DocumentEntityRef>[] = [];
+  categoryTreeNodes: TreeNode<DocumentCategoryCatalogRef>[] = [];
+  selectedCategoryNodes: TreeNode<DocumentCategoryCatalogRef>[] = [];
 
   constructor(
     private api: ArticleParserApi,
@@ -162,7 +162,7 @@ export class ArticleParserCategoriesComponent implements OnChanges, OnDestroy {
     this.categoriesError = '';
 
     this.api.getCategoryCatalog(this.article.document_id).subscribe({
-      next: (items: DocumentEntityRef[]) => {
+      next: (items: DocumentCategoryCatalogRef[]) => {
         this.categoryPickerCatalogItems = items;
         this.categoryTreeNodes = [...this.mapCategoriesToTreeNodes(items)];
         this.syncSelectedNodesFromAssignedCategories();
@@ -179,17 +179,52 @@ export class ArticleParserCategoriesComponent implements OnChanges, OnDestroy {
     });
   }
 
-  private mapCategoriesToTreeNodes(items: DocumentEntityRef[]): TreeNode<DocumentEntityRef>[] {
-    return items.map((item) => ({
-      key: String(item.id),
-      label: item.name,
-      data: item,
-      leaf: true,
-    }));
+  private mapCategoriesToTreeNodes(
+    items: DocumentCategoryCatalogRef[],
+  ): TreeNode<DocumentCategoryCatalogRef>[] {
+    const byId = new Map<string, TreeNode<DocumentCategoryCatalogRef>>();
+    const roots: TreeNode<DocumentCategoryCatalogRef>[] = [];
+
+    for (const item of items) {
+      const categoryId = String(item.category_id);
+      byId.set(categoryId, {
+        key: categoryId,
+        label: item.name_ru || item.name || item.code,
+        data: item,
+        children: [],
+      });
+    }
+
+    for (const item of items) {
+      const node = byId.get(String(item.category_id));
+      if (!node) {
+        continue;
+      }
+
+      const parentId = item.parent_id ? String(item.parent_id) : '';
+      if (parentId && byId.has(parentId)) {
+        byId.get(parentId)!.children!.push(node);
+      } else {
+        roots.push(node);
+      }
+    }
+
+    const sortTree = (nodes: TreeNode<DocumentCategoryCatalogRef>[]): void => {
+      nodes.sort((a, b) => String(a.label || '').localeCompare(String(b.label || '')));
+      for (const node of nodes) {
+        if (node.children?.length) {
+          sortTree(node.children);
+        }
+        node.leaf = !node.children?.length;
+      }
+    };
+
+    sortTree(roots);
+    return roots;
   }
 
   onCategoryTreeSelectChange(
-    value: TreeNode<DocumentEntityRef>[] | null,
+    value: TreeNode<DocumentCategoryCatalogRef>[] | null,
   ): void {
     this.selectedCategoryNodes = value ?? [];
   }
@@ -202,7 +237,7 @@ export class ArticleParserCategoriesComponent implements OnChanges, OnDestroy {
 
     const selectedIds = new Set(
       (this.selectedCategoryNodes || [])
-        .map((node) => String(node?.key || node?.data?.id || ''))
+        .map((node) => String(node?.key || node?.data?.category_id || ''))
         .filter(Boolean),
     );
     const existingIds = new Set((this.state.categories || []).map((cat) => String(cat.category_id)));
@@ -226,15 +261,17 @@ export class ArticleParserCategoriesComponent implements OnChanges, OnDestroy {
     });
   }
 
-  get filteredCategoryPickerItems(): DocumentEntityRef[] {
+  get filteredCategoryPickerItems(): DocumentCategoryCatalogRef[] {
     const q = this.categoryPickerSearch.trim().toLowerCase();
     if (!q) {
       return this.categoryPickerCatalogItems;
     }
-    return this.categoryPickerCatalogItems.filter((item) => item.name.toLowerCase().includes(q));
+    return this.categoryPickerCatalogItems.filter((item) =>
+      (item.name_ru || item.name || item.code).toLowerCase().includes(q),
+    );
   }
 
-  onCategoryPickerSelect(item: DocumentEntityRef): void {
+  onCategoryPickerSelect(item: DocumentCategoryCatalogRef): void {
     const docId = this.article?.document_id;
     if (!docId || this.loadingDocumentCategoriesMutation) {
       return;
@@ -243,7 +280,7 @@ export class ArticleParserCategoriesComponent implements OnChanges, OnDestroy {
     this.loadingDocumentCategoriesMutation = true;
     this.categoriesError = '';
 
-    this.api.assignDocumentCategory(docId, item.id).subscribe({
+    this.api.assignDocumentCategory(docId, item.category_id).subscribe({
       next: () => {
         this.selectedCategoryNodes = [];
         this.refreshDocumentCategoriesFromServer(docId);
@@ -305,7 +342,7 @@ export class ArticleParserCategoriesComponent implements OnChanges, OnDestroy {
   private syncSelectedNodesFromAssignedCategories(): void {
     const selectedIds = new Set((this.state.categories || []).map((cat) => String(cat.category_id)));
     this.selectedCategoryNodes = this.categoryTreeNodes.filter((node) =>
-      selectedIds.has(String(node.key || node.data?.id)),
+      selectedIds.has(String(node.key || node.data?.category_id)),
     );
   }
 

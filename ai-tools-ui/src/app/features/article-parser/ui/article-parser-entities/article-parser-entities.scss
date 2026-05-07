@@ -212,6 +212,10 @@
   max-width: min(320px, 90vw);
 }
 
+:host ::ng-deep .entity-picker-select {
+  width: 240px;
+}
+
 .status-picker-item,
 .entity-picker-item {
   border: 1px solid #dbeafe;

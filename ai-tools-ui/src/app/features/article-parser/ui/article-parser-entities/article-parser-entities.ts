@@ -1,7 +1,9 @@
-import { Component, EventEmitter, Input, Output } from '@angular/core';
+import { Component, EventEmitter, Input, Output, ViewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ChipModule } from 'primeng/chip';
 import { SkeletonModule } from 'primeng/skeleton';
+import { SelectModule } from 'primeng/select';
+import { Select } from 'primeng/select';
 import {
   ArticleParserApi,
   DocumentEntityRef,
@@ -22,7 +24,7 @@ type TagScope = 'original' | 'translated';
 @Component({
   selector: 'app-article-parser-entities',
   standalone: true,
-  imports: [FormsModule, ChipModule, SkeletonModule, OutlineButtonComponent],
+  imports: [FormsModule, ChipModule, SkeletonModule, OutlineButtonComponent, SelectModule],
   templateUrl: './article-parser-entities.html',
   styleUrl: './article-parser-entities.scss',
 })
@@ -32,6 +34,7 @@ export class ArticleParserEntitiesComponent {
   @Input() loadingOriginalTags = false;
   @Input() loadingTranslatedTags = false;
   @Output() entitiesLoadingChange = new EventEmitter<boolean>();
+  @ViewChild('entityPickerSelect') entityPickerSelect?: Select;
 
   readonly ButtonVariant = ButtonVariant;
 
@@ -41,12 +44,14 @@ export class ArticleParserEntitiesComponent {
   entityPickerOpen: EntitySection | null = null;
   entityPickerSearch = '';
   entityPickerCatalogItems: DocumentEntityRef[] = [];
+  selectedEntityPickerItem: DocumentEntityRef | null = null;
   loadingEntityPickerCatalog = false;
   loadingDocumentEntitiesMutation = false;
 
   tagPickerOpen: TagScope | null = null;
   tagPickerSearch = '';
   tagPickerCatalogItems: DocumentTagRef[] = [];
+  selectedTagPickerItem: DocumentTagRef | null = null;
   loadingTagPickerCatalog = false;
   loadingDocumentTagsMutation = false;
 
@@ -124,6 +129,7 @@ export class ArticleParserEntitiesComponent {
     this.entityPickerOpen = section;
     this.entityPickerSearch = '';
     this.entityPickerCatalogItems = [];
+    this.selectedEntityPickerItem = null;
     const docId = this.state.article.document_id;
     const typeCode = this.entityTypeCodeForSection(section);
     this.loadingEntityPickerCatalog = true;
@@ -132,6 +138,7 @@ export class ArticleParserEntitiesComponent {
       next: (items: DocumentEntityRef[]) => {
         this.entityPickerCatalogItems = items;
         this.loadingEntityPickerCatalog = false;
+        setTimeout(() => this.entityPickerSelect?.show(true));
       },
       error: () => {
         this.entitiesError = 'Не удалось загрузить список сущностей';
@@ -151,7 +158,7 @@ export class ArticleParserEntitiesComponent {
 
   onEntityPickerSelect(item: DocumentEntityRef): void {
     const docId = this.state.article?.document_id;
-    if (!docId || this.loadingDocumentEntitiesMutation) {
+    if (!docId || this.loadingDocumentEntitiesMutation || !item?.id) {
       return;
     }
 
@@ -203,6 +210,7 @@ export class ArticleParserEntitiesComponent {
     this.tagPickerOpen = scope;
     this.tagPickerSearch = '';
     this.tagPickerCatalogItems = [];
+    this.selectedTagPickerItem = null;
     const docId = this.state.article.document_id;
     this.loadingTagPickerCatalog = true;
 
@@ -228,7 +236,7 @@ export class ArticleParserEntitiesComponent {
 
   onTagPickerSelect(item: DocumentTagRef): void {
     const docId = this.state.article?.document_id;
-    if (!docId || this.loadingDocumentTagsMutation) {
+    if (!docId || this.loadingDocumentTagsMutation || !item?.id) {
       return;
     }
 
@@ -312,6 +320,7 @@ export class ArticleParserEntitiesComponent {
     this.tagPickerOpen = null;
     this.tagPickerSearch = '';
     this.tagPickerCatalogItems = [];
+    this.selectedTagPickerItem = null;
     this.loadingTagPickerCatalog = false;
   }
 
@@ -319,6 +328,7 @@ export class ArticleParserEntitiesComponent {
     this.entityPickerOpen = null;
     this.entityPickerSearch = '';
     this.entityPickerCatalogItems = [];
+    this.selectedEntityPickerItem = null;
     this.loadingEntityPickerCatalog = false;
   }
 }
