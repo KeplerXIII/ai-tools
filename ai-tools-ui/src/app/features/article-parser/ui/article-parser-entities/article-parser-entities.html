@@ -1,0 +1,374 @@
+<section class="panel">
+  <div class="title-wrapper entities-title-row">
+    <h3 class="panel-title">Сущности</h3>
+
+    <div class="entities-title-trailing">
+      <app-outline-button
+        text="Извлечь"
+        size="large"
+        [variant]="ButtonVariant.Rounded"
+        [disabled]="buttonsDisabled"
+        (clicked)="requestEntities()"
+      />
+
+      <button
+        type="button"
+        class="block-edit-toggle no-print-field"
+        [class.block-edit-toggle--active]="isEditingEntitiesBlock"
+        [attr.aria-pressed]="isEditingEntitiesBlock"
+        [attr.aria-label]="
+          isEditingEntitiesBlock ? 'Завершить редактирование блока' : 'Редактировать блок'
+        "
+        (click)="toggleBlockEdit()"
+      >
+        <i class="pi" [class.pi-pencil]="!isEditingEntitiesBlock" [class.pi-check]="isEditingEntitiesBlock"></i>
+      </button>
+    </div>
+  </div>
+
+  @if (entitiesError) {
+    <div class="field-error">{{ entitiesError }}</div>
+  }
+
+  @if (loadingEntities) {
+    <div class="entities-sceleton-wrapper">
+      <p-skeleton width="10rem" height="1rem" borderRadius="12px" />
+      <p-skeleton width="100%" height="1rem" borderRadius="12px" />
+      <p-skeleton width="100%" height="1rem" borderRadius="12px" />
+      <p-skeleton width="100%" height="1rem" borderRadius="12px" />
+      <p-skeleton width="100%" height="1rem" borderRadius="12px" />
+      <p-skeleton width="100%" height="1rem" borderRadius="12px" />
+    </div>
+  }
+
+  @if (hasEmptyEntitiesResult) {
+    <p class="empty-entities-message">Извлеките чтобы увидеть.</p>
+  }
+
+  @if (state.entities?.military_equipment?.length) {
+    <div class="meta-tags meta-tags--entity-row">
+      <h4 class="entity-row-title">Упоминания образцов ВВТ:</h4>
+      <div class="tags entity-tags-military">
+        @if (isEditingEntitiesBlock) {
+          <div class="entity-add-wrapper">
+            <button
+              type="button"
+              class="entity-add-chip"
+              [disabled]="loadingDocumentEntitiesMutation"
+              (click)="toggleEntityPicker('military_equipment')"
+            >
+              +
+            </button>
+
+            @if (entityPickerOpen === 'military_equipment') {
+              <div class="entity-picker-popover">
+                <input
+                  type="search"
+                  class="entity-picker-search"
+                  name="entity-picker-search-military"
+                  [(ngModel)]="entityPickerSearch"
+                  placeholder="Поиск..."
+                  autocomplete="off"
+                />
+                @if (loadingEntityPickerCatalog) {
+                  <div class="entity-picker-loading">Загрузка…</div>
+                } @else {
+                  <div class="entity-picker-list">
+                    @for (item of filteredEntityPickerItems; track item.id) {
+                      <button
+                        type="button"
+                        class="entity-picker-item"
+                        [disabled]="loadingDocumentEntitiesMutation"
+                        (click)="onEntityPickerSelect(item)"
+                      >
+                        {{ item.name }}
+                      </button>
+                    }
+                  </div>
+                  @if (!filteredEntityPickerItems.length) {
+                    <div class="entity-picker-empty">Нет вариантов</div>
+                  }
+                }
+              </div>
+            }
+          </div>
+        }
+
+        @for (item of state.entities!.military_equipment; track item.id) {
+          <p-chip
+            [label]="item.name"
+            class="entity-chip-military chip-compact"
+            [removable]="isEditingEntitiesBlock && !loadingDocumentEntitiesMutation"
+            (onRemove)="removeEntityItem(item)"
+          />
+        }
+      </div>
+    </div>
+  }
+
+  @if (state.entities?.manufacturers?.length) {
+    <div class="meta-tags meta-tags--entity-row">
+      <h4 class="entity-row-title">Производители:</h4>
+      <div class="tags entity-tags-manufacturer">
+        @if (isEditingEntitiesBlock) {
+          <div class="entity-add-wrapper">
+            <button
+              type="button"
+              class="entity-add-chip"
+              [disabled]="loadingDocumentEntitiesMutation"
+              (click)="toggleEntityPicker('manufacturers')"
+            >
+              +
+            </button>
+            @if (entityPickerOpen === 'manufacturers') {
+              <div class="entity-picker-popover">
+                <input
+                  type="search"
+                  class="entity-picker-search"
+                  name="entity-picker-search-manufacturers"
+                  [(ngModel)]="entityPickerSearch"
+                  placeholder="Поиск..."
+                  autocomplete="off"
+                />
+                @if (loadingEntityPickerCatalog) {
+                  <div class="entity-picker-loading">Загрузка…</div>
+                } @else {
+                  <div class="entity-picker-list">
+                    @for (item of filteredEntityPickerItems; track item.id) {
+                      <button
+                        type="button"
+                        class="entity-picker-item"
+                        [disabled]="loadingDocumentEntitiesMutation"
+                        (click)="onEntityPickerSelect(item)"
+                      >
+                        {{ item.name }}
+                      </button>
+                    }
+                  </div>
+                  @if (!filteredEntityPickerItems.length) {
+                    <div class="entity-picker-empty">Нет вариантов</div>
+                  }
+                }
+              </div>
+            }
+          </div>
+        }
+        @for (item of state.entities!.manufacturers; track item.id) {
+          <p-chip
+            [label]="item.name"
+            class="entity-chip-manufacturer chip-compact"
+            [removable]="isEditingEntitiesBlock && !loadingDocumentEntitiesMutation"
+            (onRemove)="removeEntityItem(item)"
+          />
+        }
+      </div>
+    </div>
+  }
+
+  @if (state.entities?.contracts?.length) {
+    <div class="meta-tags meta-tags--entity-row">
+      <h4 class="entity-row-title">Контракты:</h4>
+      <div class="tags entity-tags-contract">
+        @if (isEditingEntitiesBlock) {
+          <div class="entity-add-wrapper">
+            <button
+              type="button"
+              class="entity-add-chip"
+              [disabled]="loadingDocumentEntitiesMutation"
+              (click)="toggleEntityPicker('contracts')"
+            >
+              +
+            </button>
+            @if (entityPickerOpen === 'contracts') {
+              <div class="entity-picker-popover">
+                <input
+                  type="search"
+                  class="entity-picker-search"
+                  name="entity-picker-search-contracts"
+                  [(ngModel)]="entityPickerSearch"
+                  placeholder="Поиск..."
+                  autocomplete="off"
+                />
+                @if (loadingEntityPickerCatalog) {
+                  <div class="entity-picker-loading">Загрузка…</div>
+                } @else {
+                  <div class="entity-picker-list">
+                    @for (item of filteredEntityPickerItems; track item.id) {
+                      <button
+                        type="button"
+                        class="entity-picker-item"
+                        [disabled]="loadingDocumentEntitiesMutation"
+                        (click)="onEntityPickerSelect(item)"
+                      >
+                        {{ item.name }}
+                      </button>
+                    }
+                  </div>
+                  @if (!filteredEntityPickerItems.length) {
+                    <div class="entity-picker-empty">Нет вариантов</div>
+                  }
+                }
+              </div>
+            }
+          </div>
+        }
+        @for (item of state.entities!.contracts; track item.id) {
+          <p-chip
+            [label]="item.name"
+            class="entity-chip-contract chip-compact"
+            [removable]="isEditingEntitiesBlock && !loadingDocumentEntitiesMutation"
+            (onRemove)="removeEntityItem(item)"
+          />
+        }
+      </div>
+    </div>
+  }
+
+  @if (loadingOriginalTags) {
+    <p-skeleton width="8rem" height="1rem" borderRadius="12px" />
+    <div class="loading-original-tag-wrapper-btn">
+      <p-skeleton height="2rem" width="7rem" borderRadius="20px" />
+      <p-skeleton height="2rem" width="7rem" borderRadius="20px" />
+      <p-skeleton height="2rem" width="7rem" borderRadius="20px" />
+      <p-skeleton height="2rem" width="7rem" borderRadius="20px" />
+      <p-skeleton height="2rem" width="7rem" borderRadius="20px" />
+      <p-skeleton height="2rem" width="7rem" borderRadius="20px" />
+      <p-skeleton height="2rem" width="7rem" borderRadius="20px" />
+      <p-skeleton height="2rem" width="7rem" borderRadius="20px" />
+    </div>
+  }
+
+  @if (state.originalTags.length) {
+    <div class="meta-tags meta-tags--entity-row">
+      <h4 class="entity-row-title">Теги (оригинал):</h4>
+      <div class="tags original">
+        @if (isEditingEntitiesBlock) {
+          <div class="entity-add-wrapper">
+            <button
+              type="button"
+              class="entity-add-chip"
+              [disabled]="loadingDocumentTagsMutation"
+              (click)="toggleTagPicker('original')"
+            >
+              +
+            </button>
+            @if (tagPickerOpen === 'original') {
+              <div class="entity-picker-popover">
+                <input
+                  type="search"
+                  class="entity-picker-search"
+                  name="tag-picker-search-original"
+                  [(ngModel)]="tagPickerSearch"
+                  placeholder="Поиск..."
+                  autocomplete="off"
+                />
+                @if (loadingTagPickerCatalog) {
+                  <div class="entity-picker-loading">Загрузка…</div>
+                } @else {
+                  <div class="entity-picker-list">
+                    @for (item of filteredTagPickerItems; track item.id) {
+                      <button
+                        type="button"
+                        class="entity-picker-item"
+                        [disabled]="loadingDocumentTagsMutation"
+                        (click)="onTagPickerSelect(item)"
+                      >
+                        {{ item.name }}
+                      </button>
+                    }
+                  </div>
+                  @if (!filteredTagPickerItems.length) {
+                    <div class="entity-picker-empty">Нет вариантов</div>
+                  }
+                }
+              </div>
+            }
+          </div>
+        }
+
+        @for (tag of state.originalTags; track tag.id) {
+          <p-chip
+            [label]="tag.name"
+            class="original-chip chip-compact"
+            [removable]="isEditingEntitiesBlock && !loadingDocumentTagsMutation"
+            (onRemove)="removeOriginalTag(tag)"
+          />
+        }
+      </div>
+    </div>
+  }
+
+  @if (loadingTranslatedTags) {
+    <p-skeleton width="8rem" height="1rem" borderRadius="12px" style="margin-top: 10px" />
+    <div class="loading-original-tag-wrapper-btn">
+      <p-skeleton height="2rem" width="7rem" borderRadius="20px" />
+      <p-skeleton height="2rem" width="7rem" borderRadius="20px" />
+      <p-skeleton height="2rem" width="7rem" borderRadius="20px" />
+      <p-skeleton height="2rem" width="7rem" borderRadius="20px" />
+      <p-skeleton height="2rem" width="7rem" borderRadius="20px" />
+      <p-skeleton height="2rem" width="7rem" borderRadius="20px" />
+      <p-skeleton height="2rem" width="7rem" borderRadius="20px" />
+      <p-skeleton height="2rem" width="7rem" borderRadius="20px" />
+    </div>
+  }
+
+  @if (state.translatedTags.length) {
+    <div class="meta-tags meta-tags--entity-row">
+      <h4 class="entity-row-title">Теги (русский):</h4>
+      <div class="tags translated">
+        @if (isEditingEntitiesBlock) {
+          <div class="entity-add-wrapper">
+            <button
+              type="button"
+              class="entity-add-chip"
+              [disabled]="loadingDocumentTagsMutation"
+              (click)="toggleTagPicker('translated')"
+            >
+              +
+            </button>
+            @if (tagPickerOpen === 'translated') {
+              <div class="entity-picker-popover">
+                <input
+                  type="search"
+                  class="entity-picker-search"
+                  name="tag-picker-search-translated"
+                  [(ngModel)]="tagPickerSearch"
+                  placeholder="Поиск..."
+                  autocomplete="off"
+                />
+                @if (loadingTagPickerCatalog) {
+                  <div class="entity-picker-loading">Загрузка…</div>
+                } @else {
+                  <div class="entity-picker-list">
+                    @for (item of filteredTagPickerItems; track item.id) {
+                      <button
+                        type="button"
+                        class="entity-picker-item"
+                        [disabled]="loadingDocumentTagsMutation"
+                        (click)="onTagPickerSelect(item)"
+                      >
+                        {{ item.name }}
+                      </button>
+                    }
+                  </div>
+                  @if (!filteredTagPickerItems.length) {
+                    <div class="entity-picker-empty">Нет вариантов</div>
+                  }
+                }
+              </div>
+            }
+          </div>
+        }
+
+        @for (tag of state.translatedTags; track tag.id) {
+          <p-chip
+            [label]="tag.name"
+            class="translated-chip chip-compact"
+            [removable]="isEditingEntitiesBlock && !loadingDocumentTagsMutation"
+            (onRemove)="removeTranslatedTag(tag)"
+          />
+        }
+      </div>
+    </div>
+  }
+</section>

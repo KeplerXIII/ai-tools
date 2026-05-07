@@ -82,6 +82,7 @@
           >
             <p-knob
               [ngModel]="categoryKnobValue(cat)"
+              [style.--p-knob-value-background]="categoryKnobColor(cat)"
               [disabled]="true"
               [size]="65"
               [strokeWidth]="8"

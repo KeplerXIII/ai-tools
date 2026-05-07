@@ -317,5 +317,19 @@ export class ArticleParserCategoriesComponent implements OnChanges, OnDestroy {
     return Math.round(cat.confidence * 100);
   }
 
+  categoryKnobColor(cat: DocumentCategoryRef): string {
+    const value = this.categoryKnobValue(cat);
+    if (value <= 30) {
+      return '#ef4444';
+    }
+    if (value <= 60) {
+      return '#f97316';
+    }
+    if (value <= 90) {
+      return '#eab308';
+    }
+    return '#22c55e';
+  }
+
   valueTemplate = (v: number): string => `${v}%`;
 }

@@ -9,18 +9,15 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { SkeletonModule } from 'primeng/skeleton';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { ChipModule } from 'primeng/chip';
 import { TextareaModule } from 'primeng/textarea';
 import { ArticleParserUrlFormComponent } from './ui/article-parser-url-form/article-parser-url-form';
 import { ArticleParserStatusComponent } from './ui/article-parser-status/article-parser-status';
 import { ArticleParserMetaComponent } from './ui/article-parser-meta/article-parser-meta';
 import { ArticleParserCategoriesComponent } from './ui/article-parser-categories/article-parser-categories';
+import { ArticleParserEntitiesComponent } from './ui/article-parser-entities/article-parser-entities';
 import {
   ArticleParserApi,
-  DocumentEntityRef,
-  DocumentTagRef,
   DocumentTagsResponse,
-  EntitiesResponse,
 } from './api/article-parser-api';
 import { ArticleParserState } from './model/article-parser-state';
 import {
@@ -31,14 +28,9 @@ import { buildHighlightedArticleTextByGroups } from './lib/article-highlighter';
 import { scrollToElement } from './lib/scroll-to-element';
 
 export type ArticleParserBlock =
-  | 'entities'
   | 'original'
   | 'translation'
   | 'annotation';
-
-export type EntitySection = 'military_equipment' | 'manufacturers' | 'contracts';
-
-export type TagScope = 'original' | 'translated';
 
 @Component({
   selector: 'app-article-parser',
@@ -56,7 +48,7 @@ export type TagScope = 'original' | 'translated';
     ArticleParserStatusComponent,
     ArticleParserMetaComponent,
     ArticleParserCategoriesComponent,
-    ChipModule,
+    ArticleParserEntitiesComponent,
     SkeletonModule,
     TextareaModule,
   ],
@@ -66,37 +58,22 @@ export type TagScope = 'original' | 'translated';
 export class ArticleParser {
   @ViewChild('translationSkeleton') translationSkeleton?: ElementRef;
   @ViewChild('annotationSkeleton') annotationSkeleton?: ElementRef;
-  @ViewChild('entitiesBlock') entitiesBlock?: ElementRef;
   @ViewChild('originalTextPreview') originalTextPreview?: ElementRef<HTMLElement>;
   @ViewChild('originalTextEditor') originalTextEditor?: ElementRef<HTMLElement>;
   readonly ButtonVariant = ButtonVariant;
   loadingArticle = false;
-  loadingEntities = false;
+  loadingEntitiesSection = false;
   loadingCategories = false;
   loadingTranslation = false;
   loadingSummary = false;
   loadingOriginalTags = false;
   loadingTranslatedTags = false;
-  entitiesError = '';
   articleError = '';
   originalTagsError = '';
   translationError = '';
   translatedTagsError = '';
   summaryError = '';
 
-  entityPickerOpen: EntitySection | null = null;
-  entityPickerSearch = '';
-  entityPickerCatalogItems: DocumentEntityRef[] = [];
-  loadingEntityPickerCatalog = false;
-  loadingDocumentEntitiesMutation = false;
-
-  tagPickerOpen: TagScope | null = null;
-  tagPickerSearch = '';
-  tagPickerCatalogItems: DocumentTagRef[] = [];
-  loadingTagPickerCatalog = false;
-  loadingDocumentTagsMutation = false;
-
-  isEditingEntitiesBlock = false;
   isEditingOriginalBlock = false;
   isEditingTranslationBlock = false;
   isEditingAnnotationBlock = false;
@@ -122,7 +99,6 @@ export class ArticleParser {
 
     this.articleError = '';
     this.state.error = '';
-    this.entitiesError = '';
     this.originalTagsError = '';
     this.translationError = '';
     this.loadingCategories = false;
@@ -159,29 +135,6 @@ export class ArticleParser {
       error: () => {
         this.articleError = 'Ошибка при извлечении статьи';
         this.loadingArticle = false;
-      },
-    });
-  }
-
-  requestEntities(): void {
-    if (!this.state.article?.text || !this.state.article.document_id) return;
-
-    this.loadingEntities = true;
-    this.entitiesError = '';
-    this.state.entities = null;
-
-    this.api.extractEntities(this.state.article.document_id).subscribe({
-      next: (response) => {
-        this.state.entities = {
-          military_equipment: response.military_equipment || [],
-          manufacturers: response.manufacturers || [],
-          contracts: response.contracts || [],
-        };
-        this.loadingEntities = false;
-      },
-      error: () => {
-        this.entitiesError = 'Ошибка при извлечении сущностей';
-        this.loadingEntities = false;
       },
     });
   }
@@ -242,7 +195,6 @@ export class ArticleParser {
   clear(): void {
     this.resetBlockEditors();
     this.state.clear();
-    this.entitiesError = '';
     this.articleError = '';
     this.originalTagsError = '';
     this.translationError = '';
@@ -299,13 +251,6 @@ export class ArticleParser {
 
   toggleBlockEdit(block: ArticleParserBlock): void {
     switch (block) {
-      case 'entities':
-        this.isEditingEntitiesBlock = !this.isEditingEntitiesBlock;
-        if (!this.isEditingEntitiesBlock) {
-          this.closeEntityPicker();
-          this.closeTagPicker();
-        }
-        break;
       case 'original':
         if (!this.isEditingOriginalBlock) {
           const docId = this.state.article?.document_id;
@@ -414,195 +359,9 @@ export class ArticleParser {
   }
 
   private resetBlockEditors(): void {
-    this.isEditingEntitiesBlock = false;
     this.isEditingOriginalBlock = false;
     this.isEditingTranslationBlock = false;
     this.isEditingAnnotationBlock = false;
-    this.closeEntityPicker();
-    this.closeTagPicker();
-  }
-
-  private closeTagPicker(): void {
-    this.tagPickerOpen = null;
-    this.tagPickerSearch = '';
-    this.tagPickerCatalogItems = [];
-    this.loadingTagPickerCatalog = false;
-  }
-
-  private closeEntityPicker(): void {
-    this.entityPickerOpen = null;
-    this.entityPickerSearch = '';
-    this.entityPickerCatalogItems = [];
-    this.loadingEntityPickerCatalog = false;
-  }
-
-  entityTypeCodeForSection(section: EntitySection): string {
-    if (section === 'manufacturers') {
-      return 'manufacturer';
-    }
-    if (section === 'contracts') {
-      return 'contract';
-    }
-    return 'military_equipment';
-  }
-
-  toggleEntityPicker(section: EntitySection): void {
-    if (!this.isEditingEntitiesBlock || !this.state.article?.document_id) {
-      return;
-    }
-
-    if (this.entityPickerOpen === section) {
-      this.closeEntityPicker();
-      return;
-    }
-
-    this.entityPickerOpen = section;
-    this.entityPickerSearch = '';
-    this.entityPickerCatalogItems = [];
-    const docId = this.state.article.document_id;
-    const typeCode = this.entityTypeCodeForSection(section);
-    this.loadingEntityPickerCatalog = true;
-
-    this.api.getEntityCatalog(docId, typeCode).subscribe({
-      next: (items: DocumentEntityRef[]) => {
-        this.entityPickerCatalogItems = items;
-        this.loadingEntityPickerCatalog = false;
-      },
-      error: () => {
-        this.entitiesError = 'Не удалось загрузить список сущностей';
-        this.loadingEntityPickerCatalog = false;
-        this.closeEntityPicker();
-      },
-    });
-  }
-
-  get filteredEntityPickerItems(): DocumentEntityRef[] {
-    const q = this.entityPickerSearch.trim().toLowerCase();
-    if (!q) {
-      return this.entityPickerCatalogItems;
-    }
-    return this.entityPickerCatalogItems.filter((item) => item.name.toLowerCase().includes(q));
-  }
-
-  onEntityPickerSelect(item: DocumentEntityRef): void {
-    const docId = this.state.article?.document_id;
-    if (!docId || this.loadingDocumentEntitiesMutation) {
-      return;
-    }
-
-    this.loadingDocumentEntitiesMutation = true;
-    this.entitiesError = '';
-
-    this.api.assignDocumentEntity(docId, item.id).subscribe({
-      next: () => {
-        this.closeEntityPicker();
-        this.refreshDocumentEntitiesFromServer(docId);
-      },
-      error: () => {
-        this.entitiesError = 'Не удалось добавить сущность';
-        this.loadingDocumentEntitiesMutation = false;
-      },
-    });
-  }
-
-  private refreshDocumentEntitiesFromServer(documentId: string): void {
-    this.api.getDocumentEntities(documentId).subscribe({
-      next: (res: EntitiesResponse) => {
-        this.state.entities = {
-          military_equipment: res.military_equipment || [],
-          manufacturers: res.manufacturers || [],
-          contracts: res.contracts || [],
-        };
-        this.loadingDocumentEntitiesMutation = false;
-      },
-      error: () => {
-        this.entitiesError = 'Не удалось обновить список сущностей';
-        this.loadingDocumentEntitiesMutation = false;
-      },
-    });
-  }
-
-  toggleTagPicker(scope: TagScope): void {
-    if (!this.isEditingEntitiesBlock || !this.state.article?.document_id) {
-      return;
-    }
-
-    if (this.tagPickerOpen === scope) {
-      this.closeTagPicker();
-      return;
-    }
-
-    this.tagPickerOpen = scope;
-    this.tagPickerSearch = '';
-    this.tagPickerCatalogItems = [];
-    const docId = this.state.article.document_id;
-    this.loadingTagPickerCatalog = true;
-
-    this.api.getTagCatalog(docId, scope).subscribe({
-      next: (items: DocumentTagRef[]) => {
-        this.tagPickerCatalogItems = items;
-        this.loadingTagPickerCatalog = false;
-      },
-      error: () => {
-        if (scope === 'original') {
-          this.originalTagsError = 'Не удалось загрузить каталог тегов';
-        } else {
-          this.translatedTagsError = 'Не удалось загрузить каталог тегов';
-        }
-        this.loadingTagPickerCatalog = false;
-        this.closeTagPicker();
-      },
-    });
-  }
-
-  get filteredTagPickerItems(): DocumentTagRef[] {
-    const q = this.tagPickerSearch.trim().toLowerCase();
-    if (!q) {
-      return this.tagPickerCatalogItems;
-    }
-    return this.tagPickerCatalogItems.filter((item) => item.name.toLowerCase().includes(q));
-  }
-
-  onTagPickerSelect(item: DocumentTagRef): void {
-    const docId = this.state.article?.document_id;
-    if (!docId || this.loadingDocumentTagsMutation) {
-      return;
-    }
-
-    this.loadingDocumentTagsMutation = true;
-    this.originalTagsError = '';
-    this.translatedTagsError = '';
-
-    this.api.assignDocumentTag(docId, item.id).subscribe({
-      next: () => {
-        this.closeTagPicker();
-        this.refreshDocumentTagsFromServer(docId);
-      },
-      error: () => {
-        const scope = this.tagPickerOpen;
-        if (scope === 'translated') {
-          this.translatedTagsError = 'Не удалось добавить тег';
-        } else {
-          this.originalTagsError = 'Не удалось добавить тег';
-        }
-        this.loadingDocumentTagsMutation = false;
-      },
-    });
-  }
-
-  private refreshDocumentTagsFromServer(documentId: string): void {
-    this.api.getDocumentTags(documentId).subscribe({
-      next: (res: DocumentTagsResponse) => {
-        this.state.originalTags = res.original_tags || [];
-        this.state.translatedTags = res.translated_tags || [];
-        this.loadingDocumentTagsMutation = false;
-      },
-      error: () => {
-        this.originalTagsError = 'Не удалось обновить список тегов';
-        this.translatedTagsError = 'Не удалось обновить список тегов';
-        this.loadingDocumentTagsMutation = false;
-      },
-    });
   }
 
   private reloadTagsFromServer(kind: 'original' | 'translated'): void {
@@ -623,7 +382,7 @@ export class ArticleParser {
         this.loadingOriginalTags = false;
         this.loadingTranslatedTags = false;
         this.cdr.detectChanges();
-        scrollToElement(() => this.entitiesBlock, this.cdr);
+        // Tags are rendered in the dedicated entities component.
       },
       error: () => {
         if (kind === 'original') {
@@ -637,70 +396,6 @@ export class ArticleParser {
     });
   }
 
-  // =========================
-  // СУЩНОСТИ
-  // =========================
-
-  removeEntityItem(item: DocumentEntityRef): void {
-    const docId = this.state.article?.document_id;
-    if (!docId || this.loadingDocumentEntitiesMutation) {
-      return;
-    }
-
-    this.loadingDocumentEntitiesMutation = true;
-    this.entitiesError = '';
-
-    this.api.removeDocumentEntity(docId, item.id).subscribe({
-      next: () => {
-        this.refreshDocumentEntitiesFromServer(docId);
-      },
-      error: () => {
-        this.entitiesError = 'Не удалось удалить сущность';
-        this.loadingDocumentEntitiesMutation = false;
-      },
-    });
-  }
-
-  removeOriginalTag(tag: DocumentTagRef): void {
-    const docId = this.state.article?.document_id;
-    if (!docId || this.loadingDocumentTagsMutation) {
-      return;
-    }
-
-    this.loadingDocumentTagsMutation = true;
-    this.originalTagsError = '';
-
-    this.api.removeDocumentTag(docId, tag.id).subscribe({
-      next: () => {
-        this.refreshDocumentTagsFromServer(docId);
-      },
-      error: () => {
-        this.originalTagsError = 'Не удалось удалить тег';
-        this.loadingDocumentTagsMutation = false;
-      },
-    });
-  }
-
-  removeTranslatedTag(tag: DocumentTagRef): void {
-    const docId = this.state.article?.document_id;
-    if (!docId || this.loadingDocumentTagsMutation) {
-      return;
-    }
-
-    this.loadingDocumentTagsMutation = true;
-    this.translatedTagsError = '';
-
-    this.api.removeDocumentTag(docId, tag.id).subscribe({
-      next: () => {
-        this.refreshDocumentTagsFromServer(docId);
-      },
-      error: () => {
-        this.translatedTagsError = 'Не удалось удалить тег';
-        this.loadingDocumentTagsMutation = false;
-      },
-    });
-  }
-
   autoResize(event: Event): void {
     const textarea = event.target as HTMLTextAreaElement;
 
@@ -708,20 +403,10 @@ export class ArticleParser {
     textarea.style.height = `${textarea.scrollHeight}px`;
   }
 
-  get hasEmptyEntitiesResult(): boolean {
-    return (
-      !!this.state.entities &&
-      !this.loadingEntities &&
-      !this.state.entities.military_equipment?.length &&
-      !this.state.entities.manufacturers?.length &&
-      !this.state.entities.contracts?.length
-    );
-  }
-
   get isLoading(): boolean {
     return (
       this.loadingArticle ||
-      this.loadingEntities ||
+      this.loadingEntitiesSection ||
       this.loadingCategories ||
       this.loadingTranslation ||
       this.loadingSummary ||
