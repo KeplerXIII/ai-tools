@@ -73,6 +73,26 @@ export interface DocumentTypeCatalogItem {
   description: string | null;
 }
 
+export interface TranslateMissingDocumentsResponse {
+  ok: boolean;
+  batch_id: string;
+  queue: string;
+  scanned: number;
+  enqueued: number;
+}
+
+export interface TranslateMissingBatchStatusResponse {
+  ok: boolean;
+  batch_id: string;
+  scanned: number;
+  enqueued: number;
+  completed: number;
+  failed: number;
+  skipped: number;
+  pending: number;
+  done: boolean;
+}
+
 export interface ListDocumentsFilters {
   statusCode?: string;
   documentTypeCode?: string;
@@ -120,5 +140,20 @@ export class DocumentsApi {
 
   deleteDocument(documentId: string): Observable<{ ok: boolean; document_id: string }> {
     return this.http.delete<{ ok: boolean; document_id: string }>(`/api/v1/documents/${documentId}`);
+  }
+
+  enqueueTranslateMissingDocuments(
+    payload: { target_lang?: string; limit?: number } = {},
+  ): Observable<TranslateMissingDocumentsResponse> {
+    return this.http.post<TranslateMissingDocumentsResponse>(
+      '/api/v1/processing/documents/translate-missing',
+      payload,
+    );
+  }
+
+  getTranslateMissingBatchStatus(batchId: string): Observable<TranslateMissingBatchStatusResponse> {
+    return this.http.get<TranslateMissingBatchStatusResponse>(
+      `/api/v1/processing/documents/translate-missing/${batchId}`,
+    );
   }
 }

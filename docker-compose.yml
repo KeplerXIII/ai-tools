@@ -12,6 +12,21 @@ services:
     restart: unless-stopped
     depends_on:
       - postgres
+      - redis
+
+  ai-tools-translate-worker:
+    build: .
+    container_name: ai-tools-translate-worker
+    env_file:
+      - .env
+    command: ["uv", "run", "saq", "app.workers.documents_translate_worker.settings"]
+    networks:
+      - ai_stack
+    shm_size: "1gb"
+    restart: unless-stopped
+    depends_on:
+      - postgres
+      - redis
 
   ai-tools-ui:
     build:
@@ -40,8 +55,19 @@ services:
       - ai_stack
     restart: unless-stopped
 
+  redis:
+    image: redis:7-alpine
+    container_name: ai-tools-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    networks:
+      - ai_stack
+    restart: unless-stopped
+
 volumes:
   postgres_data:
+  redis_data:
 
 networks:
   ai_stack:

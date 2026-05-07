@@ -5,6 +5,7 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { ChipModule } from 'primeng/chip';
 import { SourceListItem, SourcesApi } from '../sources/sources-api';
+import { TranslateBatchNotifierService } from '../../core/processing/translate-batch-notifier.service';
 import {
   DocumentCategoryItem,
   DocumentEntityItem,
@@ -28,6 +29,9 @@ export class Documents implements OnInit {
   sources: SourceListItem[] = [];
   loading = false;
   error = '';
+  bulkTranslateLoading = false;
+  bulkTranslateMessage = '';
+  bulkTranslateError = '';
 
   selectedStatusCode = '';
   selectedDocumentTypeCode = '';
@@ -47,6 +51,7 @@ export class Documents implements OnInit {
   constructor(
     private readonly documentsApi: DocumentsApi,
     private readonly sourcesApi: SourcesApi,
+    private readonly translateBatchNotifier: TranslateBatchNotifierService,
     private readonly router: Router,
   ) {}
 
@@ -117,6 +122,31 @@ export class Documents implements OnInit {
     this.usePublishedDate = false;
     this.dateSortOption = 'uploaded-desc';
     this.loadDocuments();
+  }
+
+  enqueueTranslateMissing(): void {
+    if (this.bulkTranslateLoading) {
+      return;
+    }
+    this.bulkTranslateLoading = true;
+    this.bulkTranslateMessage = '';
+    this.bulkTranslateError = '';
+    this.documentsApi.enqueueTranslateMissingDocuments({ target_lang: 'ru' }).subscribe({
+      next: (response) => {
+        this.bulkTranslateLoading = false;
+        if (response.enqueued > 0) {
+          this.translateBatchNotifier.trackBatch(response.batch_id);
+        }
+        this.bulkTranslateMessage =
+          response.enqueued > 0
+            ? `В очередь поставлено: ${response.enqueued} из ${response.scanned}`
+            : 'Новых документов без перевода для постановки в очередь не найдено';
+      },
+      error: () => {
+        this.bulkTranslateLoading = false;
+        this.bulkTranslateError = 'Не удалось поставить документы на перевод';
+      },
+    });
   }
 
   sourceFilterLabel(src: SourceListItem): string {
