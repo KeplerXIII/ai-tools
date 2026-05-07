@@ -4,8 +4,8 @@ import { FloatLabelModule } from 'primeng/floatlabel';
 import { InputTextModule } from 'primeng/inputtext';
 import { ChipModule } from 'primeng/chip';
 import { ImageModule } from 'primeng/image';
-import { ArticleParserApi, ExtractResponse } from '../../article-parser-api';
-import { ArticleParserState } from '../../article-parser-state';
+import { ArticleParserApi, ExtractResponse } from '../../api/article-parser-api';
+import { ArticleParserState } from '../../model/article-parser-state';
 
 @Component({
   selector: 'app-article-parser-meta',

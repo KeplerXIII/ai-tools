@@ -2,7 +2,7 @@ import { Component, Input, OnChanges, SimpleChanges } from '@angular/core';
 import { MenuItem } from 'primeng/api';
 import { ChipModule } from 'primeng/chip';
 import { SpeedDialModule } from 'primeng/speeddial';
-import { ArticleParserApi, ExtractResponse } from '../../article-parser-api';
+import { ArticleParserApi, ExtractResponse } from '../../api/article-parser-api';
 
 @Component({
   selector: 'app-article-parser-status',
@@ -78,7 +78,11 @@ export class ArticleParserStatusComponent implements OnChanges {
     });
   }
 
-  get unassignedDocumentStatuses(): { code: string; name_ru: string; description: string | null }[] {
+  get unassignedDocumentStatuses(): {
+    code: string;
+    name_ru: string;
+    description: string | null;
+  }[] {
     const assigned = new Set(this.documentStatusTags.map((status) => status.code));
     return this.availableDocumentStatuses.filter((status) => !assigned.has(status.code));
   }

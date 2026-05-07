@@ -20,8 +20,8 @@ import {
   DocumentTagRef,
   DocumentTagsResponse,
   EntitiesResponse,
-} from './article-parser-api';
-import { ArticleParserState } from './article-parser-state';
+} from './api/article-parser-api';
+import { ArticleParserState } from './model/article-parser-state';
 import {
   ButtonVariant,
   OutlineButtonComponent,
