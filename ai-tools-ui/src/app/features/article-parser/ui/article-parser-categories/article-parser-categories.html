@@ -1,0 +1,109 @@
+<section class="categories-panel">
+  <div #categoriesBlock class="categories-title-wrapper categories-title-row">
+    <h3 class="categories-panel-title">Категории</h3>
+
+    <div class="categories-title-trailing">
+      <app-outline-button
+        text="Классифицировать"
+        size="large"
+        [variant]="ButtonVariant.Rounded"
+        [disabled]="buttonsDisabled"
+        (clicked)="requestCategorize()"
+      />
+
+      <button
+        type="button"
+        class="categories-edit-toggle no-print-field"
+        [class.categories-edit-toggle--active]="isEditingCategoriesBlock"
+        [attr.aria-pressed]="isEditingCategoriesBlock"
+        [attr.aria-label]="
+          isEditingCategoriesBlock ? 'Завершить редактирование блока' : 'Редактировать блок'
+        "
+        (click)="toggleBlockEdit()"
+      >
+        <i
+          class="pi"
+          [class.pi-pen-to-square]="!isEditingCategoriesBlock"
+          [class.pi-check-square]="isEditingCategoriesBlock"
+        ></i>
+      </button>
+    </div>
+  </div>
+
+  @if (categoriesError) {
+    <div class="categories-field-error">{{ categoriesError }}</div>
+  }
+
+  @if (loadingCategories) {
+    <div class="categories-skeleton-wrapper">
+      <p-skeleton width="10rem" height="1rem" borderRadius="12px" />
+      <p-skeleton width="100%" height="1rem" borderRadius="12px" />
+      <p-skeleton width="100%" height="1rem" borderRadius="12px" />
+    </div>
+  }
+
+  @if (hasEmptyCategoriesResult && !isEditingCategoriesBlock) {
+    <p class="categories-empty-message">Классифицируйте текст или добавьте категории вручную.</p>
+  }
+
+  @if (
+    (state.categories && state.categories.length > 0) ||
+    (isEditingCategoriesBlock && state.categories !== null)
+  ) {
+    <div class="categories-meta-tags-row">
+      <h4 class="categories-row-title">Тематика:</h4>
+
+      <div class="categories-tags">
+        @if (isEditingCategoriesBlock) {
+          <p-treeselect
+            class="categories-treeselect"
+            [(ngModel)]="selectedCategoryNodes"
+            [options]="categoryTreeNodes"
+            display="chip"
+            [metaKeySelection]="false"
+            selectionMode="checkbox"
+            placeholder="Добавить категорию"
+            [filter]="true"
+            [loading]="loadingCategoryPickerCatalog"
+            [disabled]="loadingDocumentCategoriesMutation"
+            [virtualScrollItemSize]="35"
+            [virtualScrollOptions]="{ scrollHeight: '200px' }"
+            (onShow)="loadCategoryCatalog()"
+            (ngModelChange)="onCategoryTreeSelectChange($event)"
+          />
+        }
+
+        @for (cat of rankedCategories; track cat.category_id) {
+          <div
+            class="categories-knob-item"
+            [attr.title]="'Источник: ' + cat.prediction_source_code"
+          >
+            <p-knob
+              [ngModel]="categoryKnobValue(cat)"
+              [disabled]="true"
+              [size]="80"
+              [strokeWidth]="8"
+              [showValue]="true"
+              valueTemplate="{value}%"
+            />
+
+            <span class="categories-knob-label">
+              {{ cat.name_ru || cat.name || cat.code }}
+            </span>
+
+            @if (isEditingCategoriesBlock && !loadingDocumentCategoriesMutation) {
+              <button
+                type="button"
+                class="categories-knob-remove"
+                (click)="removeCategoryChip(cat)"
+                aria-label="Удалить категорию"
+              >
+                <i class="pi pi-times" style="font-size: 1.2rem"></i>
+              </button>
+            }
+          </div>
+        }
+      </div>
+    </div>
+  }
+</section>
