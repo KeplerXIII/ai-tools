@@ -210,6 +210,22 @@ body {
     line-height: 1.6 !important;
   }
 
+  .chip-compact.p-chip,
+  .meta-chips-with-edit .p-chip,
+  .tags .tag {
+    font-size: 16px !important;
+    font-weight: 700 !important;
+    line-height: 1.35 !important;
+    padding: 0.35rem 0.7rem !important;
+    min-height: 2rem !important;
+  }
+
+  .chip-compact.p-chip .p-chip-label,
+  .meta-chips-with-edit .p-chip .p-chip-label {
+    font-weight: 700 !important;
+    line-height: 1.35 !important;
+  }
+
   .panel,
   .header {
     box-shadow: none !important;

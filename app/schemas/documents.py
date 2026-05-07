@@ -27,6 +27,11 @@ class DocumentCategorizeItem(BaseModel):
     code: str
     name: str
     name_ru: str | None = None
+    level: int
+    parent_id: uuid.UUID | None = None
+    parent_code: str | None = None
+    parent_name: str | None = None
+    parent_name_ru: str | None = None
     confidence: float = Field(..., ge=0.0, le=1.0)
     prediction_source_code: str
     text_source: Literal["original", "translated"] | None = None
@@ -112,9 +117,51 @@ class DocumentStatusCatalogItem(BaseModel):
     description: str | None = None
 
 
+class DocumentTypeCatalogItem(BaseModel):
+    code: str
+    name: str
+    description: str | None = None
+
+
 class DocumentStatusesResponse(BaseModel):
     document_id: uuid.UUID
     statuses: list[DocumentStatusItem]
+
+
+class DocumentListEntityItem(BaseModel):
+    id: uuid.UUID
+    name: str
+    entity_type_code: str
+
+
+class DocumentListTagItem(BaseModel):
+    id: uuid.UUID
+    name: str
+
+
+class DocumentListItem(BaseModel):
+    document_id: uuid.UUID
+    title: str
+    source_url: str | None = None
+    document_type_code: str
+    document_type_name: str
+    created_at: datetime
+    published_at: datetime | None = None
+    annotation: str | None = None
+    main_image: str | None = None
+    statuses: list[DocumentStatusItem] = []
+    has_categories: bool = False
+    has_entities: bool = False
+    has_tags: bool = False
+    categories: list[DocumentCategorizeItem] = []
+    entities: list[DocumentListEntityItem] = []
+    original_tags: list[DocumentListTagItem] = []
+    translated_tags: list[DocumentListTagItem] = []
+
+
+class DocumentListResponse(BaseModel):
+    total: int
+    items: list[DocumentListItem]
 
 
 class SummarySource(str, Enum):
@@ -196,4 +243,4 @@ class DocumentUpdateRequest(BaseModel):
 
 class ExtractUrlPersistRequest(BaseModel):
     url: HttpUrl
-    document_type_code: str = "article"
+    document_type_code: str = "undefined"

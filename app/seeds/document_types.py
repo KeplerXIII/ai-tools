@@ -23,6 +23,11 @@ class DocumentTypeSeed(TypedDict):
 
 
 STANDARD_DOCUMENT_TYPES: list[DocumentTypeSeed] = [
+    {
+        "code": "undefined",
+        "name": "Неопределён",
+        "description": "Тип документа не был передан источником",
+    },
     {"code": "news", "name": "Новость", "description": "Краткое сообщение о событии"},
     {
         "code": "article",

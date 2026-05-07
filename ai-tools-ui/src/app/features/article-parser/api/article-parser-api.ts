@@ -23,6 +23,11 @@ export interface DocumentCategoryRef {
   code: string;
   name: string;
   name_ru?: string | null;
+  level: number;
+  parent_id?: string | null;
+  parent_code?: string | null;
+  parent_name?: string | null;
+  parent_name_ru?: string | null;
   confidence: number;
   prediction_source_code: string;
   text_source?: 'original' | 'translated' | null;
@@ -158,6 +163,7 @@ export class ArticleParserApi {
   extractByUrl(url: string) {
     return this.http.post<ExtractResponse>('/api/v1/documents/extract-url', {
       url,
+      document_type_code: 'news',
     });
   }
 

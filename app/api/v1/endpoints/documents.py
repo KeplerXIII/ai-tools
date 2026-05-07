@@ -3,15 +3,17 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
-from sqlalchemy import delete, select
+from sqlalchemy import and_, delete, exists, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
 from app.api.deps import (
     get_current_user,
@@ -21,7 +23,8 @@ from app.api.deps import (
 from app.api.error_mapping import map_app_error
 from app.domain.errors import AppError, ValidationError
 from app.infrastructure.db.models import Category, Document, DocumentCategory, DocumentStatus, DocumentStatusAssignment
-from app.infrastructure.db.models import DocumentEntity, DocumentTag, Entity, EntityType, PredictionSource, Tag, User
+from app.infrastructure.db.models import DocumentEntity, DocumentTag, Entity, EntityType, PredictionSource, Source, Tag, User
+from app.infrastructure.db.models import DocumentType
 from app.infrastructure.db.session import AsyncSessionLocal, get_db
 from app.schemas.documents import (
     DocumentCategorizeItem,
@@ -29,6 +32,10 @@ from app.schemas.documents import (
     DocumentCategoryAssignRequest,
     DocumentEntityAssignRequest,
     DocumentEntityItem,
+    DocumentListEntityItem,
+    DocumentListItem,
+    DocumentListResponse,
+    DocumentListTagItem,
     DocumentStatusCatalogItem,
     DocumentExtractResponse,
     DocumentEntitiesExtractResponse,
@@ -44,6 +51,7 @@ from app.schemas.documents import (
     DocumentTagItem,
     DocumentTagRequest,
     DocumentTagsResponse,
+    DocumentTypeCatalogItem,
     DocumentTranslateRequest,
     DocumentUpdateRequest,
     ExtractUrlPersistRequest,
@@ -200,24 +208,34 @@ async def _get_document_categories(
     db: AsyncSession,
     document_id: UUID,
 ) -> list[DocumentCategorizeItem]:
+    parent = aliased(Category)
     rows = await db.execute(
         select(
             Category.id,
             Category.code,
             Category.name,
             Category.name_ru,
+            Category.level,
+            parent.id.label("parent_id"),
+            parent.code.label("parent_code"),
+            parent.name.label("parent_name"),
+            parent.name_ru.label("parent_name_ru"),
             DocumentCategory.confidence,
-            PredictionSource.code,
+            PredictionSource.code.label("prediction_source_code"),
         )
         .select_from(DocumentCategory)
         .join(Category, Category.id == DocumentCategory.category_id)
+        .outerjoin(parent, parent.id == Category.parent_id)
         .outerjoin(PredictionSource, PredictionSource.id == DocumentCategory.prediction_source_id)
-        .where(DocumentCategory.document_id == document_id)
+        .where(
+            DocumentCategory.document_id == document_id,
+            Category.level.in_((1, 2, 3)),
+        )
         .order_by(Category.sort_order.asc(), Category.code.asc())
     )
     out: list[DocumentCategorizeItem] = []
     for row in rows:
-        cid, code, name, name_ru, conf, ps_code = row
+        cid, code, name, name_ru, level, parent_id, parent_code, parent_name, parent_name_ru, conf, ps_code = row
         conf_f = float(conf) if conf is not None else 1.0
         conf_f = max(0.0, min(1.0, conf_f))
         out.append(
@@ -226,12 +244,276 @@ async def _get_document_categories(
                 code=code,
                 name=name,
                 name_ru=name_ru,
+                level=level,
+                parent_id=parent_id,
+                parent_code=parent_code,
+                parent_name=parent_name,
+                parent_name_ru=parent_name_ru,
                 confidence=conf_f,
                 prediction_source_code=ps_code or "unknown",
                 text_source=None,
             )
         )
     return out
+
+
+@router.get("", response_model=DocumentListResponse)
+async def list_documents(
+    status_code: str | None = Query(default=None, min_length=1, max_length=64),
+    document_type_code: str | None = Query(default=None, min_length=1, max_length=64),
+    source_id: UUID | None = Query(default=None, description="Фильтр по источнику (RSS/URL); только свои источники"),
+    date_from: datetime | None = Query(default=None),
+    date_to: datetime | None = Query(default=None),
+    use_published_date: bool = Query(default=False),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    normalized_status = status_code.strip().lower() if status_code else None
+    normalized_type = document_type_code.strip().lower() if document_type_code else None
+    date_field = Document.published_at if use_published_date else Document.created_at
+
+    stmt = (
+        select(
+            Document.id,
+            Document.title,
+            Document.source_url,
+            Document.original_language_id,
+            Document.translated_language_id,
+            Document.created_at,
+            Document.published_at,
+            Document.extracted_main_image,
+            Document.original_summary,
+            Document.translated_summary,
+            DocumentType.code.label("document_type_code"),
+            DocumentType.name.label("document_type_name"),
+        )
+        .join(DocumentType, DocumentType.id == Document.document_type_id)
+    )
+
+    filters = []
+    if source_id is not None:
+        src = await db.get(Source, source_id)
+        if src is None:
+            raise HTTPException(status_code=404, detail="Источник не найден")
+        if not user.is_admin and src.user_id != user.id:
+            raise HTTPException(status_code=403, detail="Нет доступа к источнику")
+        filters.append(Document.source_id == source_id)
+    if normalized_type:
+        filters.append(DocumentType.code == normalized_type)
+    if date_from:
+        filters.append(date_field >= date_from)
+    if date_to:
+        filters.append(date_field <= date_to)
+    if normalized_status:
+        filters.append(
+            select(DocumentStatusAssignment.document_id)
+            .join(DocumentStatus, DocumentStatus.id == DocumentStatusAssignment.status_id)
+            .where(
+                DocumentStatusAssignment.document_id == Document.id,
+                DocumentStatus.code == normalized_status,
+            )
+            .exists()
+        )
+    if filters:
+        stmt = stmt.where(and_(*filters))
+
+    total = await db.scalar(select(func.count()).select_from(stmt.subquery()))
+    rows = await db.execute(stmt.order_by(Document.created_at.desc()).offset(offset).limit(limit))
+    docs = list(rows)
+    if not docs:
+        return DocumentListResponse(total=total or 0, items=[])
+
+    doc_ids = [row.id for row in docs]
+
+    status_rows = await db.execute(
+        select(
+            DocumentStatusAssignment.document_id,
+            DocumentStatus.code,
+            DocumentStatus.name_ru,
+            DocumentStatus.description,
+            DocumentStatusAssignment.assigned_at,
+            DocumentStatusAssignment.assigned_by_id,
+        )
+        .join(DocumentStatus, DocumentStatus.id == DocumentStatusAssignment.status_id)
+        .where(DocumentStatusAssignment.document_id.in_(doc_ids))
+        .order_by(DocumentStatusAssignment.assigned_at.desc(), DocumentStatus.code.asc())
+    )
+    statuses_map: dict[UUID, list[DocumentStatusItem]] = {}
+    for row in status_rows:
+        statuses_map.setdefault(row.document_id, []).append(
+            DocumentStatusItem(
+                code=row.code,
+                name_ru=row.name_ru,
+                description=row.description,
+                assigned_at=row.assigned_at,
+                assigned_by_id=row.assigned_by_id,
+            )
+        )
+
+    category_ids = set(
+        await db.scalars(select(DocumentCategory.document_id).where(DocumentCategory.document_id.in_(doc_ids)))
+    )
+    entity_ids = set(await db.scalars(select(DocumentEntity.document_id).where(DocumentEntity.document_id.in_(doc_ids))))
+    tag_ids = set(await db.scalars(select(DocumentTag.document_id).where(DocumentTag.document_id.in_(doc_ids))))
+
+    parent = aliased(Category)
+    category_rows = await db.execute(
+        select(
+            DocumentCategory.document_id,
+            Category.id,
+            Category.code,
+            Category.name,
+            Category.name_ru,
+            Category.level,
+            parent.id.label("parent_id"),
+            parent.code.label("parent_code"),
+            parent.name.label("parent_name"),
+            parent.name_ru.label("parent_name_ru"),
+            DocumentCategory.confidence,
+            PredictionSource.code.label("prediction_source_code"),
+        )
+        .join(Category, Category.id == DocumentCategory.category_id)
+        .outerjoin(parent, parent.id == Category.parent_id)
+        .outerjoin(PredictionSource, PredictionSource.id == DocumentCategory.prediction_source_id)
+        .where(
+            DocumentCategory.document_id.in_(doc_ids),
+            Category.level.in_((1, 2, 3)),
+        )
+        .order_by(Category.sort_order.asc(), Category.code.asc())
+    )
+    categories_map: dict[UUID, list[DocumentCategorizeItem]] = {}
+    for row in category_rows:
+        conf_f = float(row.confidence) if row.confidence is not None else 1.0
+        conf_f = max(0.0, min(1.0, conf_f))
+        categories_map.setdefault(row.document_id, []).append(
+            DocumentCategorizeItem(
+                category_id=row.id,
+                code=row.code,
+                name=row.name,
+                name_ru=row.name_ru,
+                level=row.level,
+                parent_id=row.parent_id,
+                parent_code=row.parent_code,
+                parent_name=row.parent_name,
+                parent_name_ru=row.parent_name_ru,
+                confidence=conf_f,
+                prediction_source_code=row.prediction_source_code or "unknown",
+                text_source=None,
+            )
+        )
+
+    entity_rows = await db.execute(
+        select(DocumentEntity.document_id, Entity.id, Entity.name, EntityType.code)
+        .join(Entity, Entity.id == DocumentEntity.entity_id)
+        .join(EntityType, EntityType.id == Entity.entity_type_id)
+        .where(DocumentEntity.document_id.in_(doc_ids))
+        .order_by(Entity.name.asc())
+    )
+    entities_map: dict[UUID, list[DocumentListEntityItem]] = {}
+    for row in entity_rows:
+        name = (row.name or "").strip()
+        if name:
+            entities_map.setdefault(row.document_id, []).append(
+                DocumentListEntityItem(
+                    id=row.id,
+                    name=name,
+                    entity_type_code=row.code,
+                )
+            )
+
+    tag_rows = await db.execute(
+        select(DocumentTag.document_id, Tag.id, Tag.name, Tag.language_id)
+        .join(Tag, Tag.id == DocumentTag.tag_id)
+        .where(DocumentTag.document_id.in_(doc_ids))
+        .order_by(Tag.name.asc())
+    )
+    doc_languages = {
+        row.id: (row.original_language_id, row.translated_language_id)
+        for row in docs
+    }
+    original_tags_map: dict[UUID, list[DocumentListTagItem]] = {}
+    translated_tags_map: dict[UUID, list[DocumentListTagItem]] = {}
+    for row in tag_rows:
+        name = (row.name or "").strip()
+        if name:
+            item = DocumentListTagItem(id=row.id, name=name)
+            original_lang_id, translated_lang_id = doc_languages.get(row.document_id, (None, None))
+            if original_lang_id is not None and row.language_id == original_lang_id:
+                original_tags_map.setdefault(row.document_id, []).append(item)
+            elif translated_lang_id is not None and row.language_id == translated_lang_id:
+                translated_tags_map.setdefault(row.document_id, []).append(item)
+            else:
+                original_tags_map.setdefault(row.document_id, []).append(item)
+
+    items = [
+        DocumentListItem(
+            document_id=row.id,
+            title=row.title,
+            source_url=row.source_url,
+            document_type_code=row.document_type_code,
+            document_type_name=row.document_type_name,
+            created_at=row.created_at,
+            published_at=row.published_at,
+            annotation=(row.translated_summary or row.original_summary),
+            main_image=row.extracted_main_image,
+            statuses=statuses_map.get(row.id, []),
+            has_categories=row.id in category_ids,
+            has_entities=row.id in entity_ids,
+            has_tags=row.id in tag_ids,
+            categories=categories_map.get(row.id, []),
+            entities=entities_map.get(row.id, []),
+            original_tags=original_tags_map.get(row.id, []),
+            translated_tags=translated_tags_map.get(row.id, []),
+        )
+        for row in docs
+    ]
+    return DocumentListResponse(total=total or 0, items=items)
+
+
+@router.delete("/{document_id}")
+async def delete_document(
+    document_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Удаление документа (CASCADE по связям документа).
+
+    Теги и сущности из справочников ``tags`` / ``entities`` удаляются только если после
+    удаления документа на них больше нет ни одной строки в ``document_tags`` / ``document_entities``.
+    Доступ: владелец документа или администратор.
+    """
+    user_id = user.id
+    user_is_admin = user.is_admin
+    doc = await db.get(Document, document_id)
+    if doc is None:
+        raise HTTPException(status_code=404, detail="Документ не найден")
+    if not user_is_admin and doc.created_by_id != user_id:
+        raise HTTPException(status_code=403, detail="Нет права удалить этот документ")
+
+    tag_ids = list(
+        dict.fromkeys(
+            (await db.scalars(select(DocumentTag.tag_id).where(DocumentTag.document_id == document_id))).all(),
+        ),
+    )
+    entity_ids = list(
+        dict.fromkeys(
+            (await db.scalars(select(DocumentEntity.entity_id).where(DocumentEntity.document_id == document_id))).all(),
+        ),
+    )
+
+    await _prepare_write_session(db)
+    async with db.begin():
+        await db.execute(delete(Document).where(Document.id == document_id))
+        if tag_ids:
+            still_linked = exists(select(1).where(DocumentTag.tag_id == Tag.id))
+            await db.execute(delete(Tag).where(Tag.id.in_(tag_ids), ~still_linked))
+        if entity_ids:
+            still_linked_ent = exists(select(1).where(DocumentEntity.entity_id == Entity.id))
+            await db.execute(delete(Entity).where(Entity.id.in_(entity_ids), ~still_linked_ent))
+
+    return {"ok": True, "document_id": str(document_id)}
 
 
 @router.post("/extract-url", response_model=DocumentExtractResponse)
@@ -359,6 +641,23 @@ async def document_statuses_catalog(
         DocumentStatusCatalogItem(
             code=row.code,
             name_ru=row.name_ru,
+            description=row.description,
+        )
+        for row in rows
+    ]
+
+
+@router.get("/types/catalog", response_model=list[DocumentTypeCatalogItem])
+async def document_types_catalog(
+    db: AsyncSession = Depends(get_db),
+):
+    rows = await db.execute(
+        select(DocumentType.code, DocumentType.name, DocumentType.description).order_by(DocumentType.name.asc())
+    )
+    return [
+        DocumentTypeCatalogItem(
+            code=row.code,
+            name=row.name,
             description=row.description,
         )
         for row in rows
@@ -848,7 +1147,10 @@ async def document_categories_catalog(
 
     stmt = (
         select(Category.id, Category.name, Category.name_ru)
-        .where(Category.is_active.is_(True))
+        .where(
+            Category.is_active.is_(True),
+            Category.level.in_((1, 2, 3)),
+        )
         .order_by(Category.sort_order.asc(), Category.code.asc())
     )
     if assigned_ids:
@@ -872,6 +1174,8 @@ async def assign_document_category(
     cat = await db.get(Category, payload.category_id)
     if cat is None or not cat.is_active:
         raise HTTPException(status_code=404, detail="Категория не найдена")
+    if cat.level not in (1, 2, 3):
+        raise HTTPException(status_code=400, detail="Назначение категорий этого уровня запрещено")
 
     manual_id = await prediction_source_id(db, "manual")
     await _prepare_write_session(db)

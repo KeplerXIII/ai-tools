@@ -1,4 +1,5 @@
 import { ChangeDetectorRef, Component, ElementRef, ViewChild } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { FloatLabelModule } from 'primeng/floatlabel';
 import { InputTextModule } from 'primeng/inputtext';
@@ -102,11 +103,13 @@ export class ArticleParser {
 
   private buffer = '';
   private originalTextViewportScroll = 0;
+  private lastAutoloadKey = '';
 
   constructor(
     private api: ArticleParserApi,
     public state: ArticleParserState,
     private cdr: ChangeDetectorRef,
+    private route: ActivatedRoute,
   ) {}
 
   // =========================

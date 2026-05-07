@@ -1,3 +1,72 @@
+.login-celebration {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: transparent;
+  pointer-events: auto;
+}
+
+.login-celebration__exit {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 1;
+  padding: 8px 14px;
+  border: 1px solid #cbd5e1;
+  background: var(--light-text-color);
+  color: var(--primary-text-color);
+  font-size: var(--font-size-small);
+  cursor: pointer;
+
+  &:hover {
+    border-color: var(--primary-text-color-light);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--primary-text-color-light);
+    outline-offset: 2px;
+  }
+}
+
+.login-celebration__frame {
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.login-celebration__gif {
+  max-width: 100%;
+  max-height: min(320px, 42vh);
+  width: auto;
+  height: auto;
+  image-rendering: pixelated;
+  -webkit-mask-image: radial-gradient(
+    ellipse 82% 84% at 50% 48%,
+    #fff 38%,
+    rgb(255 255 255 / 72%) 58%,
+    rgb(255 255 255 / 28%) 78%,
+    rgb(255 255 255 / 0%) 100%
+  );
+  mask-image: radial-gradient(
+    ellipse 82% 84% at 50% 48%,
+    #fff 38%,
+    rgb(255 255 255 / 72%) 58%,
+    rgb(255 255 255 / 28%) 78%,
+    rgb(255 255 255 / 0%) 100%
+  );
+  mask-mode: alpha;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+}
+
 .login-shell {
   min-height: 100vh;
   display: grid;

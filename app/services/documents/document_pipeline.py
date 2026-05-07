@@ -7,6 +7,7 @@ from decimal import Decimal
 from typing import Literal
 
 from sqlalchemy import delete, or_, select
+from sqlalchemy.orm import aliased
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -204,7 +205,7 @@ async def create_document_after_extract(
     norm_url: str,
     extract_payload: dict,
     created_by_id: uuid.UUID | None,
-    document_type_code: str = "article",
+    document_type_code: str = "undefined",
 ) -> Document:
     text = extract_payload["text"]
     lang_code = _map_lang_for_db(await asyncio.to_thread(detect_language, text))
@@ -686,6 +687,7 @@ async def run_categorize_document(
     else:
         raise ValidationError("Пустой текст документа")
 
+    parent = aliased(Category)
     q = await session.execute(
         select(
             Category.id,
@@ -694,11 +696,45 @@ async def run_categorize_document(
             Category.name_ru,
             Category.description,
             Category.description_ru,
-        ).where(Category.is_active.is_(True)),
+            Category.level,
+            parent.id.label("parent_id"),
+            parent.code.label("parent_code"),
+            parent.name.label("parent_name"),
+            parent.name_ru.label("parent_name_ru"),
+        )
+        .outerjoin(parent, parent.id == Category.parent_id)
+        .where(
+            Category.is_active.is_(True),
+            Category.level == 3,
+        ),
     )
     pairs: list[tuple[str, str]] = []
-    meta_by_code: dict[str, tuple[uuid.UUID, str, str | None]] = {}
-    for cid, code, name, name_ru, description, description_ru in q.all():
+    meta_by_code: dict[
+        str,
+        tuple[
+            uuid.UUID,
+            str,
+            str | None,
+            int,
+            uuid.UUID | None,
+            str | None,
+            str | None,
+            str | None,
+        ],
+    ] = {}
+    for (
+        cid,
+        code,
+        name,
+        name_ru,
+        description,
+        description_ru,
+        level,
+        parent_id,
+        parent_code,
+        parent_name,
+        parent_name_ru,
+    ) in q.all():
         label = f"{name_ru} — {name}" if name_ru else name
         desc = (description_ru or description or "").strip()
         if desc:
@@ -706,7 +742,16 @@ async def run_categorize_document(
                 desc = desc[:317] + "..."
             label = f"{label}. {desc}"
         pairs.append((code, label))
-        meta_by_code[code] = (cid, name, name_ru)
+        meta_by_code[code] = (
+            cid,
+            name,
+            name_ru,
+            level,
+            parent_id,
+            parent_code,
+            parent_name,
+            parent_name_ru,
+        )
 
     llm_ps = await _llm_ps_id(session)
     assigned: list[DocumentCategorizeItem] = []
@@ -727,7 +772,7 @@ async def run_categorize_document(
             meta = meta_by_code.get(code)
             if meta is None:
                 continue
-            cid, name, name_ru = meta
+            cid, name, name_ru, level, parent_id, parent_code, parent_name, parent_name_ru = meta
             conf_f = float(it.get("confidence", 0.5))
             conf = Decimal(str(conf_f))
             session.add(
@@ -744,6 +789,11 @@ async def run_categorize_document(
                     code=code,
                     name=name,
                     name_ru=name_ru,
+                    level=level,
+                    parent_id=parent_id,
+                    parent_code=parent_code,
+                    parent_name=parent_name,
+                    parent_name_ru=parent_name_ru,
                     confidence=conf_f,
                     prediction_source_code="llm",
                     text_source=text_source,

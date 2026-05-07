@@ -29,7 +29,10 @@ def _parse_any_date(raw: str | None) -> datetime | None:
     text = raw.strip()
     if not text:
         return None
-    parsed = email.utils.parsedate_to_datetime(text)
+    try:
+        parsed = email.utils.parsedate_to_datetime(text)
+    except (TypeError, ValueError):
+        parsed = None
     if parsed is not None:
         return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
     try:
@@ -96,9 +99,13 @@ def _extract_links_from_html(html: str, page_url: str, base_host: str) -> list[D
     return out
 
 
-def _within_days(published_at: datetime | None, threshold: datetime) -> bool:
+def _within_days(published_at: datetime | None, threshold: datetime, *, skip_undated: bool) -> bool:
     if published_at is None:
-        return True
+        return not skip_undated
+    if published_at.tzinfo is None:
+        published_at = published_at.replace(tzinfo=UTC)
+    else:
+        published_at = published_at.astimezone(UTC)
     return published_at >= threshold
 
 
@@ -140,7 +147,13 @@ def _parse_rss_items(xml_text: str) -> list[DiscoveredUrl]:
     return items
 
 
-async def discover_source_news_urls(source_url: str, *, rss_url: str | None, days: int) -> list[DiscoveredUrl]:
+async def discover_source_news_urls(
+    source_url: str,
+    *,
+    rss_url: str | None,
+    days: int,
+    skip_undated: bool = True,
+) -> list[DiscoveredUrl]:
     threshold = datetime.now(UTC) - timedelta(days=days)
     base = normalize_source_url(source_url)
     base_host = urlparse(base).netloc
@@ -150,7 +163,7 @@ async def discover_source_news_urls(source_url: str, *, rss_url: str | None, day
     if rss_url:
         rss_xml = await download_html(rss_url)
         for item in _parse_rss_items(rss_xml):
-            if _within_days(item.published_at, threshold):
+            if _within_days(item.published_at, threshold, skip_undated=skip_undated):
                 discovered[item.url] = item
 
     pages = [base]
@@ -163,7 +176,7 @@ async def discover_source_news_urls(source_url: str, *, rss_url: str | None, day
         except Exception:
             continue
         for item in _extract_links_from_html(html, page_url, base_host):
-            if _within_days(item.published_at, threshold):
+            if _within_days(item.published_at, threshold, skip_undated=skip_undated):
                 if item.url not in discovered:
                     discovered[item.url] = item
             if len(discovered) >= MAX_DISCOVERED_LINKS:
