@@ -6,6 +6,9 @@ import { Router } from '@angular/router';
 import { ChipModule } from 'primeng/chip';
 import { SourceListItem, SourcesApi } from '../sources/sources-api';
 import { AnnotateBatchNotifierService } from '../../core/processing/annotate-batch-notifier.service';
+import { CategorizeBatchNotifierService } from '../../core/processing/categorize-batch-notifier.service';
+import { ExtractorBatchNotifierService } from '../../core/processing/extractor-batch-notifier.service';
+import { TaggerBatchNotifierService } from '../../core/processing/tagger-batch-notifier.service';
 import { TranslateBatchNotifierService } from '../../core/processing/translate-batch-notifier.service';
 import {
   DocumentCategoryItem,
@@ -36,6 +39,18 @@ export class Documents implements OnInit {
   bulkAnnotateLoading = false;
   bulkAnnotateMessage = '';
   bulkAnnotateError = '';
+  bulkCategorizeLoading = false;
+  bulkCategorizeMessage = '';
+  bulkCategorizeError = '';
+  bulkExtractorLoading = false;
+  bulkExtractorMessage = '';
+  bulkExtractorError = '';
+  bulkTagOriginalLoading = false;
+  bulkTagOriginalMessage = '';
+  bulkTagOriginalError = '';
+  bulkTagTranslatedLoading = false;
+  bulkTagTranslatedMessage = '';
+  bulkTagTranslatedError = '';
   pollingBatchId = '';
   pollingControlMessage = '';
   pollingControlError = '';
@@ -60,6 +75,9 @@ export class Documents implements OnInit {
     private readonly sourcesApi: SourcesApi,
     private readonly translateBatchNotifier: TranslateBatchNotifierService,
     private readonly annotateBatchNotifier: AnnotateBatchNotifierService,
+    private readonly categorizeBatchNotifier: CategorizeBatchNotifierService,
+    private readonly extractorBatchNotifier: ExtractorBatchNotifierService,
+    private readonly taggerBatchNotifier: TaggerBatchNotifierService,
     private readonly router: Router,
   ) {}
 
@@ -182,6 +200,106 @@ export class Documents implements OnInit {
     });
   }
 
+  enqueueCategorizeMissing(): void {
+    if (this.bulkCategorizeLoading) {
+      return;
+    }
+    this.bulkCategorizeLoading = true;
+    this.bulkCategorizeMessage = '';
+    this.bulkCategorizeError = '';
+    this.documentsApi.enqueueCategorizeMissingDocuments().subscribe({
+      next: (response) => {
+        this.bulkCategorizeLoading = false;
+        if (response.enqueued > 0) {
+          this.categorizeBatchNotifier.trackBatch(response.batch_id);
+        }
+        this.bulkCategorizeMessage =
+          response.enqueued > 0
+            ? `В очередь поставлено на категоризацию: ${response.enqueued} из ${response.scanned}`
+            : 'Новых документов с переводом без категорий не найдено';
+      },
+      error: () => {
+        this.bulkCategorizeLoading = false;
+        this.bulkCategorizeError = 'Не удалось поставить документы на категоризацию';
+      },
+    });
+  }
+
+  enqueueExtractorMissing(): void {
+    if (this.bulkExtractorLoading) {
+      return;
+    }
+    this.bulkExtractorLoading = true;
+    this.bulkExtractorMessage = '';
+    this.bulkExtractorError = '';
+    this.documentsApi.enqueueExtractorMissingDocuments().subscribe({
+      next: (response) => {
+        this.bulkExtractorLoading = false;
+        if (response.enqueued > 0) {
+          this.extractorBatchNotifier.trackBatch(response.batch_id);
+        }
+        this.bulkExtractorMessage =
+          response.enqueued > 0
+            ? `В очередь extractor поставлено: ${response.enqueued} из ${response.scanned}`
+            : 'Новых документов с оригинальным текстом без сущностей не найдено';
+      },
+      error: () => {
+        this.bulkExtractorLoading = false;
+        this.bulkExtractorError = 'Не удалось поставить документы на извлечение сущностей';
+      },
+    });
+  }
+
+  enqueueTaggerMissingOriginal(): void {
+    if (this.bulkTagOriginalLoading) {
+      return;
+    }
+    this.bulkTagOriginalLoading = true;
+    this.bulkTagOriginalMessage = '';
+    this.bulkTagOriginalError = '';
+    this.documentsApi.enqueueTaggerMissingOriginalDocuments().subscribe({
+      next: (response) => {
+        this.bulkTagOriginalLoading = false;
+        if (response.enqueued > 0) {
+          this.taggerBatchNotifier.trackBatch(response.batch_id, 'original');
+        }
+        this.bulkTagOriginalMessage =
+          response.enqueued > 0
+            ? `В очередь tagger (оригинал) поставлено: ${response.enqueued} из ${response.scanned}`
+            : 'Новых документов с оригиналом без оригинальных тегов не найдено';
+      },
+      error: () => {
+        this.bulkTagOriginalLoading = false;
+        this.bulkTagOriginalError = 'Не удалось поставить документы на извлечение оригинальных тегов';
+      },
+    });
+  }
+
+  enqueueTaggerMissingTranslated(): void {
+    if (this.bulkTagTranslatedLoading) {
+      return;
+    }
+    this.bulkTagTranslatedLoading = true;
+    this.bulkTagTranslatedMessage = '';
+    this.bulkTagTranslatedError = '';
+    this.documentsApi.enqueueTaggerMissingTranslatedDocuments().subscribe({
+      next: (response) => {
+        this.bulkTagTranslatedLoading = false;
+        if (response.enqueued > 0) {
+          this.taggerBatchNotifier.trackBatch(response.batch_id, 'translated');
+        }
+        this.bulkTagTranslatedMessage =
+          response.enqueued > 0
+            ? `В очередь tagger (перевод) поставлено: ${response.enqueued} из ${response.scanned}`
+            : 'Новых документов с переводом без переводных тегов не найдено';
+      },
+      error: () => {
+        this.bulkTagTranslatedLoading = false;
+        this.bulkTagTranslatedError = 'Не удалось поставить документы на извлечение тегов перевода';
+      },
+    });
+  }
+
   stopPollingByBatchId(): void {
     const batchId = this.pollingBatchId.trim();
     if (!batchId) {
@@ -192,7 +310,10 @@ export class Documents implements OnInit {
 
     const stoppedTranslate = this.translateBatchNotifier.stopTrackingByBatchId(batchId);
     const stoppedAnnotate = this.annotateBatchNotifier.stopTrackingByBatchId(batchId);
-    if (stoppedTranslate || stoppedAnnotate) {
+    const stoppedCategorize = this.categorizeBatchNotifier.stopTrackingByBatchId(batchId);
+    const stoppedExtractor = this.extractorBatchNotifier.stopTrackingByBatchId(batchId);
+    const stoppedTagger = this.taggerBatchNotifier.stopTrackingByBatchId(batchId);
+    if (stoppedTranslate || stoppedAnnotate || stoppedCategorize || stoppedExtractor || stoppedTagger) {
       this.pollingControlMessage = `Поллинг для батча ${batchId} остановлен`;
       this.pollingControlError = '';
       return;

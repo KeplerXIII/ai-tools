@@ -65,6 +65,38 @@
       <button class="annotate-missing-btn" type="button" [disabled]="bulkAnnotateLoading" (click)="enqueueAnnotateMissing()">
         {{ bulkAnnotateLoading ? 'Постановка...' : 'Аннотировать все с переводом без аннотации' }}
       </button>
+      <button
+        class="categorize-missing-btn"
+        type="button"
+        [disabled]="bulkCategorizeLoading"
+        (click)="enqueueCategorizeMissing()"
+      >
+        {{ bulkCategorizeLoading ? 'Постановка...' : 'Категоризировать все с переводом без категорий' }}
+      </button>
+      <button
+        class="extractor-missing-btn"
+        type="button"
+        [disabled]="bulkExtractorLoading"
+        (click)="enqueueExtractorMissing()"
+      >
+        {{ bulkExtractorLoading ? 'Постановка...' : 'Extractor: извлечь сущности по оригиналу' }}
+      </button>
+      <button
+        class="tagger-original-btn"
+        type="button"
+        [disabled]="bulkTagOriginalLoading"
+        (click)="enqueueTaggerMissingOriginal()"
+      >
+        {{ bulkTagOriginalLoading ? 'Постановка...' : 'Tagger: теги по оригиналу' }}
+      </button>
+      <button
+        class="tagger-translated-btn"
+        type="button"
+        [disabled]="bulkTagTranslatedLoading"
+        (click)="enqueueTaggerMissingTranslated()"
+      >
+        {{ bulkTagTranslatedLoading ? 'Постановка...' : 'Tagger: теги по переводу' }}
+      </button>
       <label class="filter-item filter-item_batch-stop">
         <span>Остановить поллинг batch_id</span>
         <input type="text" [(ngModel)]="pollingBatchId" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
@@ -82,6 +114,30 @@
     }
     @if (bulkAnnotateError) {
       <div class="state-message state-message_error">{{ bulkAnnotateError }}</div>
+    }
+    @if (bulkCategorizeMessage) {
+      <div class="state-message state-message_success">{{ bulkCategorizeMessage }}</div>
+    }
+    @if (bulkCategorizeError) {
+      <div class="state-message state-message_error">{{ bulkCategorizeError }}</div>
+    }
+    @if (bulkExtractorMessage) {
+      <div class="state-message state-message_success">{{ bulkExtractorMessage }}</div>
+    }
+    @if (bulkExtractorError) {
+      <div class="state-message state-message_error">{{ bulkExtractorError }}</div>
+    }
+    @if (bulkTagOriginalMessage) {
+      <div class="state-message state-message_success">{{ bulkTagOriginalMessage }}</div>
+    }
+    @if (bulkTagOriginalError) {
+      <div class="state-message state-message_error">{{ bulkTagOriginalError }}</div>
+    }
+    @if (bulkTagTranslatedMessage) {
+      <div class="state-message state-message_success">{{ bulkTagTranslatedMessage }}</div>
+    }
+    @if (bulkTagTranslatedError) {
+      <div class="state-message state-message_error">{{ bulkTagTranslatedError }}</div>
     }
     @if (pollingControlMessage) {
       <div class="state-message state-message_success">{{ pollingControlMessage }}</div>

@@ -1,11 +1,18 @@
 <section class="processing-dashboard">
   <header class="topbar">
     <h1 class="title">Мониторинг обработки</h1>
-    <span class="snapshot-time" *ngIf="snapshotAt">Снимок: {{ snapshotAt }}</span>
+    <div class="topbar-actions">
+      <span class="snapshot-time" *ngIf="snapshotAt">Снимок: {{ snapshotAt }}</span>
+      <button class="purge-btn" type="button" [disabled]="purgeLoading" (click)="purgeAllDocuments()">
+        {{ purgeLoading ? 'Очистка...' : 'Очистить документы (debug)' }}
+      </button>
+    </div>
   </header>
 
   <div class="state-box loading" *ngIf="loading">Подключение к live-потоку...</div>
   <div class="state-box error" *ngIf="!loading && error">{{ error }}</div>
+  <div class="state-box success" *ngIf="purgeMessage">{{ purgeMessage }}</div>
+  <div class="state-box error" *ngIf="purgeError">{{ purgeError }}</div>
 
   <section class="counters-panel" *ngIf="counters">
     <h2>Счётчики документов</h2>

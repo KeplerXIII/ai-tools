@@ -25,3 +25,21 @@
     {{ toast.text }}
   </div>
 }
+
+@if (categorizeBatchNotifier.toast$ | async; as toast) {
+  <div class="global-toast" [class.global-toast_error]="toast.kind === 'error'" (click)="categorizeBatchNotifier.dismissToast()">
+    {{ toast.text }}
+  </div>
+}
+
+@if (extractorBatchNotifier.toast$ | async; as toast) {
+  <div class="global-toast" [class.global-toast_error]="toast.kind === 'error'" (click)="extractorBatchNotifier.dismissToast()">
+    {{ toast.text }}
+  </div>
+}
+
+@if (taggerBatchNotifier.toast$ | async; as toast) {
+  <div class="global-toast" [class.global-toast_error]="toast.kind === 'error'" (click)="taggerBatchNotifier.dismissToast()">
+    {{ toast.text }}
+  </div>
+}

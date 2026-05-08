@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
+from contextlib import nullcontext
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Literal
@@ -55,6 +56,7 @@ from app.services.llm.translator import detect_language, translate_text
 from app.services.processing.jobs import JobStatus, JobType, processing_job
 
 NOT_FOUND_ENTITY_NAME = "не обнаружено"
+FALLBACK_CATEGORY_CODE = "other_domain"
 
 
 def _published_at_from_extract_date(date_str: str | None) -> datetime | None:
@@ -566,6 +568,7 @@ async def run_tag_document(
     max_tags: int,
     use_translation: bool,
     started_by_id: uuid.UUID | None,
+    track_job: bool = True,
 ) -> Document:
     doc = await session.get(Document, document_id)
     if doc is None:
@@ -581,15 +584,20 @@ async def run_tag_document(
 
     llm_ps = await _llm_ps_id(session)
 
-    async with processing_job(
-        session,
-        document_id=document_id,
-        job_type=JobType.TAG,
-        model_name=settings.model_tagging,
-        provider=None,
-        started_by_id=started_by_id,
-        llm_task_for_provider=LLMTask.TAGGING,
-    ):
+    if track_job:
+        job_ctx = processing_job(
+            session,
+            document_id=document_id,
+            job_type=JobType.TAG,
+            model_name=settings.model_tagging,
+            provider=None,
+            started_by_id=started_by_id,
+            llm_task_for_provider=LLMTask.TAGGING,
+        )
+    else:
+        job_ctx = nullcontext()
+
+    async with job_ctx:
         await delete_auto_document_tags(session, document_id, language_id=lang_id)
         tags_payload = await tag_text(src, max_tags=max_tags)
         for tag_name in tags_payload.get("tags", []):
@@ -609,6 +617,7 @@ async def run_entity_extract_document(
     *,
     document_id: uuid.UUID,
     started_by_id: uuid.UUID | None,
+    track_job: bool = True,
 ) -> Document:
     doc = await session.get(Document, document_id)
     if doc is None:
@@ -623,15 +632,20 @@ async def run_entity_extract_document(
     et_man = await entity_type_id_by_code(session, "manufacturer")
     et_con = await entity_type_id_by_code(session, "contract")
 
-    async with processing_job(
-        session,
-        document_id=document_id,
-        job_type=JobType.ENTITY_EXTRACT,
-        model_name=settings.model_entity_extraction,
-        provider=None,
-        started_by_id=started_by_id,
-        llm_task_for_provider=LLMTask.ENTITY_EXTRACTION,
-    ):
+    if track_job:
+        job_ctx = processing_job(
+            session,
+            document_id=document_id,
+            job_type=JobType.ENTITY_EXTRACT,
+            model_name=settings.model_entity_extraction,
+            provider=None,
+            started_by_id=started_by_id,
+            llm_task_for_provider=LLMTask.ENTITY_EXTRACTION,
+        )
+    else:
+        job_ctx = nullcontext()
+
+    async with job_ctx:
         await delete_auto_document_entities(session, document_id)
         raw = await extract_entities(src)
         military_equipment = [name.strip() for name in raw.get("military_equipment", []) if name and name.strip()]
@@ -680,6 +694,7 @@ async def run_categorize_document(
     *,
     document_id: uuid.UUID,
     started_by_id: uuid.UUID | None,
+    track_job: bool = True,
 ) -> tuple[Document, list[DocumentCategorizeItem]]:
     doc = await session.get(Document, document_id)
     if doc is None:
@@ -765,15 +780,20 @@ async def run_categorize_document(
     llm_ps = await _llm_ps_id(session)
     assigned: list[DocumentCategorizeItem] = []
 
-    async with processing_job(
-        session,
-        document_id=document_id,
-        job_type=JobType.CATEGORIZE,
-        model_name=settings.model_categorization,
-        provider=None,
-        started_by_id=started_by_id,
-        llm_task_for_provider=LLMTask.CATEGORIZATION,
-    ):
+    if track_job:
+        job_ctx = processing_job(
+            session,
+            document_id=document_id,
+            job_type=JobType.CATEGORIZE,
+            model_name=settings.model_categorization,
+            provider=None,
+            started_by_id=started_by_id,
+            llm_task_for_provider=LLMTask.CATEGORIZATION,
+        )
+    else:
+        job_ctx = nullcontext()
+
+    async with job_ctx:
         await delete_auto_document_categories(session, document_id)
         items = await categorize_text(src, pairs)
         unique_items_by_category: dict[
@@ -822,6 +842,52 @@ async def run_categorize_document(
                 },
             )
             await session.execute(stmt)
+        else:
+            fallback = await session.execute(
+                select(
+                    Category.id,
+                    Category.code,
+                    Category.name,
+                    Category.name_ru,
+                    Category.level,
+                ).where(Category.code == FALLBACK_CATEGORY_CODE)
+            )
+            fallback_row = fallback.first()
+            if fallback_row is None:
+                raise ValidationError(
+                    f"Не найдена fallback-категория '{FALLBACK_CATEGORY_CODE}'. Примените seed_reference_data."
+                )
+
+            fallback_conf = Decimal("1.0")
+            stmt = insert(DocumentCategory).values(
+                [
+                    {
+                        "document_id": document_id,
+                        "category_id": fallback_row.id,
+                        "confidence": fallback_conf,
+                        "prediction_source_id": llm_ps,
+                    }
+                ]
+            )
+            stmt = stmt.on_conflict_do_update(
+                index_elements=[DocumentCategory.document_id, DocumentCategory.category_id],
+                set_={
+                    "confidence": stmt.excluded.confidence,
+                    "prediction_source_id": stmt.excluded.prediction_source_id,
+                },
+            )
+            await session.execute(stmt)
+            unique_items_by_category[fallback_row.id] = (
+                fallback_row.code,
+                fallback_row.name,
+                fallback_row.name_ru,
+                fallback_row.level,
+                None,
+                None,
+                None,
+                None,
+                fallback_conf,
+            )
 
         for cid, payload in unique_items_by_category.items():
             (

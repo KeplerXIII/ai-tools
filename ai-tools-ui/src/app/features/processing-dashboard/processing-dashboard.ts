@@ -27,6 +27,9 @@ export class ProcessingDashboard implements OnInit, OnDestroy {
   snapshotAt = '';
   loading = true;
   error = '';
+  purgeLoading = false;
+  purgeMessage = '';
+  purgeError = '';
 
   counterFlash: Partial<Record<CounterKey, CounterFlashKind>> = {};
   jobFlash: Record<string, JobFlashKind> = {};
@@ -201,6 +204,31 @@ export class ProcessingDashboard implements OnInit, OnDestroy {
 
   isCellFlashing(jobId: string, field: JobFieldKey): boolean {
     return Boolean(this.jobCellFlash[`${jobId}:${field}`]);
+  }
+
+  async purgeAllDocuments(): Promise<void> {
+    if (this.purgeLoading) {
+      return;
+    }
+    const ok = window.confirm(
+      'Удалить ВСЕ документы и связанные данные (теги/сущности/категории/джобы)? Действие необратимо.',
+    );
+    if (!ok) {
+      return;
+    }
+    this.purgeLoading = true;
+    this.purgeMessage = '';
+    this.purgeError = '';
+    this.cdr.detectChanges();
+    try {
+      const result = await this.api.purgeAllDocuments();
+      this.purgeMessage = `Удалено документов: ${result.deleted_documents}`;
+    } catch {
+      this.purgeError = 'Не удалось очистить документы';
+    } finally {
+      this.purgeLoading = false;
+      this.cdr.detectChanges();
+    }
   }
 
   private resetFlashLater(key: string, handler: () => void): void {

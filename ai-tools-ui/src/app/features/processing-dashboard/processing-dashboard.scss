@@ -12,6 +12,12 @@
   gap: 12px;
 }
 
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .title {
   margin: 0;
 }
@@ -35,6 +41,27 @@
   background: #fef2f2;
   border-color: #fecaca;
   color: #991b1b;
+}
+
+.state-box.success {
+  background: #ecfdf5;
+  border-color: #86efac;
+  color: #166534;
+}
+
+.purge-btn {
+  height: 34px;
+  border: 1px solid #b91c1c;
+  border-radius: 999px;
+  background: #b91c1c;
+  color: #fff;
+  padding: 0 12px;
+  cursor: pointer;
+}
+
+.purge-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
 }
 
 .counters-panel,

@@ -79,6 +79,66 @@
   cursor: not-allowed;
 }
 
+.categorize-missing-btn {
+  height: 40px;
+  border: 1px solid #7c3aed;
+  border-radius: 999px;
+  background: #7c3aed;
+  color: #fff;
+  padding: 0 14px;
+  cursor: pointer;
+}
+
+.categorize-missing-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.extractor-missing-btn {
+  height: 40px;
+  border: 1px solid #b45309;
+  border-radius: 999px;
+  background: #b45309;
+  color: #fff;
+  padding: 0 14px;
+  cursor: pointer;
+}
+
+.extractor-missing-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.tagger-original-btn {
+  height: 40px;
+  border: 1px solid #0f766e;
+  border-radius: 999px;
+  background: #0f766e;
+  color: #fff;
+  padding: 0 14px;
+  cursor: pointer;
+}
+
+.tagger-original-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.tagger-translated-btn {
+  height: 40px;
+  border: 1px solid #0369a1;
+  border-radius: 999px;
+  background: #0369a1;
+  color: #fff;
+  padding: 0 14px;
+  cursor: pointer;
+}
+
+.tagger-translated-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
 .filter-item_batch-stop {
   min-width: 360px;
 }

@@ -58,10 +58,19 @@ class Settings(BaseSettings):
     saq_queue_url: str = "redis://localhost:6379/0"
     saq_translate_queue_name: str = "ai-tools-translate"
     saq_annotate_queue_name: str = "ai-tools-annotate"
+    saq_categorize_queue_name: str = "ai-tools-categorize"
+    saq_extractor_queue_name: str = "ai-tools-extractor"
+    saq_tagger_queue_name: str = "ai-tools-tagger"
     saq_translate_worker_concurrency: int = 1
     saq_annotate_worker_concurrency: int = 1
+    saq_categorize_worker_concurrency: int = 5
+    saq_extractor_worker_concurrency: int = 5
+    saq_tagger_worker_concurrency: int = 5
     saq_translate_job_timeout_sec: int = 1800
     saq_annotate_job_timeout_sec: int = 1800
+    saq_categorize_job_timeout_sec: int = 1800
+    saq_extractor_job_timeout_sec: int = 1800
+    saq_tagger_job_timeout_sec: int = 1800
 
     # --- documents ---
     document_lock_expire_minutes: int = 15

@@ -42,6 +42,48 @@ services:
       - postgres
       - redis
 
+  ai-tools-categorize-worker:
+    build: .
+    container_name: ai-tools-categorize-worker
+    env_file:
+      - .env
+    command: ["uv", "run", "saq", "app.workers.documents_categorize_worker.settings"]
+    networks:
+      - ai_stack
+    shm_size: "1gb"
+    restart: unless-stopped
+    depends_on:
+      - postgres
+      - redis
+
+  ai-tools-extractor-worker:
+    build: .
+    container_name: ai-tools-extractor-worker
+    env_file:
+      - .env
+    command: ["uv", "run", "saq", "app.workers.documents_extractor_worker.settings"]
+    networks:
+      - ai_stack
+    shm_size: "1gb"
+    restart: unless-stopped
+    depends_on:
+      - postgres
+      - redis
+
+  ai-tools-tagger-worker:
+    build: .
+    container_name: ai-tools-tagger-worker
+    env_file:
+      - .env
+    command: ["uv", "run", "saq", "app.workers.documents_tagger_worker.settings"]
+    networks:
+      - ai_stack
+    shm_size: "1gb"
+    restart: unless-stopped
+    depends_on:
+      - postgres
+      - redis
+
   ai-tools-ui:
     build:
       context: ./ai-tools-ui

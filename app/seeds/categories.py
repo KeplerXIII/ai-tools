@@ -11,9 +11,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.infrastructure.db.models import Category
 from app.seeds.defense_taxonomy import DEFENSE_CATEGORY_TAXONOMY
 
+_FALLBACK_CATEGORIES: tuple[dict[str, object], ...] = (
+    {
+        "code": "other_domain",
+        "name": "Other domain",
+        "name_ru": "Другое",
+        "description": "Documents outside of the current defense taxonomy scope.",
+        "description_ru": "Материалы вне предметной области текущей таксономии.",
+        "level": 1,
+        "parent_code": None,
+    },
+)
+
 
 async def apply_categories_seed(session: AsyncSession) -> int:
-    tax = sorted(DEFENSE_CATEGORY_TAXONOMY, key=lambda x: (x["level"], x["code"]))
+    tax = sorted([*DEFENSE_CATEGORY_TAXONOMY, *_FALLBACK_CATEGORIES], key=lambda x: (x["level"], x["code"]))
     res = await session.execute(select(Category.code, Category.id))
     id_by_code: dict[str, uuid.UUID] = {row[0]: row[1] for row in res.all()}
 

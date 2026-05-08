@@ -36,6 +36,11 @@ export interface ProcessingDashboardSnapshot {
   counters: ProcessingCounters;
 }
 
+export interface PurgeDocumentsResponse {
+  ok: boolean;
+  deleted_documents: number;
+}
+
 @Injectable({
   providedIn: 'root',
 })
@@ -143,5 +148,20 @@ export class ProcessingDashboardApi {
 
       return () => controller.abort();
     });
+  }
+
+  async purgeAllDocuments(): Promise<PurgeDocumentsResponse> {
+    const token = this.authService.getToken();
+    const response = await fetch('/api/v1/processing/debug/documents/purge', {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+    if (!response.ok) {
+      throw new Error(`Ошибка очистки документов: ${response.status}`);
+    }
+    return (await response.json()) as PurgeDocumentsResponse;
   }
 }
