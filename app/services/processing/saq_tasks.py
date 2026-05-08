@@ -51,7 +51,13 @@ async def translate_document_job(
                 }
             raise
         except Exception:
-            await session.rollback()
+            # run_translate_document() marks ProcessingJob as failed inside the same session.
+            # Commit here to persist that audit trail; nested transaction already rolls back
+            # document mutations from the failed pipeline step.
+            try:
+                await session.commit()
+            except Exception:
+                await session.rollback()
             if batch_id:
                 await inc_translate_batch_counter(batch_id, "failed")
             raise
