@@ -139,6 +139,15 @@ export class ArticleParserCategoriesComponent implements OnChanges, OnDestroy {
     });
   }
 
+  categoryParentLabel(cat: DocumentCategoryRef): string {
+    // Не показываем самый верхний доменный узел (например, "Оборона и безопасность")
+    // для категорий верхнего рабочего уровня.
+    if (Number(cat.level || 0) <= 2) {
+      return '';
+    }
+    return (cat.parent_name_ru || cat.parent_name || cat.parent_code || '').trim();
+  }
+
   categoryChipLabel(cat: DocumentCategoryRef): string {
     const title = (cat.name_ru || cat.name || cat.code).trim();
     const confPct =
@@ -194,6 +203,33 @@ export class ArticleParserCategoriesComponent implements OnChanges, OnDestroy {
       });
     }
 
+    // Иногда API может прислать дочерние узлы без полного набора родительских записей.
+    // Создаём минимальные placeholder-узлы родителей, чтобы не терять иерархию.
+    for (const item of items) {
+      const parentId = item.parent_id ? String(item.parent_id) : '';
+      if (!parentId || byId.has(parentId)) {
+        continue;
+      }
+
+      const parentLabel = item.parent_name_ru || item.parent_name || item.parent_code || parentId;
+      byId.set(parentId, {
+        key: parentId,
+        label: parentLabel,
+        data: {
+          category_id: parentId,
+          code: item.parent_code || parentId,
+          name: item.parent_name || parentLabel,
+          name_ru: item.parent_name_ru || parentLabel,
+          level: Math.max(1, Number(item.level || 1) - 1),
+          parent_id: null,
+          parent_code: null,
+          parent_name: null,
+          parent_name_ru: null,
+        },
+        children: [],
+      });
+    }
+
     for (const item of items) {
       const node = byId.get(String(item.category_id));
       if (!node) {
@@ -229,7 +265,14 @@ export class ArticleParserCategoriesComponent implements OnChanges, OnDestroy {
   private hoistTopLevelBranches(
     roots: TreeNode<DocumentCategoryCatalogRef>[],
   ): TreeNode<DocumentCategoryCatalogRef>[] {
-    const merged = roots.flatMap((node) => (node.children?.length ? node.children : [node]));
+    const merged = roots.flatMap((node) => {
+      const level = Number(node.data?.level || 0);
+      const isDomainTopLevel = level <= 1;
+      if (isDomainTopLevel && node.children?.length) {
+        return node.children;
+      }
+      return [node];
+    });
     merged.sort((a, b) => String(a.label || '').localeCompare(String(b.label || '')));
     return merged;
   }

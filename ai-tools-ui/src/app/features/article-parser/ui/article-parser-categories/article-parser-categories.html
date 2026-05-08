@@ -90,7 +90,10 @@
             />
 
             <span class="categories-knob-label">
-              {{ cat.name_ru || cat.name || cat.code }}
+              @if (categoryParentLabel(cat); as parentLabel) {
+                <span class="categories-knob-label-parent">{{ parentLabel }}</span>
+              }
+              <span class="categories-knob-label-own">{{ cat.name_ru || cat.name || cat.code }}</span>
             </span>
 
             @if (isEditingCategoriesBlock && !loadingDocumentCategoriesMutation) {
