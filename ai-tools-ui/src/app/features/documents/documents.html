@@ -59,7 +59,16 @@
       </label>
 
       <button class="reset-btn" type="button" (click)="resetFilters()">Сбросить</button>
+      <button class="translate-missing-btn" type="button" [disabled]="bulkTranslateLoading" (click)="enqueueTranslateMissing()">
+        {{ bulkTranslateLoading ? 'Постановка...' : 'Перевести все без перевода' }}
+      </button>
     </div>
+    @if (bulkTranslateMessage) {
+      <div class="state-message state-message_success">{{ bulkTranslateMessage }}</div>
+    }
+    @if (bulkTranslateError) {
+      <div class="state-message state-message_error">{{ bulkTranslateError }}</div>
+    }
   </header>
 
   @if (loading) {

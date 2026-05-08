@@ -54,6 +54,12 @@ class Settings(BaseSettings):
     # --- runtime ---
     llm_timeout: int = 120
 
+    # --- background processing (SAQ) ---
+    saq_queue_url: str = "redis://localhost:6379/0"
+    saq_queue_name: str = "ai-tools"
+    saq_worker_concurrency: int = 1
+    saq_translate_job_timeout_sec: int = 1800
+
     # --- documents ---
     document_lock_expire_minutes: int = 15
 
