@@ -506,20 +506,27 @@ async def persist_document_translation(
     translated_text: str,
     target_lang: str,
     started_by_id: uuid.UUID | None,
+    track_job: bool = True,
 ) -> Document:
     doc = await session.get(Document, document_id)
     if doc is None:
         raise NotFoundError("Документ не найден")
 
-    async with processing_job(
-        session,
-        document_id=document_id,
-        job_type=JobType.TRANSLATE,
-        model_name=settings.model_translation,
-        provider=None,
-        started_by_id=started_by_id,
-        llm_task_for_provider=LLMTask.TRANSLATION,
-    ):
+    if track_job:
+        async with processing_job(
+            session,
+            document_id=document_id,
+            job_type=JobType.TRANSLATE,
+            model_name=settings.model_translation,
+            provider=None,
+            started_by_id=started_by_id,
+            llm_task_for_provider=LLMTask.TRANSLATION,
+        ):
+            tl_id = await language_id_by_code(session, target_lang)
+            doc.translated_content = translated_text
+            doc.translated_language_id = tl_id
+            doc.translated_summary_stale = True
+    else:
         tl_id = await language_id_by_code(session, target_lang)
         doc.translated_content = translated_text
         doc.translated_language_id = tl_id
@@ -533,6 +540,7 @@ async def run_translate_document(
     document_id: uuid.UUID,
     target_lang: str,
     started_by_id: uuid.UUID | None,
+    track_job: bool = True,
 ) -> Document:
     doc = await session.get(Document, document_id)
     if doc is None:
@@ -547,6 +555,7 @@ async def run_translate_document(
         translated_text=text,
         target_lang=target_lang,
         started_by_id=started_by_id,
+        track_job=track_job,
     )
 
 
@@ -881,20 +890,26 @@ async def persist_document_summary(
     source: SummarySource,
     annotation: str,
     started_by_id: uuid.UUID | None,
+    track_job: bool = True,
 ) -> Document:
     doc = await session.get(Document, document_id)
     if doc is None:
         raise NotFoundError("Документ не найден")
 
-    async with processing_job(
-        session,
-        document_id=document_id,
-        job_type=JobType.SUMMARY,
-        model_name=settings.model_summary,
-        provider=None,
-        started_by_id=started_by_id,
-        llm_task_for_provider=LLMTask.SUMMARY,
-    ):
+    if track_job:
+        async with processing_job(
+            session,
+            document_id=document_id,
+            job_type=JobType.SUMMARY,
+            model_name=settings.model_summary,
+            provider=None,
+            started_by_id=started_by_id,
+            llm_task_for_provider=LLMTask.SUMMARY,
+        ):
+            # Summarizer prompts produce Russian; store in translated_summary only.
+            doc.translated_summary = annotation
+            doc.translated_summary_stale = False
+    else:
         # Summarizer prompts produce Russian; store in translated_summary only.
         doc.translated_summary = annotation
         doc.translated_summary_stale = False
@@ -907,6 +922,7 @@ async def run_summary_document(
     document_id: uuid.UUID,
     source: SummarySource,
     started_by_id: uuid.UUID | None,
+    track_job: bool = True,
 ) -> tuple[Document, str]:
     doc = await session.get(Document, document_id)
     if doc is None:
@@ -927,6 +943,7 @@ async def run_summary_document(
         source=source,
         annotation=ann,
         started_by_id=started_by_id,
+        track_job=track_job,
     )
     return doc, ann
 

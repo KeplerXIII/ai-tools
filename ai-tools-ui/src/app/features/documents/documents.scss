@@ -64,6 +64,35 @@
   cursor: not-allowed;
 }
 
+.annotate-missing-btn {
+  height: 40px;
+  border: 1px solid #047857;
+  border-radius: 999px;
+  background: #047857;
+  color: #fff;
+  padding: 0 14px;
+  cursor: pointer;
+}
+
+.annotate-missing-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.filter-item_batch-stop {
+  min-width: 360px;
+}
+
+.stop-polling-btn {
+  height: 40px;
+  border: 1px solid #9ca3af;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #0f172a;
+  padding: 0 14px;
+  cursor: pointer;
+}
+
 .documents-list {
   display: flex;
   flex-direction: column;

@@ -26,3 +26,27 @@ class TranslateBatchStatusResponse(BaseModel):
     skipped: int
     pending: int
     done: bool
+
+
+class EnqueueAnnotateMissingRequest(BaseModel):
+    limit: int | None = Field(default=None, ge=1, le=10_000)
+
+
+class EnqueueAnnotateMissingResponse(BaseModel):
+    ok: bool = True
+    batch_id: str
+    queue: str
+    scanned: int
+    enqueued: int
+
+
+class AnnotateBatchStatusResponse(BaseModel):
+    ok: bool = True
+    batch_id: str
+    scanned: int
+    enqueued: int
+    completed: int
+    failed: int
+    skipped: int
+    pending: int
+    done: bool

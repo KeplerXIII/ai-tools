@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { BehaviorSubject, Subscription, timer } from 'rxjs';
 
-import { DocumentsApi, TranslateMissingBatchStatusResponse } from '../../features/documents/documents-api';
+import { AnnotateMissingBatchStatusResponse, DocumentsApi } from '../../features/documents/documents-api';
 
 type ToastKind = 'success' | 'error';
 
@@ -14,13 +14,12 @@ export interface GlobalToast {
 @Injectable({
   providedIn: 'root',
 })
-export class TranslateBatchNotifierService {
-  private readonly storageKey = 'translate_missing_batch_id';
+export class AnnotateBatchNotifierService {
+  private readonly storageKey = 'annotate_missing_batch_id';
   private pollSub: Subscription | null = null;
   private hideTimer: ReturnType<typeof setTimeout> | null = null;
 
   private readonly _toast = new BehaviorSubject<GlobalToast | null>(null);
-  /** Async pipe в корневом компоненте запускает change detection при обновлении тоста. */
   readonly toast$ = this._toast.asObservable();
 
   constructor(private readonly documentsApi: DocumentsApi) {}
@@ -61,7 +60,7 @@ export class TranslateBatchNotifierService {
   private startPolling(batchId: string): void {
     this.pollSub?.unsubscribe();
     this.pollSub = timer(0, 5000).subscribe(() => {
-      this.documentsApi.getTranslateMissingBatchStatus(batchId).subscribe({
+      this.documentsApi.getAnnotateMissingBatchStatus(batchId).subscribe({
         next: (status) => this.handleStatus(status),
         error: (err: HttpErrorResponse) => {
           if (err.status === 404) {
@@ -72,7 +71,7 @@ export class TranslateBatchNotifierService {
     });
   }
 
-  private handleStatus(status: TranslateMissingBatchStatusResponse): void {
+  private handleStatus(status: AnnotateMissingBatchStatusResponse): void {
     if (!status.done) {
       return;
     }
@@ -80,7 +79,7 @@ export class TranslateBatchNotifierService {
     const hasErrors = status.failed > 0;
     this._toast.next({
       kind: hasErrors ? 'error' : 'success',
-      text: `Перевод завершен: переведено ${status.completed}, ошибок ${status.failed}, пропущено ${status.skipped}`,
+      text: `Аннотация завершена: готово ${status.completed}, ошибок ${status.failed}, пропущено ${status.skipped}`,
     });
     this.stopTracking();
 

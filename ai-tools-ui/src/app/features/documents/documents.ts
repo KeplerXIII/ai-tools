@@ -5,6 +5,7 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { ChipModule } from 'primeng/chip';
 import { SourceListItem, SourcesApi } from '../sources/sources-api';
+import { AnnotateBatchNotifierService } from '../../core/processing/annotate-batch-notifier.service';
 import { TranslateBatchNotifierService } from '../../core/processing/translate-batch-notifier.service';
 import {
   DocumentCategoryItem,
@@ -32,6 +33,12 @@ export class Documents implements OnInit {
   bulkTranslateLoading = false;
   bulkTranslateMessage = '';
   bulkTranslateError = '';
+  bulkAnnotateLoading = false;
+  bulkAnnotateMessage = '';
+  bulkAnnotateError = '';
+  pollingBatchId = '';
+  pollingControlMessage = '';
+  pollingControlError = '';
 
   selectedStatusCode = '';
   selectedDocumentTypeCode = '';
@@ -52,6 +59,7 @@ export class Documents implements OnInit {
     private readonly documentsApi: DocumentsApi,
     private readonly sourcesApi: SourcesApi,
     private readonly translateBatchNotifier: TranslateBatchNotifierService,
+    private readonly annotateBatchNotifier: AnnotateBatchNotifierService,
     private readonly router: Router,
   ) {}
 
@@ -147,6 +155,51 @@ export class Documents implements OnInit {
         this.bulkTranslateError = 'Не удалось поставить документы на перевод';
       },
     });
+  }
+
+  enqueueAnnotateMissing(): void {
+    if (this.bulkAnnotateLoading) {
+      return;
+    }
+    this.bulkAnnotateLoading = true;
+    this.bulkAnnotateMessage = '';
+    this.bulkAnnotateError = '';
+    this.documentsApi.enqueueAnnotateMissingDocuments().subscribe({
+      next: (response) => {
+        this.bulkAnnotateLoading = false;
+        if (response.enqueued > 0) {
+          this.annotateBatchNotifier.trackBatch(response.batch_id);
+        }
+        this.bulkAnnotateMessage =
+          response.enqueued > 0
+            ? `В очередь поставлено на аннотацию: ${response.enqueued} из ${response.scanned}`
+            : 'Новых документов с переводом без аннотации не найдено';
+      },
+      error: () => {
+        this.bulkAnnotateLoading = false;
+        this.bulkAnnotateError = 'Не удалось поставить документы на аннотацию';
+      },
+    });
+  }
+
+  stopPollingByBatchId(): void {
+    const batchId = this.pollingBatchId.trim();
+    if (!batchId) {
+      this.pollingControlError = 'Укажите batch_id';
+      this.pollingControlMessage = '';
+      return;
+    }
+
+    const stoppedTranslate = this.translateBatchNotifier.stopTrackingByBatchId(batchId);
+    const stoppedAnnotate = this.annotateBatchNotifier.stopTrackingByBatchId(batchId);
+    if (stoppedTranslate || stoppedAnnotate) {
+      this.pollingControlMessage = `Поллинг для батча ${batchId} остановлен`;
+      this.pollingControlError = '';
+      return;
+    }
+
+    this.pollingControlError = `Активный поллинг для батча ${batchId} не найден`;
+    this.pollingControlMessage = '';
   }
 
   sourceFilterLabel(src: SourceListItem): string {

@@ -19,3 +19,9 @@
     {{ toast.text }}
   </div>
 }
+
+@if (annotateBatchNotifier.toast$ | async; as toast) {
+  <div class="global-toast" [class.global-toast_error]="toast.kind === 'error'" (click)="annotateBatchNotifier.dismissToast()">
+    {{ toast.text }}
+  </div>
+}

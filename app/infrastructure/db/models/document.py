@@ -233,6 +233,9 @@ class ProcessingJob(Base):
 
     model_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     provider: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    batch_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    queue_name: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    queue_job_key: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     started_by_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

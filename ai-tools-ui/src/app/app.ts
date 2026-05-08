@@ -7,6 +7,7 @@ import { MatListModule } from '@angular/material/list';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { HeaderComponent } from './shared/ui/header/header.component';
 import { SidebarComponent } from './shared/ui/sidebar/sidebar-component';
+import { AnnotateBatchNotifierService } from './core/processing/annotate-batch-notifier.service';
 import { AuthService } from './core/auth/auth.service';
 import { TranslateBatchNotifierService } from './core/processing/translate-batch-notifier.service';
 
@@ -29,8 +30,10 @@ export class App {
     private readonly router: Router,
     private readonly authService: AuthService,
     readonly translateBatchNotifier: TranslateBatchNotifierService,
+    readonly annotateBatchNotifier: AnnotateBatchNotifierService,
   ) {
     this.translateBatchNotifier.initFromStorage();
+    this.annotateBatchNotifier.initFromStorage();
   }
 
   get showAppShell(): boolean {

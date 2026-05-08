@@ -93,6 +93,26 @@ export interface TranslateMissingBatchStatusResponse {
   done: boolean;
 }
 
+export interface AnnotateMissingDocumentsResponse {
+  ok: boolean;
+  batch_id: string;
+  queue: string;
+  scanned: number;
+  enqueued: number;
+}
+
+export interface AnnotateMissingBatchStatusResponse {
+  ok: boolean;
+  batch_id: string;
+  scanned: number;
+  enqueued: number;
+  completed: number;
+  failed: number;
+  skipped: number;
+  pending: number;
+  done: boolean;
+}
+
 export interface ListDocumentsFilters {
   statusCode?: string;
   documentTypeCode?: string;
@@ -154,6 +174,21 @@ export class DocumentsApi {
   getTranslateMissingBatchStatus(batchId: string): Observable<TranslateMissingBatchStatusResponse> {
     return this.http.get<TranslateMissingBatchStatusResponse>(
       `/api/v1/processing/documents/translate-missing/${batchId}`,
+    );
+  }
+
+  enqueueAnnotateMissingDocuments(
+    payload: { limit?: number } = {},
+  ): Observable<AnnotateMissingDocumentsResponse> {
+    return this.http.post<AnnotateMissingDocumentsResponse>(
+      '/api/v1/processing/documents/annotate-missing',
+      payload,
+    );
+  }
+
+  getAnnotateMissingBatchStatus(batchId: string): Observable<AnnotateMissingBatchStatusResponse> {
+    return this.http.get<AnnotateMissingBatchStatusResponse>(
+      `/api/v1/processing/documents/annotate-missing/${batchId}`,
     );
   }
 }

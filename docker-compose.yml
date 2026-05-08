@@ -28,6 +28,20 @@ services:
       - postgres
       - redis
 
+  ai-tools-annotate-worker:
+    build: .
+    container_name: ai-tools-annotate-worker
+    env_file:
+      - .env
+    command: ["uv", "run", "saq", "app.workers.documents_annotate_worker.settings"]
+    networks:
+      - ai_stack
+    shm_size: "1gb"
+    restart: unless-stopped
+    depends_on:
+      - postgres
+      - redis
+
   ai-tools-ui:
     build:
       context: ./ai-tools-ui
