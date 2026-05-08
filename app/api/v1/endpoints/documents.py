@@ -75,6 +75,7 @@ from app.services.documents.document_pipeline import (
     run_tag_document,
     run_translate_document,
     save_document_after_edit,
+    sync_document_statuses,
     update_document_metadata,
 )
 from app.services.documents.url_norm import normalize_source_url
@@ -732,6 +733,11 @@ async def assign_document_status(
             index_elements=[DocumentStatusAssignment.document_id, DocumentStatusAssignment.status_id]
         )
         await db.execute(stmt)
+        await sync_document_statuses(
+            db,
+            document_id=document_id,
+            assigned_by_id=user_id,
+        )
     return {"ok": True, "document_id": str(document_id), "status_code": status_code}
 
 
@@ -762,6 +768,11 @@ async def remove_document_status(
                 DocumentStatusAssignment.document_id == document_id,
                 DocumentStatusAssignment.status_id == status_id,
             )
+        )
+        await sync_document_statuses(
+            db,
+            document_id=document_id,
+            assigned_by_id=user.id,
         )
     return {"ok": True, "document_id": str(document_id), "status_code": normalized_code}
 
@@ -933,6 +944,11 @@ async def assign_document_tag(
             index_elements=[DocumentTag.document_id, DocumentTag.tag_id],
         )
         await db.execute(stmt)
+        await sync_document_statuses(
+            db,
+            document_id=document_id,
+            assigned_by_id=user.id,
+        )
     return {"ok": True, "document_id": str(document_id), "tag_id": str(payload.tag_id)}
 
 
@@ -955,6 +971,11 @@ async def remove_document_tag(
                 DocumentTag.document_id == document_id,
                 DocumentTag.tag_id == tag_id,
             )
+        )
+        await sync_document_statuses(
+            db,
+            document_id=document_id,
+            assigned_by_id=user.id,
         )
     return {"ok": True, "document_id": str(document_id), "tag_id": str(tag_id)}
 
@@ -1071,6 +1092,11 @@ async def assign_document_entity(
             index_elements=[DocumentEntity.document_id, DocumentEntity.entity_id],
         )
         await db.execute(stmt)
+        await sync_document_statuses(
+            db,
+            document_id=document_id,
+            assigned_by_id=user.id,
+        )
     return {"ok": True, "document_id": str(document_id), "entity_id": str(payload.entity_id)}
 
 
@@ -1093,6 +1119,11 @@ async def remove_document_entity(
                 DocumentEntity.document_id == document_id,
                 DocumentEntity.entity_id == entity_id,
             )
+        )
+        await sync_document_statuses(
+            db,
+            document_id=document_id,
+            assigned_by_id=user.id,
         )
     return {"ok": True, "document_id": str(document_id), "entity_id": str(entity_id)}
 
@@ -1223,6 +1254,11 @@ async def assign_document_category(
             },
         )
         await db.execute(stmt)
+        await sync_document_statuses(
+            db,
+            document_id=document_id,
+            assigned_by_id=user.id,
+        )
     return {"ok": True, "document_id": str(document_id), "category_id": str(payload.category_id)}
 
 
@@ -1245,6 +1281,11 @@ async def remove_document_category(
                 DocumentCategory.document_id == document_id,
                 DocumentCategory.category_id == category_id,
             )
+        )
+        await sync_document_statuses(
+            db,
+            document_id=document_id,
+            assigned_by_id=user.id,
         )
     return {"ok": True, "document_id": str(document_id), "category_id": str(category_id)}
 

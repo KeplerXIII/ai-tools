@@ -132,6 +132,162 @@ async def _attach_default_new_unprocessed_statuses(
     )
 
 
+async def _status_ids_by_code(
+    session: AsyncSession,
+    *,
+    required_codes: tuple[str, ...],
+) -> dict[str, uuid.UUID]:
+    rows = (
+        await session.execute(
+            select(DocumentStatus.code, DocumentStatus.id).where(DocumentStatus.code.in_(required_codes)),
+        )
+    ).all()
+    by_code = {code: sid for code, sid in rows}
+    missing = [c for c in required_codes if c not in by_code]
+    if missing:
+        raise ValidationError(
+            f"Справочник статусов документов неполон: отсутствуют коды {', '.join(missing)}"
+        )
+    return by_code
+
+
+async def _has_document_tags_for_language(
+    session: AsyncSession,
+    *,
+    document_id: uuid.UUID,
+    language_id: uuid.UUID,
+) -> bool:
+    return bool(
+        await session.scalar(
+            select(DocumentTag.document_id)
+            .join(Tag, Tag.id == DocumentTag.tag_id)
+            .where(
+                DocumentTag.document_id == document_id,
+                Tag.language_id == language_id,
+            )
+            .limit(1)
+        )
+    )
+
+
+async def _is_document_fully_populated(session: AsyncSession, *, doc: Document) -> bool:
+    has_translation = bool((doc.translated_content or "").strip()) and doc.translated_language_id is not None
+    if not has_translation:
+        return False
+    translated_language_id = doc.translated_language_id
+    assert translated_language_id is not None
+
+    has_original_tags = await _has_document_tags_for_language(
+        session,
+        document_id=doc.id,
+        language_id=doc.original_language_id,
+    )
+    has_translated_tags = await _has_document_tags_for_language(
+        session,
+        document_id=doc.id,
+        language_id=translated_language_id,
+    )
+    if not (has_original_tags and has_translated_tags):
+        return False
+
+    has_entities = bool(
+        await session.scalar(select(DocumentEntity.document_id).where(DocumentEntity.document_id == doc.id).limit(1))
+    )
+    if not has_entities:
+        return False
+
+    has_categories = bool(
+        await session.scalar(
+            select(DocumentCategory.document_id).where(DocumentCategory.document_id == doc.id).limit(1)
+        )
+    )
+    if not has_categories:
+        return False
+
+    has_annotation = bool((doc.translated_summary or doc.original_summary or "").strip())
+    if not has_annotation:
+        return False
+
+    return True
+
+
+async def sync_document_statuses(
+    session: AsyncSession,
+    *,
+    document_id: uuid.UUID,
+    assigned_by_id: uuid.UUID | None,
+) -> None:
+    doc = await session.get(Document, document_id)
+    if doc is None:
+        return
+
+    by_code = await _status_ids_by_code(
+        session,
+        required_codes=("new", "unprocessed", "processed"),
+    )
+    now = datetime.now(UTC)
+    week_ago = now - timedelta(days=7)
+    keep_new = doc.created_at >= week_ago
+    is_fully_populated = await _is_document_fully_populated(session, doc=doc)
+
+    if keep_new:
+        await session.execute(
+            insert(DocumentStatusAssignment)
+            .values(
+                document_id=document_id,
+                status_id=by_code["new"],
+                assigned_by_id=assigned_by_id,
+            )
+            .on_conflict_do_nothing(
+                index_elements=[DocumentStatusAssignment.document_id, DocumentStatusAssignment.status_id]
+            )
+        )
+    else:
+        await session.execute(
+            delete(DocumentStatusAssignment).where(
+                DocumentStatusAssignment.document_id == document_id,
+                DocumentStatusAssignment.status_id == by_code["new"],
+            )
+        )
+
+    if is_fully_populated:
+        await session.execute(
+            delete(DocumentStatusAssignment).where(
+                DocumentStatusAssignment.document_id == document_id,
+                DocumentStatusAssignment.status_id == by_code["unprocessed"],
+            )
+        )
+        await session.execute(
+            insert(DocumentStatusAssignment)
+            .values(
+                document_id=document_id,
+                status_id=by_code["processed"],
+                assigned_by_id=assigned_by_id,
+            )
+            .on_conflict_do_nothing(
+                index_elements=[DocumentStatusAssignment.document_id, DocumentStatusAssignment.status_id]
+            )
+        )
+    else:
+        await session.execute(
+            delete(DocumentStatusAssignment).where(
+                DocumentStatusAssignment.document_id == document_id,
+                DocumentStatusAssignment.status_id == by_code["processed"],
+            )
+        )
+        await session.execute(
+            insert(DocumentStatusAssignment)
+            .values(
+                document_id=document_id,
+                status_id=by_code["unprocessed"],
+                assigned_by_id=assigned_by_id,
+            )
+            .on_conflict_do_nothing(
+                index_elements=[DocumentStatusAssignment.document_id, DocumentStatusAssignment.status_id]
+            )
+        )
+
+
 async def get_document_by_source_url(session: AsyncSession, url: str) -> Document | None:
     norm = normalize_source_url(url)
     q = await session.execute(select(Document).where(Document.source_url == norm))
@@ -422,6 +578,11 @@ async def save_document_after_edit(
 
     if original_changed or translated_changed:
         await invalidate_auto_derivatives(session, document_id)
+    await sync_document_statuses(
+        session,
+        document_id=document_id,
+        assigned_by_id=user_id,
+    )
     return doc
 
 
@@ -533,6 +694,11 @@ async def persist_document_translation(
         doc.translated_content = translated_text
         doc.translated_language_id = tl_id
         doc.translated_summary_stale = True
+    await sync_document_statuses(
+        session,
+        document_id=document_id,
+        assigned_by_id=started_by_id,
+    )
     return doc
 
 
@@ -609,6 +775,11 @@ async def run_tag_document(
                     prediction_source_id=llm_ps,
                 ),
             )
+    await sync_document_statuses(
+        session,
+        document_id=document_id,
+        assigned_by_id=started_by_id,
+    )
     return doc
 
 
@@ -686,6 +857,11 @@ async def run_entity_extract_document(
                     prediction_source_id=llm_ps,
                 ),
             )
+    await sync_document_statuses(
+        session,
+        document_id=document_id,
+        assigned_by_id=started_by_id,
+    )
     return doc
 
 
@@ -918,6 +1094,11 @@ async def run_categorize_document(
                 ),
             )
 
+    await sync_document_statuses(
+        session,
+        document_id=document_id,
+        assigned_by_id=started_by_id,
+    )
     assigned.sort(key=lambda x: x.confidence, reverse=True)
     return doc, assigned
 
@@ -946,6 +1127,11 @@ async def persist_document_refined_summary(
         # Summarizer/refiner prompts produce Russian; store in translated_summary only.
         doc.translated_summary = refined_annotation
         doc.translated_summary_stale = False
+    await sync_document_statuses(
+        session,
+        document_id=document_id,
+        assigned_by_id=started_by_id,
+    )
     return doc
 
 
@@ -979,6 +1165,11 @@ async def persist_document_summary(
         # Summarizer prompts produce Russian; store in translated_summary only.
         doc.translated_summary = annotation
         doc.translated_summary_stale = False
+    await sync_document_statuses(
+        session,
+        document_id=document_id,
+        assigned_by_id=started_by_id,
+    )
     return doc
 
 
