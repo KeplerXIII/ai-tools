@@ -182,6 +182,18 @@
 
             <div class="row-cell row-cell_flag">
               <span class="flag-item">
+                Перевод
+                <i class="pi" [class.pi-check-circle]="doc.has_translation" [class.pi-circle]="!doc.has_translation"></i>
+              </span>
+            </div>
+            <div class="row-cell row-cell_flag">
+              <span class="flag-item">
+                Аннотация
+                <i class="pi" [class.pi-check-circle]="doc.has_annotation" [class.pi-circle]="!doc.has_annotation"></i>
+              </span>
+            </div>
+            <div class="row-cell row-cell_flag">
+              <span class="flag-item">
                 Категории
                 <i class="pi" [class.pi-check-circle]="doc.has_categories" [class.pi-circle]="!doc.has_categories"></i>
               </span>

@@ -47,6 +47,8 @@ export interface DocumentListItem {
   annotation: string | null;
   main_image: string | null;
   statuses: DocumentStatusItem[];
+  has_translation: boolean;
+  has_annotation: boolean;
   has_categories: boolean;
   has_entities: boolean;
   has_tags: boolean;

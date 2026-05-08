@@ -162,6 +162,8 @@ class DocumentListItem(BaseModel):
     annotation: str | None = None
     main_image: str | None = None
     statuses: list[DocumentStatusItem] = []
+    has_translation: bool = False
+    has_annotation: bool = False
     has_categories: bool = False
     has_entities: bool = False
     has_tags: bool = False

@@ -172,7 +172,7 @@
 .document-row-top {
   display: grid;
   width: 100%;
-  grid-template-columns: minmax(0, 1fr) 110px 110px 90px minmax(260px, 320px) auto 36px;
+  grid-template-columns: minmax(0, 1fr) 100px 110px 110px 110px 90px minmax(220px, 280px) auto 36px;
   align-items: center;
   gap: 10px;
 }

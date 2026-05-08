@@ -685,6 +685,8 @@ async def _enqueue_tagger_missing_documents(
             )
             db.add(pending_job)
             await db.flush()
+            # Commit pending job first, so worker can reliably see processing_job_id.
+            await db.commit()
             job = await queue.enqueue(
                 "tagger_document_job",
                 key=queue_job_key,
@@ -702,7 +704,7 @@ async def _enqueue_tagger_missing_documents(
             else:
                 pending_job.status = JobStatus.CANCELLED
                 pending_job.finished_at = datetime.now(UTC)
-        await db.commit()
+                await db.commit()
     finally:
         await queue.disconnect()
 
