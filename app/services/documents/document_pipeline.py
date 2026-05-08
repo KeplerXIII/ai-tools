@@ -767,6 +767,10 @@ async def run_categorize_document(
     ):
         await delete_auto_document_categories(session, document_id)
         items = await categorize_text(src, pairs)
+        unique_items_by_category: dict[
+            uuid.UUID,
+            tuple[str, str, str | None, int, uuid.UUID | None, str | None, str | None, str | None, Decimal],
+        ] = {}
         for it in items:
             code = it["code"]
             meta = meta_by_code.get(code)
@@ -775,14 +779,53 @@ async def run_categorize_document(
             cid, name, name_ru, level, parent_id, parent_code, parent_name, parent_name_ru = meta
             conf_f = float(it.get("confidence", 0.5))
             conf = Decimal(str(conf_f))
-            session.add(
-                DocumentCategory(
-                    document_id=document_id,
-                    category_id=cid,
-                    confidence=conf,
-                    prediction_source_id=llm_ps,
-                ),
+            prev = unique_items_by_category.get(cid)
+            if prev is None or conf > prev[-1]:
+                unique_items_by_category[cid] = (
+                    code,
+                    name,
+                    name_ru,
+                    level,
+                    parent_id,
+                    parent_code,
+                    parent_name,
+                    parent_name_ru,
+                    conf,
+                )
+
+        if unique_items_by_category:
+            stmt = insert(DocumentCategory).values(
+                [
+                    {
+                        "document_id": document_id,
+                        "category_id": cid,
+                        "confidence": payload[-1],
+                        "prediction_source_id": llm_ps,
+                    }
+                    for cid, payload in unique_items_by_category.items()
+                ]
             )
+            stmt = stmt.on_conflict_do_update(
+                index_elements=[DocumentCategory.document_id, DocumentCategory.category_id],
+                set_={
+                    "confidence": stmt.excluded.confidence,
+                    "prediction_source_id": stmt.excluded.prediction_source_id,
+                },
+            )
+            await session.execute(stmt)
+
+        for cid, payload in unique_items_by_category.items():
+            (
+                code,
+                name,
+                name_ru,
+                level,
+                parent_id,
+                parent_code,
+                parent_name,
+                parent_name_ru,
+                conf,
+            ) = payload
             assigned.append(
                 DocumentCategorizeItem(
                     category_id=cid,
@@ -794,7 +837,7 @@ async def run_categorize_document(
                     parent_code=parent_code,
                     parent_name=parent_name,
                     parent_name_ru=parent_name_ru,
-                    confidence=conf_f,
+                    confidence=float(conf),
                     prediction_source_code="llm",
                     text_source=text_source,
                 ),
