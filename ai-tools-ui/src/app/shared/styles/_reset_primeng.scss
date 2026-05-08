@@ -154,11 +154,11 @@
 }
 
 .p-select:not(.p-disabled).p-focus {
-  border-color: var(--primary-text-color-light) !important;
+  border-color: var(--light-grey-text-color) !important;
 }
 
 .p-treeselect:not(.p-disabled).p-focus {
-  border-color: var(--primary-text-color) !important;
+  border-color: var(--light-grey-text-color) !important;
 }
 
 .p-iconfield .p-inputtext:enabled:focus {
@@ -503,4 +503,22 @@
 
 .p-disabled {
   opacity: 1 !important;
+}
+
+.p-treeselect {
+  background: var(--light-text-color) !important;
+}
+
+.p-treeselect-overlay .p-tree {
+  background: var(--light-text-color) !important;
+  padding: 10px !important;
+}
+
+.p-tree-node-content {
+  color: var(--primary-text-color) !important;
+}
+
+.p-tree-node-children {
+  padding-left: 40px !important;
+  font-weight: var(--font-weight-light) !important;
 }
