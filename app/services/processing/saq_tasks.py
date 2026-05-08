@@ -40,6 +40,8 @@ async def translate_document_job(
                 if pj is not None and pj.status == JobStatus.PENDING:
                     pj.status = JobStatus.RUNNING
                     pj.started_at = datetime.now(UTC)
+                    # Persist intermediate state so monitoring can observe running jobs.
+                    await session.commit()
             try:
                 await run_translate_document(
                     session,
@@ -129,6 +131,8 @@ async def annotate_document_job(
                 if pj is not None and pj.status == JobStatus.PENDING:
                     pj.status = JobStatus.RUNNING
                     pj.started_at = datetime.now(UTC)
+                    # Persist intermediate state so monitoring can observe running jobs.
+                    await session.commit()
             try:
                 await run_summary_document(
                     session,

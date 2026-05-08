@@ -56,7 +56,7 @@ class Settings(BaseSettings):
 
     # --- background processing (SAQ) ---
     saq_queue_url: str = "redis://localhost:6379/0"
-    saq_translate_queue_name: str = "ai-tools"
+    saq_translate_queue_name: str = "ai-tools-translate"
     saq_annotate_queue_name: str = "ai-tools-annotate"
     saq_translate_worker_concurrency: int = 1
     saq_annotate_worker_concurrency: int = 1

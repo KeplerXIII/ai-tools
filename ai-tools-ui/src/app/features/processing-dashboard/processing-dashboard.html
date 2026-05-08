@@ -1,0 +1,91 @@
+<section class="processing-dashboard">
+  <header class="topbar">
+    <h1 class="title">Мониторинг обработки</h1>
+    <span class="snapshot-time" *ngIf="snapshotAt">Снимок: {{ snapshotAt }}</span>
+  </header>
+
+  <div class="state-box loading" *ngIf="loading">Подключение к live-потоку...</div>
+  <div class="state-box error" *ngIf="!loading && error">{{ error }}</div>
+
+  <section class="counters-panel" *ngIf="counters">
+    <h2>Счётчики документов</h2>
+    <div class="counter-grid">
+      <article class="counter-card" [ngClass]="'flash-' + (counterFlash.documents_total || 'same')">
+        <div class="counter-label">Всего документов</div>
+        <div class="counter-value">{{ counters.documents_total }}</div>
+      </article>
+      <article class="counter-card" [ngClass]="'flash-' + (counterFlash.with_translations || 'same')">
+        <div class="counter-label">С переводами</div>
+        <div class="counter-value">{{ counters.with_translations }}</div>
+      </article>
+      <article class="counter-card" [ngClass]="'flash-' + (counterFlash.with_annotations || 'same')">
+        <div class="counter-label">С аннотациями</div>
+        <div class="counter-value">{{ counters.with_annotations }}</div>
+      </article>
+      <article class="counter-card" [ngClass]="'flash-' + (counterFlash.categorized || 'same')">
+        <div class="counter-label">Категоризированные</div>
+        <div class="counter-value">{{ counters.categorized }}</div>
+      </article>
+      <article class="counter-card" [ngClass]="'flash-' + (counterFlash.with_entities || 'same')">
+        <div class="counter-label">С извлечёнными сущностями</div>
+        <div class="counter-value">{{ counters.with_entities }}</div>
+      </article>
+      <article class="counter-card" [ngClass]="'flash-' + (counterFlash.tagged_original_lang || 'same')">
+        <div class="counter-label">Тегированные (исходный язык)</div>
+        <div class="counter-value">{{ counters.tagged_original_lang }}</div>
+      </article>
+      <article class="counter-card" [ngClass]="'flash-' + (counterFlash.tagged_translated_lang || 'same')">
+        <div class="counter-label">Тегированные (переведённый язык)</div>
+        <div class="counter-value">{{ counters.tagged_translated_lang }}</div>
+      </article>
+    </div>
+  </section>
+
+  <section class="jobs-panel">
+    <h2>Processing Jobs (все поля)</h2>
+    <div class="table-wrap">
+      <table class="jobs-table">
+        <thead>
+          <tr>
+            <th>id</th>
+            <th>document_id</th>
+            <th>job_type</th>
+            <th>status</th>
+            <th>model_name</th>
+            <th>provider</th>
+            <th>batch_id</th>
+            <th>queue_name</th>
+            <th>queue_job_key</th>
+            <th>started_by_id</th>
+            <th>started_at</th>
+            <th>finished_at</th>
+            <th>duration_ms</th>
+            <th>error_message</th>
+            <th>created_at</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let job of jobs; trackBy: trackJob" [ngClass]="'row-flash-' + (jobFlash[job.id] || 'none')">
+            <td [class.cell-flash]="isCellFlashing(job.id, 'id')">{{ job.id }}</td>
+            <td [class.cell-flash]="isCellFlashing(job.id, 'document_id')">{{ job.document_id }}</td>
+            <td [class.cell-flash]="isCellFlashing(job.id, 'job_type')">{{ job.job_type }}</td>
+            <td [class.cell-flash]="isCellFlashing(job.id, 'status')">{{ job.status }}</td>
+            <td [class.cell-flash]="isCellFlashing(job.id, 'model_name')">{{ job.model_name || '-' }}</td>
+            <td [class.cell-flash]="isCellFlashing(job.id, 'provider')">{{ job.provider || '-' }}</td>
+            <td [class.cell-flash]="isCellFlashing(job.id, 'batch_id')">{{ job.batch_id || '-' }}</td>
+            <td [class.cell-flash]="isCellFlashing(job.id, 'queue_name')">{{ job.queue_name || '-' }}</td>
+            <td [class.cell-flash]="isCellFlashing(job.id, 'queue_job_key')">{{ job.queue_job_key || '-' }}</td>
+            <td [class.cell-flash]="isCellFlashing(job.id, 'started_by_id')">{{ job.started_by_id || '-' }}</td>
+            <td [class.cell-flash]="isCellFlashing(job.id, 'started_at')">{{ job.started_at || '-' }}</td>
+            <td [class.cell-flash]="isCellFlashing(job.id, 'finished_at')">{{ job.finished_at || '-' }}</td>
+            <td [class.cell-flash]="isCellFlashing(job.id, 'duration_ms')">{{ job.duration_ms ?? '-' }}</td>
+            <td class="error-col" [class.cell-flash]="isCellFlashing(job.id, 'error_message')">
+              {{ job.error_message || '-' }}
+            </td>
+            <td [class.cell-flash]="isCellFlashing(job.id, 'created_at')">{{ job.created_at || '-' }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</section>

@@ -44,6 +44,10 @@ def provider_label_default() -> str:
     return _provider_for_llm_task(LLMTask.SUMMARY)
 
 
+def provider_label_for_task(task: LLMTask) -> str:
+    return _provider_for_llm_task(task)
+
+
 @asynccontextmanager
 async def processing_job(
     session: AsyncSession,

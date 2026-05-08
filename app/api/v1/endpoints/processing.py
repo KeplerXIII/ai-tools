@@ -1,17 +1,21 @@
 from __future__ import annotations
 
+import asyncio
+import json
 import uuid
 from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_optional_started_by_id
 from app.core.config import settings
-from app.infrastructure.db.models import Document, ProcessingJob
-from app.infrastructure.db.session import get_db
+from app.core.llm_task import LLMTask
+from app.infrastructure.db.models import Document, DocumentCategory, DocumentEntity, DocumentTag, ProcessingJob, Tag
+from app.infrastructure.db.session import AsyncSessionLocal, get_db
 from app.schemas.processing import (
     AnnotateBatchStatusResponse,
     EnqueueAnnotateMissingRequest,
@@ -27,7 +31,7 @@ from app.services.processing.annotate_batch_store import (
 )
 from app.services.processing.enqueue_locks import try_acquire_enqueue_lock
 from app.services.processing.saq_queue import get_saq_annotate_queue, get_saq_translate_queue
-from app.services.processing.jobs import JobStatus, JobType
+from app.services.processing.jobs import JobStatus, JobType, provider_label_for_task
 from app.services.processing.translate_batch_store import (
     get_translate_batch,
     inc_translate_batch_counter,
@@ -35,6 +39,95 @@ from app.services.processing.translate_batch_store import (
 )
 
 router = APIRouter(prefix="/processing", tags=["processing"])
+
+
+def _sse_event(event: str, payload: dict) -> bytes:
+    data = json.dumps(payload, ensure_ascii=False, default=str)
+    return f"event: {event}\ndata: {data}\n\n".encode("utf-8")
+
+
+def _job_to_dict(job: ProcessingJob) -> dict:
+    return {
+        "id": str(job.id),
+        "document_id": str(job.document_id),
+        "job_type": job.job_type,
+        "status": job.status,
+        "model_name": job.model_name,
+        "provider": job.provider,
+        "batch_id": job.batch_id,
+        "queue_name": job.queue_name,
+        "queue_job_key": job.queue_job_key,
+        "started_by_id": str(job.started_by_id) if job.started_by_id else None,
+        "started_at": job.started_at.isoformat() if job.started_at else None,
+        "finished_at": job.finished_at.isoformat() if job.finished_at else None,
+        "duration_ms": job.duration_ms,
+        "error_message": job.error_message,
+        "created_at": job.created_at.isoformat() if job.created_at else None,
+    }
+
+
+async def _collect_dashboard_payload(session: AsyncSession) -> dict:
+    jobs_rows = await session.execute(select(ProcessingJob).order_by(ProcessingJob.created_at.desc()))
+    jobs = [_job_to_dict(row[0]) for row in jobs_rows]
+
+    docs_total = int(await session.scalar(select(func.count(Document.id))) or 0)
+    docs_with_translation = int(
+        await session.scalar(
+            select(func.count(Document.id)).where(
+                Document.translated_content.is_not(None),
+                func.btrim(Document.translated_content) != "",
+            )
+        )
+        or 0
+    )
+    docs_with_summary = int(
+        await session.scalar(
+            select(func.count(Document.id)).where(
+                Document.translated_summary.is_not(None),
+                func.btrim(Document.translated_summary) != "",
+            )
+        )
+        or 0
+    )
+    docs_categorized = int(await session.scalar(select(func.count(func.distinct(DocumentCategory.document_id)))) or 0)
+    docs_with_entities = int(await session.scalar(select(func.count(func.distinct(DocumentEntity.document_id)))) or 0)
+
+    docs_with_original_tags = int(
+        await session.scalar(
+            select(func.count(func.distinct(DocumentTag.document_id)))
+            .select_from(DocumentTag)
+            .join(Tag, Tag.id == DocumentTag.tag_id)
+            .join(Document, Document.id == DocumentTag.document_id)
+            .where(Tag.language_id == Document.original_language_id)
+        )
+        or 0
+    )
+    docs_with_translated_tags = int(
+        await session.scalar(
+            select(func.count(func.distinct(DocumentTag.document_id)))
+            .select_from(DocumentTag)
+            .join(Tag, Tag.id == DocumentTag.tag_id)
+            .join(Document, Document.id == DocumentTag.document_id)
+            .where(
+                Document.translated_language_id.is_not(None),
+                Tag.language_id == Document.translated_language_id,
+            )
+        )
+        or 0
+    )
+
+    return {
+        "jobs": jobs,
+        "counters": {
+            "documents_total": docs_total,
+            "with_translations": docs_with_translation,
+            "with_annotations": docs_with_summary,
+            "categorized": docs_categorized,
+            "with_entities": docs_with_entities,
+            "tagged_original_lang": docs_with_original_tags,
+            "tagged_translated_lang": docs_with_translated_tags,
+        },
+    }
 
 
 @router.post("/documents/translate-missing", response_model=EnqueueTranslateMissingResponse)
@@ -87,6 +180,7 @@ async def enqueue_translate_missing_documents(
                 job_type=JobType.TRANSLATE,
                 status=JobStatus.PENDING,
                 model_name=settings.model_translation,
+                provider=provider_label_for_task(LLMTask.TRANSLATION),
                 batch_id=batch_id,
                 queue_name=queue.name,
                 queue_job_key=queue_job_key,
@@ -200,6 +294,7 @@ async def enqueue_annotate_missing_documents(
                 job_type=JobType.SUMMARY,
                 status=JobStatus.PENDING,
                 model_name=settings.model_summary,
+                provider=provider_label_for_task(LLMTask.SUMMARY),
                 batch_id=batch_id,
                 queue_name=queue.name,
                 queue_job_key=queue_job_key,
@@ -257,4 +352,41 @@ async def get_annotate_missing_batch_status(batch_id: str) -> AnnotateBatchStatu
         skipped=skipped,
         pending=pending,
         done=done,
+    )
+
+
+@router.get("/dashboard/stream")
+async def stream_processing_dashboard() -> StreamingResponse:
+    async def event_stream():
+        previous_stable_payload_json: str | None = None
+        while True:
+            try:
+                async with AsyncSessionLocal() as session:
+                    stable_payload = await _collect_dashboard_payload(session)
+                stable_payload_json = json.dumps(stable_payload, ensure_ascii=False, sort_keys=True)
+                if stable_payload_json != previous_stable_payload_json:
+                    snapshot_payload = {
+                        "snapshot_at": datetime.now(UTC).isoformat(),
+                        **stable_payload,
+                    }
+                    yield _sse_event("snapshot", snapshot_payload)
+                    previous_stable_payload_json = stable_payload_json
+                else:
+                    yield b"event: heartbeat\ndata: ping\n\n"
+                await asyncio.sleep(2)
+            except asyncio.CancelledError:
+                break
+            except Exception as exc:
+                yield _sse_event("error", {"message": str(exc)})
+                await asyncio.sleep(2)
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            # Disable buffering in nginx/compatible proxies for low-latency SSE delivery.
+            "X-Accel-Buffering": "no",
+        },
     )
