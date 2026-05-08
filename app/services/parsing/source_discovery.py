@@ -29,7 +29,10 @@ def _parse_any_date(raw: str | None) -> datetime | None:
     text = raw.strip()
     if not text:
         return None
-    parsed = email.utils.parsedate_to_datetime(text)
+    try:
+        parsed = email.utils.parsedate_to_datetime(text)
+    except (TypeError, ValueError):
+        parsed = None
     if parsed is not None:
         return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
     try:

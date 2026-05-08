@@ -47,6 +47,18 @@ class DocumentCategoryAssignRequest(BaseModel):
     category_id: uuid.UUID
 
 
+class DocumentCategoryCatalogItem(BaseModel):
+    category_id: uuid.UUID
+    code: str
+    name: str
+    name_ru: str | None = None
+    level: int
+    parent_id: uuid.UUID | None = None
+    parent_code: str | None = None
+    parent_name: str | None = None
+    parent_name_ru: str | None = None
+
+
 class DocumentExtractResponse(ExtractResponse):
     document_id: uuid.UUID
     from_cache: bool

@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
-import { AuthService } from '../../core/auth/auth.service';
+import { AuthService } from '../../../core/auth/auth.service';
 
 export interface ImageInfo {
   url: string;
@@ -31,6 +31,18 @@ export interface DocumentCategoryRef {
   confidence: number;
   prediction_source_code: string;
   text_source?: 'original' | 'translated' | null;
+}
+
+export interface DocumentCategoryCatalogRef {
+  category_id: string;
+  code: string;
+  name: string;
+  name_ru?: string | null;
+  level: number;
+  parent_id?: string | null;
+  parent_code?: string | null;
+  parent_name?: string | null;
+  parent_name_ru?: string | null;
 }
 
 export interface DocumentCategorizeResponse {
@@ -168,11 +180,17 @@ export class ArticleParserApi {
   }
 
   lockDocument(documentId: string) {
-    return this.http.post<{ ok?: boolean; document_id?: string }>(`/api/v1/documents/${documentId}/lock`, {});
+    return this.http.post<{ ok?: boolean; document_id?: string }>(
+      `/api/v1/documents/${documentId}/lock`,
+      {},
+    );
   }
 
   saveDocument(documentId: string, payload: DocumentUpdateRequest) {
-    return this.http.put<{ ok?: boolean; document_id?: string }>(`/api/v1/documents/${documentId}`, payload);
+    return this.http.put<{ ok?: boolean; document_id?: string }>(
+      `/api/v1/documents/${documentId}`,
+      payload,
+    );
   }
 
   updateDocumentMetadata(documentId: string, payload: DocumentMetadataUpdateRequest) {
@@ -203,7 +221,9 @@ export class ArticleParserApi {
   }
 
   removeDocumentEntity(documentId: string, entityId: string) {
-    return this.http.delete<{ ok?: boolean }>(`/api/v1/documents/${documentId}/entities/${entityId}`);
+    return this.http.delete<{ ok?: boolean }>(
+      `/api/v1/documents/${documentId}/entities/${entityId}`,
+    );
   }
 
   translateToRussian(documentId: string, text: string) {
@@ -283,9 +303,12 @@ export class ArticleParserApi {
   }
 
   summarize(documentId: string, text: string) {
-    return this.http.post<SummaryResponse>(`/api/v1/documents/${documentId}/summary/refine/stream`, {
-      text,
-    });
+    return this.http.post<SummaryResponse>(
+      `/api/v1/documents/${documentId}/summary/refine/stream`,
+      {
+        text,
+      },
+    );
   }
 
   summarizeRefineStream(
@@ -364,7 +387,10 @@ export class ArticleParserApi {
     });
   }
 
-  summarizeStream(documentId: string, source: 'original' | 'translated' = 'translated'): Observable<string> {
+  summarizeStream(
+    documentId: string,
+    source: 'original' | 'translated' = 'translated',
+  ): Observable<string> {
     return new Observable<string>((observer) => {
       const controller = new AbortController();
 
@@ -432,10 +458,13 @@ export class ArticleParserApi {
   }
 
   tagText(documentId: string, maxTags = 12, useTranslation = false) {
-    return this.http.post<{ tags?: string[]; ok?: boolean }>(`/api/v1/documents/${documentId}/tags`, {
-      max_tags: maxTags,
-      use_translation: useTranslation,
-    });
+    return this.http.post<{ tags?: string[]; ok?: boolean }>(
+      `/api/v1/documents/${documentId}/tags`,
+      {
+        max_tags: maxTags,
+        use_translation: useTranslation,
+      },
+    );
   }
 
   getDocumentTags(documentId: string) {
@@ -484,11 +513,16 @@ export class ArticleParserApi {
   }
 
   categorizeDocument(documentId: string) {
-    return this.http.post<DocumentCategorizeResponse>(`/api/v1/documents/${documentId}/categorize`, {});
+    return this.http.post<DocumentCategorizeResponse>(
+      `/api/v1/documents/${documentId}/categorize`,
+      {},
+    );
   }
 
   getCategoryCatalog(documentId: string) {
-    return this.http.get<DocumentEntityRef[]>(`/api/v1/documents/${documentId}/categories/catalog`);
+    return this.http.get<DocumentCategoryCatalogRef[]>(
+      `/api/v1/documents/${documentId}/categories/catalog`,
+    );
   }
 
   assignDocumentCategory(documentId: string, categoryId: string) {
@@ -498,6 +532,8 @@ export class ArticleParserApi {
   }
 
   removeDocumentCategory(documentId: string, categoryId: string) {
-    return this.http.delete<{ ok?: boolean }>(`/api/v1/documents/${documentId}/categories/${categoryId}`);
+    return this.http.delete<{ ok?: boolean }>(
+      `/api/v1/documents/${documentId}/categories/${categoryId}`,
+    );
   }
 }

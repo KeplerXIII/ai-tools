@@ -1,4 +1,5 @@
-import { ChangeDetectorRef, Component, ElementRef, ViewChild } from '@angular/core';
+import { ChangeDetectorRef, Component, DestroyRef, ElementRef, OnInit, ViewChild } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { FloatLabelModule } from 'primeng/floatlabel';
@@ -9,36 +10,28 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { SkeletonModule } from 'primeng/skeleton';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { ChipModule } from 'primeng/chip';
-import { ImageModule } from 'primeng/image';
 import { TextareaModule } from 'primeng/textarea';
+import { ArticleParserUrlFormComponent } from './ui/article-parser-url-form/article-parser-url-form';
+import { ArticleParserStatusComponent } from './ui/article-parser-status/article-parser-status';
+import { ArticleParserMetaComponent } from './ui/article-parser-meta/article-parser-meta';
+import { ArticleParserCategoriesComponent } from './ui/article-parser-categories/article-parser-categories';
+import { ArticleParserEntitiesComponent } from './ui/article-parser-entities/article-parser-entities';
 import {
   ArticleParserApi,
-  DocumentCategoryRef,
-  DocumentEntityRef,
-  DocumentTagRef,
   DocumentTagsResponse,
-  EntitiesResponse,
-} from './article-parser-api';
-import { ArticleParserState } from './article-parser-state';
+} from './api/article-parser-api';
+import { ArticleParserState } from './model/article-parser-state';
 import {
   ButtonVariant,
   OutlineButtonComponent,
 } from '../../shared/ui/outline-button/outline-button.component';
-import { ArticleParserUrlFormComponent } from './article-parser-url-form/article-parser-url-form';
+import { buildHighlightedArticleTextByGroups } from './lib/article-highlighter';
+import { scrollToElement } from './lib/scroll-to-element';
 
 export type ArticleParserBlock =
-  | 'status'
-  | 'meta'
-  | 'categories'
-  | 'entities'
   | 'original'
   | 'translation'
   | 'annotation';
-
-export type EntitySection = 'military_equipment' | 'manufacturers' | 'contracts';
-
-export type TagScope = 'original' | 'translated';
 
 @Component({
   selector: 'app-article-parser',
@@ -53,65 +46,35 @@ export type TagScope = 'original' | 'translated';
     InputTextModule,
     OutlineButtonComponent,
     ArticleParserUrlFormComponent,
-    ChipModule,
-    ImageModule,
+    ArticleParserStatusComponent,
+    ArticleParserMetaComponent,
+    ArticleParserCategoriesComponent,
+    ArticleParserEntitiesComponent,
     SkeletonModule,
     TextareaModule,
   ],
   templateUrl: './article-parser.html',
   styleUrl: './article-parser.scss',
 })
-export class ArticleParser {
+export class ArticleParser implements OnInit {
   @ViewChild('translationSkeleton') translationSkeleton?: ElementRef;
   @ViewChild('annotationSkeleton') annotationSkeleton?: ElementRef;
-  @ViewChild('entitiesBlock') entitiesBlock?: ElementRef;
-  @ViewChild('categoriesBlock') categoriesBlock?: ElementRef;
   @ViewChild('originalTextPreview') originalTextPreview?: ElementRef<HTMLElement>;
   @ViewChild('originalTextEditor') originalTextEditor?: ElementRef<HTMLElement>;
   readonly ButtonVariant = ButtonVariant;
   loadingArticle = false;
-  loadingEntities = false;
+  loadingEntitiesSection = false;
   loadingCategories = false;
   loadingTranslation = false;
   loadingSummary = false;
   loadingOriginalTags = false;
   loadingTranslatedTags = false;
-  entitiesError = '';
-  categoriesError = '';
   articleError = '';
   originalTagsError = '';
   translationError = '';
   translatedTagsError = '';
   summaryError = '';
-  imagePreview: string | null = null;
-  availableDocumentStatuses: { code: string; name_ru: string; description: string | null }[] = [];
-  documentStatusTags: { code: string; label: string }[] = [];
-  loadingDocumentStatuses = false;
-  documentStatusError = '';
-  isStatusPickerOpen = false;
 
-  entityPickerOpen: EntitySection | null = null;
-  entityPickerSearch = '';
-  entityPickerCatalogItems: DocumentEntityRef[] = [];
-  loadingEntityPickerCatalog = false;
-  loadingDocumentEntitiesMutation = false;
-  loadingDocumentCategoriesMutation = false;
-
-  tagPickerOpen: TagScope | null = null;
-  tagPickerSearch = '';
-  tagPickerCatalogItems: DocumentTagRef[] = [];
-  loadingTagPickerCatalog = false;
-  loadingDocumentTagsMutation = false;
-
-  categoryPickerOpen = false;
-  categoryPickerSearch = '';
-  categoryPickerCatalogItems: DocumentEntityRef[] = [];
-  loadingCategoryPickerCatalog = false;
-
-  isEditingStatusBlock = false;
-  isEditingMetaBlock = false;
-  isEditingCategoriesBlock = false;
-  isEditingEntitiesBlock = false;
   isEditingOriginalBlock = false;
   isEditingTranslationBlock = false;
   isEditingAnnotationBlock = false;
@@ -125,34 +88,32 @@ export class ArticleParser {
     public state: ArticleParserState,
     private cdr: ChangeDetectorRef,
     private route: ActivatedRoute,
+    private destroyRef: DestroyRef,
   ) {}
-
-  ngOnInit(): void {
-    this.route.queryParamMap.subscribe((params) => {
-      const url = (params.get('url') || '').trim();
-      const autoload = params.get('autoload') === '1';
-      const autoloadKey = `${autoload}:${url}`;
-      if (!autoload || !url || this.lastAutoloadKey === autoloadKey) {
-        return;
-      }
-
-      this.lastAutoloadKey = autoloadKey;
-      this.state.url = url;
-      this.extractArticle();
-    });
-  }
-
-  openImage(url: string): void {
-    this.imagePreview = url;
-  }
-
-  closeImage(): void {
-    this.imagePreview = null;
-  }
 
   // =========================
   // ОСНОВНОЕ
   // =========================
+
+  ngOnInit(): void {
+    this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
+      const url = params.get('url')?.trim() || '';
+      const autoload = params.get('autoload') === '1';
+
+      if (!url) {
+        return;
+      }
+
+      this.state.url = url;
+
+      if (!autoload || this.lastAutoloadKey === url) {
+        return;
+      }
+
+      this.lastAutoloadKey = url;
+      this.extractArticle();
+    });
+  }
 
   extractArticle(): void {
     const value = this.state.url.trim();
@@ -160,10 +121,9 @@ export class ArticleParser {
 
     this.articleError = '';
     this.state.error = '';
-    this.entitiesError = '';
-    this.categoriesError = '';
     this.originalTagsError = '';
     this.translationError = '';
+    this.loadingCategories = false;
     this.state.article = null;
     this.state.entities = null;
     this.state.categories = null;
@@ -178,10 +138,12 @@ export class ArticleParser {
     this.api.extractByUrl(value).subscribe({
       next: (response) => {
         this.state.article = response;
-        this.syncDocumentStatusTagsFromArticle();
-        this.loadAvailableDocumentStatuses();
         this.state.translatedText = response.translated_content?.trim() || '';
-        this.state.annotation = (response.translated_summary || response.original_summary || '').trim();
+        this.state.annotation = (
+          response.translated_summary ||
+          response.original_summary ||
+          ''
+        ).trim();
         this.state.originalTags = response.original_tags || [];
         this.state.translatedTags = response.translated_tags || [];
         this.state.entities = {
@@ -199,49 +161,6 @@ export class ArticleParser {
     });
   }
 
-  requestCategorize(): void {
-    if (!this.state.article?.document_id) return;
-
-    this.loadingCategories = true;
-    this.categoriesError = '';
-    this.state.categories = null;
-
-    this.api.categorizeDocument(this.state.article.document_id).subscribe({
-      next: (response) => {
-        this.state.categories = response.categories || [];
-        this.loadingCategories = false;
-        this.scrollToElement(() => this.categoriesBlock);
-      },
-      error: () => {
-        this.categoriesError = 'Ошибка при классификации категорий';
-        this.loadingCategories = false;
-      },
-    });
-  }
-
-  requestEntities(): void {
-    if (!this.state.article?.text || !this.state.article.document_id) return;
-
-    this.loadingEntities = true;
-    this.entitiesError = '';
-    this.state.entities = null;
-
-    this.api.extractEntities(this.state.article.document_id).subscribe({
-      next: (response) => {
-        this.state.entities = {
-          military_equipment: response.military_equipment || [],
-          manufacturers: response.manufacturers || [],
-          contracts: response.contracts || [],
-        };
-        this.loadingEntities = false;
-      },
-      error: () => {
-        this.entitiesError = 'Ошибка при извлечении сущностей';
-        this.loadingEntities = false;
-      },
-    });
-  }
-
   async translateArticle(): Promise<void> {
     if (!this.state.article?.document_id) return;
 
@@ -252,7 +171,7 @@ export class ArticleParser {
     this.state.annotation = '';
     this.state.translatedTags = [];
 
-    this.scrollToElement(() => this.translationSkeleton);
+    scrollToElement(() => this.translationSkeleton, this.cdr);
 
     this.api.translateToRussianStream(this.state.article.document_id).subscribe({
       next: (chunk) => {
@@ -277,7 +196,7 @@ export class ArticleParser {
     this.state.annotation = '';
     this.buffer = '';
 
-    this.scrollToElement(() => this.annotationSkeleton);
+    scrollToElement(() => this.annotationSkeleton, this.cdr);
 
     this.api.summarizeStream(this.state.article.document_id, 'translated').subscribe({
       next: (chunk) => {
@@ -298,12 +217,6 @@ export class ArticleParser {
   clear(): void {
     this.resetBlockEditors();
     this.state.clear();
-    this.documentStatusTags = [];
-    this.loadingDocumentStatuses = false;
-    this.documentStatusError = '';
-    this.isStatusPickerOpen = false;
-    this.entitiesError = '';
-    this.categoriesError = '';
     this.articleError = '';
     this.originalTagsError = '';
     this.translationError = '';
@@ -354,73 +267,12 @@ export class ArticleParser {
   // ПОДСВЕТКА СУЩНОСТЕЙ
   // =========================
 
-  private escapeRegExp(value: string): string {
-    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  }
-
   // =========================
   // РЕДАКТИРОВАНИЕ
   // =========================
 
   toggleBlockEdit(block: ArticleParserBlock): void {
     switch (block) {
-      case 'status':
-        this.isEditingStatusBlock = !this.isEditingStatusBlock;
-        if (!this.isEditingStatusBlock) {
-          this.isStatusPickerOpen = false;
-        }
-        break;
-      case 'meta':
-        if (!this.isEditingMetaBlock) {
-          const docId = this.state.article?.document_id;
-          if (docId) {
-            this.state.error = '';
-            this.api.lockDocument(docId).subscribe({
-              error: () => {
-                this.state.error = 'Не удалось заблокировать документ для редактирования';
-                this.cdr.detectChanges();
-              },
-            });
-          }
-        }
-        this.isEditingMetaBlock = !this.isEditingMetaBlock;
-        if (!this.isEditingMetaBlock) {
-          const doc = this.state.article;
-          const docId = doc?.document_id;
-          if (docId && doc) {
-            const sourceUrl = (doc.url || '').trim();
-            this.state.error = '';
-            this.api
-              .updateDocumentMetadata(docId, {
-                title: doc.title ?? '',
-                author: doc.author ?? '',
-                date: doc.date ?? '',
-                main_image: doc.main_image ?? '',
-                images: doc.images ?? [],
-                ...(sourceUrl ? { source_url: sourceUrl } : {}),
-              })
-              .subscribe({
-                error: () => {
-                  this.state.error = 'Не удалось сохранить метаданные';
-                  this.cdr.detectChanges();
-                },
-              });
-          }
-        }
-        break;
-      case 'categories':
-        this.isEditingCategoriesBlock = !this.isEditingCategoriesBlock;
-        if (!this.isEditingCategoriesBlock) {
-          this.closeCategoryPicker();
-        }
-        break;
-      case 'entities':
-        this.isEditingEntitiesBlock = !this.isEditingEntitiesBlock;
-        if (!this.isEditingEntitiesBlock) {
-          this.closeEntityPicker();
-          this.closeTagPicker();
-        }
-        break;
       case 'original':
         if (!this.isEditingOriginalBlock) {
           const docId = this.state.article?.document_id;
@@ -435,8 +287,7 @@ export class ArticleParser {
           }
         }
         if (!this.isEditingOriginalBlock) {
-          this.originalTextViewportScroll =
-            this.originalTextPreview?.nativeElement?.scrollTop ?? 0;
+          this.originalTextViewportScroll = this.originalTextPreview?.nativeElement?.scrollTop ?? 0;
         } else {
           const ta = this.getOriginalTextTextarea();
           this.originalTextViewportScroll = ta?.scrollTop ?? 0;
@@ -511,7 +362,12 @@ export class ArticleParser {
             const hasTranslation = !!this.state.translatedText?.trim();
             this.state.error = '';
             this.api
-              .saveDocument(docId, hasTranslation ? { translated_summary: this.state.annotation ?? '' } : { original_summary: this.state.annotation ?? '' })
+              .saveDocument(
+                docId,
+                hasTranslation
+                  ? { translated_summary: this.state.annotation ?? '' }
+                  : { original_summary: this.state.annotation ?? '' },
+              )
               .subscribe({
                 error: () => {
                   this.state.error = 'Не удалось сохранить аннотацию';
@@ -525,319 +381,9 @@ export class ArticleParser {
   }
 
   private resetBlockEditors(): void {
-    this.isEditingStatusBlock = false;
-    this.isEditingMetaBlock = false;
-    this.isEditingCategoriesBlock = false;
-    this.isEditingEntitiesBlock = false;
     this.isEditingOriginalBlock = false;
     this.isEditingTranslationBlock = false;
     this.isEditingAnnotationBlock = false;
-    this.isStatusPickerOpen = false;
-    this.closeEntityPicker();
-    this.closeTagPicker();
-    this.closeCategoryPicker();
-  }
-
-  private closeCategoryPicker(): void {
-    this.categoryPickerOpen = false;
-    this.categoryPickerSearch = '';
-    this.categoryPickerCatalogItems = [];
-    this.loadingCategoryPickerCatalog = false;
-  }
-
-  private closeTagPicker(): void {
-    this.tagPickerOpen = null;
-    this.tagPickerSearch = '';
-    this.tagPickerCatalogItems = [];
-    this.loadingTagPickerCatalog = false;
-  }
-
-  private closeEntityPicker(): void {
-    this.entityPickerOpen = null;
-    this.entityPickerSearch = '';
-    this.entityPickerCatalogItems = [];
-    this.loadingEntityPickerCatalog = false;
-  }
-
-  entityTypeCodeForSection(section: EntitySection): string {
-    if (section === 'manufacturers') {
-      return 'manufacturer';
-    }
-    if (section === 'contracts') {
-      return 'contract';
-    }
-    return 'military_equipment';
-  }
-
-  toggleEntityPicker(section: EntitySection): void {
-    if (!this.isEditingEntitiesBlock || !this.state.article?.document_id) {
-      return;
-    }
-
-    if (this.entityPickerOpen === section) {
-      this.closeEntityPicker();
-      return;
-    }
-
-    this.entityPickerOpen = section;
-    this.entityPickerSearch = '';
-    this.entityPickerCatalogItems = [];
-    const docId = this.state.article.document_id;
-    const typeCode = this.entityTypeCodeForSection(section);
-    this.loadingEntityPickerCatalog = true;
-
-    this.api.getEntityCatalog(docId, typeCode).subscribe({
-      next: (items: DocumentEntityRef[]) => {
-        this.entityPickerCatalogItems = items;
-        this.loadingEntityPickerCatalog = false;
-      },
-      error: () => {
-        this.entitiesError = 'Не удалось загрузить список сущностей';
-        this.loadingEntityPickerCatalog = false;
-        this.closeEntityPicker();
-      },
-    });
-  }
-
-  get filteredEntityPickerItems(): DocumentEntityRef[] {
-    const q = this.entityPickerSearch.trim().toLowerCase();
-    if (!q) {
-      return this.entityPickerCatalogItems;
-    }
-    return this.entityPickerCatalogItems.filter((item) => item.name.toLowerCase().includes(q));
-  }
-
-  onEntityPickerSelect(item: DocumentEntityRef): void {
-    const docId = this.state.article?.document_id;
-    if (!docId || this.loadingDocumentEntitiesMutation) {
-      return;
-    }
-
-    this.loadingDocumentEntitiesMutation = true;
-    this.entitiesError = '';
-
-    this.api.assignDocumentEntity(docId, item.id).subscribe({
-      next: () => {
-        this.closeEntityPicker();
-        this.refreshDocumentEntitiesFromServer(docId);
-      },
-      error: () => {
-        this.entitiesError = 'Не удалось добавить сущность';
-        this.loadingDocumentEntitiesMutation = false;
-      },
-    });
-  }
-
-  private refreshDocumentEntitiesFromServer(documentId: string): void {
-    this.api.getDocumentEntities(documentId).subscribe({
-      next: (res: EntitiesResponse) => {
-        this.state.entities = {
-          military_equipment: res.military_equipment || [],
-          manufacturers: res.manufacturers || [],
-          contracts: res.contracts || [],
-        };
-        this.loadingDocumentEntitiesMutation = false;
-      },
-      error: () => {
-        this.entitiesError = 'Не удалось обновить список сущностей';
-        this.loadingDocumentEntitiesMutation = false;
-      },
-    });
-  }
-
-  get rankedCategories(): DocumentCategoryRef[] {
-    const list = this.state.categories || [];
-    return [...list].sort((a, b) => {
-      const ac = typeof a.confidence === 'number' && !Number.isNaN(a.confidence) ? a.confidence : 0;
-      const bc = typeof b.confidence === 'number' && !Number.isNaN(b.confidence) ? b.confidence : 0;
-      if (bc !== ac) return bc - ac;
-      return (a.name_ru || a.name || a.code).localeCompare(b.name_ru || b.name || b.code);
-    });
-  }
-
-  categoryChipLabel(cat: DocumentCategoryRef): string {
-    const parentTitle = (cat.parent_name_ru || cat.parent_name || cat.parent_code || '').trim();
-    const title = (cat.name_ru || cat.name || cat.code).trim();
-    const confPct =
-      typeof cat.confidence === 'number' && !Number.isNaN(cat.confidence)
-        ? `${Math.round(cat.confidence * 100)}%`
-        : '—';
-    const label = parentTitle ? `${parentTitle} / ${title}` : title;
-    return `${label} (${confPct})`;
-  }
-
-  toggleCategoryPicker(): void {
-    if (!this.isEditingCategoriesBlock || !this.state.article?.document_id) {
-      return;
-    }
-
-    if (this.categoryPickerOpen) {
-      this.closeCategoryPicker();
-      return;
-    }
-
-    this.categoryPickerOpen = true;
-    this.categoryPickerSearch = '';
-    this.categoryPickerCatalogItems = [];
-    const docId = this.state.article.document_id;
-    this.loadingCategoryPickerCatalog = true;
-
-    this.api.getCategoryCatalog(docId).subscribe({
-      next: (items: DocumentEntityRef[]) => {
-        this.categoryPickerCatalogItems = items;
-        this.loadingCategoryPickerCatalog = false;
-      },
-      error: () => {
-        this.categoriesError = 'Не удалось загрузить каталог категорий';
-        this.loadingCategoryPickerCatalog = false;
-        this.closeCategoryPicker();
-      },
-    });
-  }
-
-  get filteredCategoryPickerItems(): DocumentEntityRef[] {
-    const q = this.categoryPickerSearch.trim().toLowerCase();
-    if (!q) {
-      return this.categoryPickerCatalogItems;
-    }
-    return this.categoryPickerCatalogItems.filter((item) => item.name.toLowerCase().includes(q));
-  }
-
-  onCategoryPickerSelect(item: DocumentEntityRef): void {
-    const docId = this.state.article?.document_id;
-    if (!docId || this.loadingDocumentCategoriesMutation) {
-      return;
-    }
-
-    this.loadingDocumentCategoriesMutation = true;
-    this.categoriesError = '';
-
-    this.api.assignDocumentCategory(docId, item.id).subscribe({
-      next: () => {
-        this.closeCategoryPicker();
-        this.refreshDocumentCategoriesFromServer(docId);
-      },
-      error: () => {
-        this.categoriesError = 'Не удалось добавить категорию';
-        this.loadingDocumentCategoriesMutation = false;
-      },
-    });
-  }
-
-  private refreshDocumentCategoriesFromServer(documentId: string): void {
-    this.api.getDocumentCategories(documentId).subscribe({
-      next: (res) => {
-        this.state.categories = res.categories || [];
-        this.loadingDocumentCategoriesMutation = false;
-      },
-      error: () => {
-        this.categoriesError = 'Не удалось обновить список категорий';
-        this.loadingDocumentCategoriesMutation = false;
-      },
-    });
-  }
-
-  removeCategoryChip(cat: DocumentCategoryRef): void {
-    const docId = this.state.article?.document_id;
-    if (!docId || this.loadingDocumentCategoriesMutation) {
-      return;
-    }
-
-    this.loadingDocumentCategoriesMutation = true;
-    this.categoriesError = '';
-
-    this.api.removeDocumentCategory(docId, cat.category_id).subscribe({
-      next: () => {
-        this.refreshDocumentCategoriesFromServer(docId);
-      },
-      error: () => {
-        this.categoriesError = 'Не удалось удалить категорию';
-        this.loadingDocumentCategoriesMutation = false;
-      },
-    });
-  }
-
-  toggleTagPicker(scope: TagScope): void {
-    if (!this.isEditingEntitiesBlock || !this.state.article?.document_id) {
-      return;
-    }
-
-    if (this.tagPickerOpen === scope) {
-      this.closeTagPicker();
-      return;
-    }
-
-    this.tagPickerOpen = scope;
-    this.tagPickerSearch = '';
-    this.tagPickerCatalogItems = [];
-    const docId = this.state.article.document_id;
-    this.loadingTagPickerCatalog = true;
-
-    this.api.getTagCatalog(docId, scope).subscribe({
-      next: (items: DocumentTagRef[]) => {
-        this.tagPickerCatalogItems = items;
-        this.loadingTagPickerCatalog = false;
-      },
-      error: () => {
-        if (scope === 'original') {
-          this.originalTagsError = 'Не удалось загрузить каталог тегов';
-        } else {
-          this.translatedTagsError = 'Не удалось загрузить каталог тегов';
-        }
-        this.loadingTagPickerCatalog = false;
-        this.closeTagPicker();
-      },
-    });
-  }
-
-  get filteredTagPickerItems(): DocumentTagRef[] {
-    const q = this.tagPickerSearch.trim().toLowerCase();
-    if (!q) {
-      return this.tagPickerCatalogItems;
-    }
-    return this.tagPickerCatalogItems.filter((item) => item.name.toLowerCase().includes(q));
-  }
-
-  onTagPickerSelect(item: DocumentTagRef): void {
-    const docId = this.state.article?.document_id;
-    if (!docId || this.loadingDocumentTagsMutation) {
-      return;
-    }
-
-    this.loadingDocumentTagsMutation = true;
-    this.originalTagsError = '';
-    this.translatedTagsError = '';
-
-    this.api.assignDocumentTag(docId, item.id).subscribe({
-      next: () => {
-        this.closeTagPicker();
-        this.refreshDocumentTagsFromServer(docId);
-      },
-      error: () => {
-        const scope = this.tagPickerOpen;
-        if (scope === 'translated') {
-          this.translatedTagsError = 'Не удалось добавить тег';
-        } else {
-          this.originalTagsError = 'Не удалось добавить тег';
-        }
-        this.loadingDocumentTagsMutation = false;
-      },
-    });
-  }
-
-  private refreshDocumentTagsFromServer(documentId: string): void {
-    this.api.getDocumentTags(documentId).subscribe({
-      next: (res: DocumentTagsResponse) => {
-        this.state.originalTags = res.original_tags || [];
-        this.state.translatedTags = res.translated_tags || [];
-        this.loadingDocumentTagsMutation = false;
-      },
-      error: () => {
-        this.originalTagsError = 'Не удалось обновить список тегов';
-        this.translatedTagsError = 'Не удалось обновить список тегов';
-        this.loadingDocumentTagsMutation = false;
-      },
-    });
   }
 
   private reloadTagsFromServer(kind: 'original' | 'translated'): void {
@@ -858,7 +404,7 @@ export class ArticleParser {
         this.loadingOriginalTags = false;
         this.loadingTranslatedTags = false;
         this.cdr.detectChanges();
-        this.scrollToElement(() => this.entitiesBlock);
+        // Tags are rendered in the dedicated entities component.
       },
       error: () => {
         if (kind === 'original') {
@@ -872,124 +418,6 @@ export class ArticleParser {
     });
   }
 
-  // =========================
-  // СУЩНОСТИ
-  // =========================
-
-  removeEntityItem(item: DocumentEntityRef): void {
-    const docId = this.state.article?.document_id;
-    if (!docId || this.loadingDocumentEntitiesMutation) {
-      return;
-    }
-
-    this.loadingDocumentEntitiesMutation = true;
-    this.entitiesError = '';
-
-    this.api.removeDocumentEntity(docId, item.id).subscribe({
-      next: () => {
-        this.refreshDocumentEntitiesFromServer(docId);
-      },
-      error: () => {
-        this.entitiesError = 'Не удалось удалить сущность';
-        this.loadingDocumentEntitiesMutation = false;
-      },
-    });
-  }
-
-  removeOriginalTag(tag: DocumentTagRef): void {
-    const docId = this.state.article?.document_id;
-    if (!docId || this.loadingDocumentTagsMutation) {
-      return;
-    }
-
-    this.loadingDocumentTagsMutation = true;
-    this.originalTagsError = '';
-
-    this.api.removeDocumentTag(docId, tag.id).subscribe({
-      next: () => {
-        this.refreshDocumentTagsFromServer(docId);
-      },
-      error: () => {
-        this.originalTagsError = 'Не удалось удалить тег';
-        this.loadingDocumentTagsMutation = false;
-      },
-    });
-  }
-
-  removeTranslatedTag(tag: DocumentTagRef): void {
-    const docId = this.state.article?.document_id;
-    if (!docId || this.loadingDocumentTagsMutation) {
-      return;
-    }
-
-    this.loadingDocumentTagsMutation = true;
-    this.translatedTagsError = '';
-
-    this.api.removeDocumentTag(docId, tag.id).subscribe({
-      next: () => {
-        this.refreshDocumentTagsFromServer(docId);
-      },
-      error: () => {
-        this.translatedTagsError = 'Не удалось удалить тег';
-        this.loadingDocumentTagsMutation = false;
-      },
-    });
-  }
-
-  addDocumentStatus(): void {
-    const documentId = this.state.article?.document_id;
-    const code = this.pendingStatusCode.trim();
-    if (!documentId || !code) return;
-
-    this.loadingDocumentStatuses = true;
-    this.documentStatusError = '';
-
-    this.api.assignDocumentStatus(documentId, code).subscribe({
-      next: () => {
-        this.pendingStatusCode = '';
-        this.isStatusPickerOpen = false;
-        this.refreshDocumentStatuses(documentId);
-      },
-      error: () => {
-        this.documentStatusError = 'Не удалось добавить статус';
-        this.loadingDocumentStatuses = false;
-      },
-    });
-  }
-
-  onDocumentStatusSelected(code: string | null | undefined): void {
-    if (!code || this.loadingDocumentStatuses) {
-      return;
-    }
-
-    const alreadyAssigned = this.documentStatusTags.some((status) => status.code === code);
-    if (alreadyAssigned) {
-      this.pendingStatusCode = '';
-      return;
-    }
-
-    this.pendingStatusCode = code;
-    this.addDocumentStatus();
-  }
-
-  removeDocumentStatusTag(code: string): void {
-    const documentId = this.state.article?.document_id;
-    if (!documentId) return;
-
-    this.loadingDocumentStatuses = true;
-    this.documentStatusError = '';
-
-    this.api.removeDocumentStatus(documentId, code).subscribe({
-      next: () => {
-        this.refreshDocumentStatuses(documentId);
-      },
-      error: () => {
-        this.documentStatusError = 'Не удалось удалить статус';
-        this.loadingDocumentStatuses = false;
-      },
-    });
-  }
-
   autoResize(event: Event): void {
     const textarea = event.target as HTMLTextAreaElement;
 
@@ -997,111 +425,10 @@ export class ArticleParser {
     textarea.style.height = `${textarea.scrollHeight}px`;
   }
 
-  private escapeHtml(value: string): string {
-    return value
-      .replaceAll('&', '&amp;')
-      .replaceAll('<', '&lt;')
-      .replaceAll('>', '&gt;')
-      .replaceAll('"', '&quot;')
-      .replaceAll("'", '&#039;');
-  }
-
-  get mainImageUrl(): string {
-    return this.state.article?.main_image?.trim() || '';
-  }
-
-  private syncDocumentStatusTagsFromArticle(): void {
-    if (!this.state.article) {
-      this.documentStatusTags = [];
-      return;
-    }
-
-    const statusItems = this.state.article.statuses || [];
-    this.documentStatusTags = statusItems
-      .map((status) => ({
-        code: status.code,
-        label: status.name_ru || status.code,
-      }))
-      .filter((status) => !!status.code);
-  }
-
-  private loadAvailableDocumentStatuses(): void {
-    this.api.getAvailableDocumentStatuses().subscribe({
-      next: (statuses) => {
-        this.availableDocumentStatuses = statuses;
-      },
-      error: () => {
-        this.documentStatusError = 'Не удалось загрузить справочник статусов';
-      },
-    });
-  }
-
-  private refreshDocumentStatuses(documentId: string): void {
-    this.api.getDocumentStatuses(documentId).subscribe({
-      next: (response) => {
-        if (this.state.article) {
-          this.state.article.statuses = response.statuses;
-        }
-        this.syncDocumentStatusTagsFromArticle();
-        this.loadingDocumentStatuses = false;
-      },
-      error: () => {
-        this.documentStatusError = 'Статусы обновлены, но не удалось получить актуальный список';
-        this.loadingDocumentStatuses = false;
-      },
-    });
-  }
-
-  pendingStatusCode = '';
-
-  toggleStatusPicker(): void {
-    if (
-      !this.isEditingStatusBlock ||
-      this.loadingDocumentStatuses ||
-      !this.unassignedDocumentStatuses.length
-    ) {
-      return;
-    }
-
-    this.isStatusPickerOpen = !this.isStatusPickerOpen;
-  }
-
-  get unassignedDocumentStatuses(): { code: string; name_ru: string; description: string | null }[] {
-    const assigned = new Set(this.documentStatusTags.map((status) => status.code));
-    return this.availableDocumentStatuses.filter((status) => !assigned.has(status.code));
-  }
-
-  onImageLoad(): void {
-    console.log('Картинка загрузилась:', this.mainImageUrl);
-  }
-
-  onImageError(event: Event): void {
-    console.log('Ошибка загрузки картинки:', this.mainImageUrl, event);
-  }
-
-  get hasEmptyEntitiesResult(): boolean {
-    return (
-      !!this.state.entities &&
-      !this.loadingEntities &&
-      !this.state.entities.military_equipment?.length &&
-      !this.state.entities.manufacturers?.length &&
-      !this.state.entities.contracts?.length
-    );
-  }
-
-  get hasEmptyCategoriesResult(): boolean {
-    return (
-      !!this.state.article &&
-      this.state.categories !== null &&
-      !this.loadingCategories &&
-      this.state.categories.length === 0
-    );
-  }
-
   get isLoading(): boolean {
     return (
       this.loadingArticle ||
-      this.loadingEntities ||
+      this.loadingEntitiesSection ||
       this.loadingCategories ||
       this.loadingTranslation ||
       this.loadingSummary ||
@@ -1132,58 +459,11 @@ export class ArticleParser {
       .filter(Boolean)
       .sort(sortDesc);
 
-    if (!military.length && !manufacturers.length && !contracts.length) {
-      return this.escapeHtml(text).replace(/\n/g, '<br>');
-    }
-
-    let result = this.escapeHtml(text);
-    result = this.applyEntityHighlights(result, military, 'highlighted-entity-military');
-    result = this.applyEntityHighlights(result, manufacturers, 'highlighted-entity-manufacturer');
-    result = this.applyEntityHighlights(result, contracts, 'highlighted-entity-contract');
-
-    return result.replace(/\n/g, '<br>');
-  }
-
-  private applyEntityHighlights(
-    html: string,
-    entities: string[],
-    className: string,
-  ): string {
-    let result = html;
-
-    for (const entity of entities) {
-      const escapedEntity = this.escapeHtml(entity.trim());
-      const pattern = this.createFlexibleEntityPattern(escapedEntity);
-
-      result = result.replace(pattern, (match) => {
-        if (match.includes('highlighted-entity')) {
-          return match;
-        }
-
-        return `<span class="${className}">${match}</span>`;
-      });
-    }
-
-    return result;
-  }
-
-  private createFlexibleEntityPattern(value: string): RegExp {
-    const escaped = value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
-    const flexible = escaped.replace(/\\ /g, '\\s+').replace(/-/g, '[-–—-]?');
-
-    return new RegExp(flexible, 'gi');
-  }
-
-  private scrollToElement(getElement: () => ElementRef | undefined): void {
-    setTimeout(() => {
-      this.cdr.detectChanges();
-
-      getElement()?.nativeElement.scrollIntoView({
-        behavior: 'smooth',
-        block: 'start',
-      });
-    }, 0);
+    return buildHighlightedArticleTextByGroups(text, [
+      { className: 'highlighted-entity-military', entities: military },
+      { className: 'highlighted-entity-manufacturer', entities: manufacturers },
+      { className: 'highlighted-entity-contract', entities: contracts },
+    ]);
   }
 
   private getOriginalTextTextarea(): HTMLTextAreaElement | null {

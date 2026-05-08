@@ -1,0 +1,332 @@
+:host {
+  display: contents;
+}
+
+:host ::ng-deep .translated-chip {
+  background-color: rgb(180, 235, 181);
+  color: var(--dark-text-color);
+}
+
+:host ::ng-deep .original-chip {
+  background-color: rgb(180, 220, 235);
+  color: var(--dark-text-color);
+}
+
+:host ::ng-deep .entity-chip-military {
+  background-color: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+
+:host ::ng-deep .entity-chip-manufacturer {
+  background-color: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fcd34d;
+}
+
+:host ::ng-deep .entity-chip-contract {
+  background-color: #f3e8ff;
+  color: #6b21a8;
+  border: 1px solid #d8b4fe;
+}
+
+:host ::ng-deep .chip-compact.p-chip {
+  padding: 5px 10px;
+  min-height: 1.375rem;
+  font-size: 15px;
+}
+
+:host ::ng-deep .chip-compact.p-chip .p-chip-label {
+  line-height: 1.25;
+  margin: 0;
+}
+
+:host ::ng-deep .chip-compact.p-chip .p-chip-remove-icon {
+  width: 0.875rem;
+  height: 0.875rem;
+  margin-inline-start: 0.1rem;
+}
+
+.panel {
+  background: var(--table-row-color);
+  width: 100%;
+  border: 1px solid var(--super-light-grey-text-color);
+  border-radius: 10px;
+  padding: 16px;
+  align-self: start;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.02),
+    0 4px 8px rgba(0, 0, 0, 0.02);
+}
+
+.panel-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--primary-text-color);
+  margin-bottom: 10px;
+}
+
+.title-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.entities-title-row {
+  align-items: center;
+  gap: 12px;
+}
+
+.entities-title-row .panel-title {
+  margin-bottom: 0;
+}
+
+.entities-title-trailing {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.block-edit-toggle {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  color: var(--light-grey-text-color);
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    color 0.5s ease;
+}
+
+.block-edit-toggle .pi {
+  font-size: 1.4rem;
+  line-height: 1;
+}
+
+.block-edit-toggle:hover {
+  border-color: #818cf8;
+  color: var(--primary-text-color);
+}
+
+.block-edit-toggle:focus-visible {
+  outline: 2px solid #818cf8;
+  outline-offset: 2px;
+}
+
+.block-edit-toggle--active {
+  border-color: #86efac;
+  color: var(--accent-color-success);
+}
+
+.block-edit-toggle--active:hover {
+  border-color: #4ade80;
+  color: #14532d;
+}
+
+.field-error {
+  min-height: 18px;
+  margin-top: 8px;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--error-text-color);
+}
+
+.entities-sceleton-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.empty-entities-message {
+  margin-top: 10px;
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-medium);
+  color: var(--light-grey-text-color);
+  text-transform: uppercase;
+}
+
+.status-add-chip,
+.entity-add-chip {
+  border: 1px dashed #93c5fd;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-radius: 999px;
+  min-width: 30px;
+  height: 30px;
+  padding: 0 10px;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.status-add-chip:disabled,
+.entity-add-chip:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.status-add-wrapper,
+.entity-add-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.status-picker-popover,
+.entity-picker-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  padding: 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow:
+    0 4px 12px rgba(15, 23, 42, 0.1),
+    0 1px 3px rgba(15, 23, 42, 0.08);
+}
+
+.entity-picker-popover {
+  left: 0;
+  gap: 8px;
+  min-width: 240px;
+  max-width: min(320px, 90vw);
+}
+
+:host ::ng-deep .entity-picker-select {
+  width: 240px;
+}
+
+.status-picker-item,
+.entity-picker-item {
+  border: 1px solid #dbeafe;
+  background: #f8fbff;
+  color: #1e3a8a;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+  flex-shrink: 0;
+}
+
+.status-picker-item:hover,
+.entity-picker-item:hover {
+  background: #e0e7ff;
+}
+
+.status-picker-item:disabled,
+.entity-picker-item:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.entity-picker-search {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 14px;
+}
+
+.entity-picker-search:focus {
+  outline: 2px solid #93c5fd;
+  outline-offset: 0;
+}
+
+.entity-picker-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.entity-picker-empty,
+.entity-picker-loading {
+  font-size: 13px;
+  color: #64748b;
+  padding: 4px 2px;
+}
+
+.meta-tags {
+  margin-top: 12px;
+}
+
+.meta-tags--entity-row {
+  --entity-meta-label-width: 18rem;
+  display: grid;
+  grid-template-columns: var(--entity-meta-label-width) minmax(0, 1fr);
+  column-gap: 10px;
+  row-gap: 8px;
+  align-items: start;
+  border-bottom: 1px solid var(--super-light-grey-text-color);
+  padding-bottom: 10px;
+}
+
+.meta-tags--entity-row .entity-row-title {
+  grid-column: 1;
+  margin: 0;
+  padding-top: 0.125rem;
+  line-height: 1.35;
+  font-size: var(--font-size-prewiew);
+  font-weight: var(--font-weight-semibold);
+  color: var(--primary-text-color);
+}
+
+.meta-tags--entity-row .tags {
+  grid-column: 2;
+  margin-top: 0;
+  align-items: center;
+  align-content: start;
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+  align-items: center;
+}
+
+.loading-original-tag-wrapper-btn {
+  margin-top: 10px;
+  display: flex;
+  gap: 10px;
+}
+
+.entities-title-trailing-buttons {
+  padding-right: 10px;
+  border-right: 1px solid var(--light-grey-text-color);
+}
+
+@media (max-width: 640px) {
+  .meta-tags--entity-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .meta-tags--entity-row .entity-row-title,
+  .meta-tags--entity-row .tags {
+    grid-column: 1;
+  }
+}

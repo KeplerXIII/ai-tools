@@ -15,8 +15,6 @@ import { TranslateBatchNotifierService } from './core/processing/translate-batch
   imports: [
     AsyncPipe,
     RouterOutlet,
-    RouterLink,
-    RouterLinkActive,
     MatSidenavModule,
     MatListModule,
     MatToolbarModule,

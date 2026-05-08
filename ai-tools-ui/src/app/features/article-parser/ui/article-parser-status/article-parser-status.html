@@ -1,0 +1,67 @@
+<section class="panel">
+  <div class="title-wrapper">
+    <h3 class="panel-title">Статус</h3>
+
+    <div class="status-title-trailing">
+      <div class="tags status-tags">
+        @if (isEditingStatusBlock) {
+          <div class="status-add-wrapper">
+            @if (unassignedDocumentStatuses.length) {
+              <p-speeddial
+                [model]="statusSpeedDialItems"
+                direction="left"
+                [style]="{
+                  position: 'absolute',
+                  top: '50%',
+                  right: 0,
+                  transform: 'translateY(-35%)',
+                }"
+                [disabled]="loadingDocumentStatuses"
+              >
+                <ng-template #item let-item let-toggleCallback="toggleCallback">
+                  <button
+                    type="button"
+                    class="status-speed-dial-item"
+                    (click)="toggleCallback($event, item)"
+                  >
+                    {{ item.label }}
+                  </button>
+                </ng-template>
+              </p-speeddial>
+            }
+          </div>
+        }
+
+        @for (status of documentStatusTags; track status.code) {
+          <p-chip
+            [label]="status.label"
+            class="chip-item status-chip"
+            [removable]="isEditingStatusBlock && !loadingDocumentStatuses"
+            (onRemove)="removeDocumentStatusTag(status.code)"
+          />
+        }
+      </div>
+
+      <button
+        type="button"
+        class="block-edit-toggle no-print-field"
+        [class.block-edit-toggle--active]="isEditingStatusBlock"
+        [attr.aria-pressed]="isEditingStatusBlock"
+        [attr.aria-label]="
+          isEditingStatusBlock ? 'Завершить редактирование блока' : 'Редактировать блок'
+        "
+        (click)="toggleEdit()"
+      >
+        <i
+          class="pi"
+          [class.pi-pen-to-square]="!isEditingStatusBlock"
+          [class.pi-check-square]="isEditingStatusBlock"
+        ></i>
+      </button>
+    </div>
+  </div>
+
+  @if (documentStatusError) {
+    <div class="field-error">{{ documentStatusError }}</div>
+  }
+</section>

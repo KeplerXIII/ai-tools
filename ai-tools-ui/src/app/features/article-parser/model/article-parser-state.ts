@@ -5,7 +5,7 @@ import {
   DocumentTagRef,
   EntitiesResponse,
   ExtractResponse,
-} from './article-parser-api';
+} from '../api/article-parser-api';
 
 @Injectable({
   providedIn: 'root',

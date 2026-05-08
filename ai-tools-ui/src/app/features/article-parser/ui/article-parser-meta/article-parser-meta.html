@@ -1,0 +1,123 @@
+<section class="panel meta-panel">
+  <div class="meta-wrapper">
+    <div class="title-wrapper meta-title-row">
+      <h3 class="panel-title">Метаданные</h3>
+
+      <div class="meta-title-trailing">
+        <div class="meta-chips-with-edit">
+          <div class="chips-wrapper">
+            @if (article.length) {
+              <p-chip label="Длина: {{ article.length }}" class="chip-item length-chip" />
+            }
+
+            @if (article.quality) {
+              <p-chip label="Качество: {{ article.quality }}" class="chip-item length-chip" />
+            }
+
+            @if (article.needs_review !== null && article.needs_review !== undefined) {
+              <p-chip
+                [label]="'Проверка: ' + (article.needs_review ? 'да' : 'нет')"
+                class="chip-item length-chip"
+              />
+            }
+          </div>
+
+          <button
+            type="button"
+            class="block-edit-toggle no-print-field"
+            [class.block-edit-toggle--active]="isEditingMetaBlock"
+            [attr.aria-pressed]="isEditingMetaBlock"
+            [attr.aria-label]="
+              isEditingMetaBlock ? 'Завершить редактирование блока' : 'Редактировать блок'
+            "
+            (click)="toggleEdit()"
+          >
+            <i class="pi" [class.pi-pen-to-square]="!isEditingMetaBlock" [class.pi-check-square]="isEditingMetaBlock"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="meta-list">
+      <div class="meta-block-one">
+        <p-floatlabel variant="on" class="prime-field full-width">
+          <input
+            pInputText
+            id="article_title"
+            name="article_title"
+            [ngModel]="isEditingMetaBlock ? article.title : article.title || 'Нет информации'"
+            (ngModelChange)="isEditingMetaBlock && article && (article.title = $event)"
+            [disabled]="!isEditingMetaBlock"
+          />
+          <label class="label-input" for="article_title">Заголовок</label>
+        </p-floatlabel>
+
+        <p-floatlabel variant="on" class="prime-field full-width">
+          <input
+            pInputText
+            id="article_author"
+            name="article_author"
+            [ngModel]="isEditingMetaBlock ? article.author : article.author || 'Нет информации'"
+            (ngModelChange)="isEditingMetaBlock && article && (article.author = $event)"
+            [disabled]="!isEditingMetaBlock"
+          />
+          <label for="article_author">Автор</label>
+        </p-floatlabel>
+
+        <p-floatlabel variant="on" class="prime-field full-width">
+          <input
+            pInputText
+            id="article_date"
+            name="article_date"
+            [ngModel]="isEditingMetaBlock ? article.date : article.date || 'Нет информации'"
+            (ngModelChange)="isEditingMetaBlock && article && (article.date = $event)"
+            [disabled]="!isEditingMetaBlock"
+          />
+          <label for="article_date">Дата</label>
+        </p-floatlabel>
+
+        <p-floatlabel variant="on" class="prime-field full-width">
+          <input
+            pInputText
+            id="article_url"
+            name="article_url"
+            [ngModel]="isEditingMetaBlock ? article.url : article.url || 'Нет информации'"
+            (ngModelChange)="isEditingMetaBlock && article && (article.url = $event)"
+            [disabled]="!isEditingMetaBlock"
+          />
+          <label for="article_url">URL</label>
+        </p-floatlabel>
+
+        <p-floatlabel variant="on" class="prime-field full-width">
+          <input
+            pInputText
+            id="article_main_image"
+            name="article_main_image"
+            [ngModel]="isEditingMetaBlock ? article.main_image : article.main_image || 'Нет информации'"
+            (ngModelChange)="isEditingMetaBlock && article && (article.main_image = $event)"
+            [disabled]="!isEditingMetaBlock"
+            placeholder="https://example.com/image.jpg"
+          />
+          <label for="article_main_image">Главное изображение</label>
+        </p-floatlabel>
+      </div>
+    </div>
+  </div>
+
+  @if (mainImageUrl) {
+    <div class="prew-image-block">
+      <p class="image-prew-title">Предпросмотр изображения:</p>
+      <p-image
+        [src]="mainImageUrl"
+        alt="Главное изображение статьи"
+        [preview]="true"
+        width="500"
+        (onImageError)="onImageError($event)"
+      >
+        <ng-template pTemplate="indicator">
+          <i class="pi pi-search-plus image-preview-icon"></i>
+        </ng-template>
+      </p-image>
+    </div>
+  }
+</section>

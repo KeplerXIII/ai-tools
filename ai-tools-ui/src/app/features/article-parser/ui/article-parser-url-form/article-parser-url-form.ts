@@ -6,8 +6,8 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import {
   ButtonVariant,
   OutlineButtonComponent,
-} from '../../../shared/ui/outline-button/outline-button.component';
-import { PrimaryButtonComponent } from '../../../shared/ui/primary-button/primary-button.component';
+} from '../../../../shared/ui/outline-button/outline-button.component';
+import { PrimaryButtonComponent } from '../../../../shared/ui/primary-button/primary-button.component';
 
 @Component({
   selector: 'app-article-parser-url-form',
