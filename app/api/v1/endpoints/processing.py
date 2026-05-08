@@ -614,6 +614,9 @@ async def _enqueue_tagger_missing_documents(
     db: AsyncSession,
     started_by_id: UUID | None,
 ) -> EnqueueTaggerMissingResponse:
+    source = "translated" if use_translation else "original"
+    same_source_active_key_prefix = f"tagger-missing-{source}:"
+
     has_text_filter = (
         (
             Document.translated_content.is_not(None),
@@ -643,6 +646,7 @@ async def _enqueue_tagger_missing_documents(
                 ProcessingJob.document_id == Document.id,
                 ProcessingJob.job_type == JobType.TAG,
                 ProcessingJob.status.in_((JobStatus.RUNNING, JobStatus.PENDING)),
+                ProcessingJob.queue_job_key.like(f"{same_source_active_key_prefix}%"),
             )
             .exists(),
         )
@@ -662,7 +666,6 @@ async def _enqueue_tagger_missing_documents(
         enqueued = 0
         started_by = str(started_by_id) if started_by_id else None
         lock_kind = "tagger_translated" if use_translation else "tagger_original"
-        source = "translated" if use_translation else "original"
         for document_id in document_ids:
             lock_acquired = await try_acquire_enqueue_lock(
                 lock_kind,
