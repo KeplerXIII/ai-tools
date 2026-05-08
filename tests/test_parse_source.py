@@ -244,8 +244,8 @@ class ParseSourceEndpointTests(IsolatedAsyncioTestCase):
         url1 = "https://example.com/news/2026/05/01/a"
         url2 = "https://example.com/news/2026/05/02/b"
         discovered = [
-            DiscoveredUrl(url=url1, published_at=datetime(2026, 5, 1, tzinfo=UTC)),
-            DiscoveredUrl(url=url2, published_at=datetime(2026, 5, 2, tzinfo=UTC)),
+            DiscoveredUrl(url=url1, published_at=datetime(2099, 5, 1, tzinfo=UTC)),
+            DiscoveredUrl(url=url2, published_at=datetime(2099, 5, 2, tzinfo=UTC)),
         ]
 
         docs_created: list[SimpleNamespace] = []
@@ -538,6 +538,57 @@ class ParseSourceEndpointTests(IsolatedAsyncioTestCase):
 
         self.assertEqual(create_calls, 0)
         self.assertEqual(result.created_total, 0)
+
+    async def test_parse_source_does_not_filter_undated_during_discovery(self):
+        """При skip_undated discovery не фильтрует бездатные ссылки до extraction."""
+        source_id = uuid.uuid4()
+        source = SimpleNamespace(
+            id=source_id,
+            document_type_id=uuid.uuid4(),
+            url="https://example.com",
+            rss_url=None,
+            is_active=True,
+        )
+        db = _FakeDb(source=source)
+        discovered = [DiscoveredUrl(url="https://example.com/news/nodate", published_at=None)]
+        discover_mock = AsyncMock(return_value=discovered)
+
+        with (
+            patch("app.api.v1.endpoints.parsing.discover_source_news_urls", discover_mock),
+            patch(
+                "app.api.v1.endpoints.parsing.get_document_by_source_url",
+                AsyncMock(return_value=None),
+            ),
+            patch(
+                "app.api.v1.endpoints.parsing._extract_single_article_for_parse_source",
+                AsyncMock(
+                    return_value={
+                        "title": "n",
+                        "text": "body",
+                        "length": 4,
+                        "method": "m",
+                        "quality": "good",
+                        "needs_review": False,
+                    }
+                ),
+            ),
+            patch(
+                "app.api.v1.endpoints.parsing.create_document_after_extract",
+                AsyncMock(return_value=SimpleNamespace(id=uuid.uuid4(), version=1, source_id=None, published_at=None)),
+            ),
+            patch(
+                "app.api.v1.endpoints.parsing._list_unprocessed_by_source",
+                AsyncMock(return_value=[]),
+            ),
+        ):
+            await parse_source(
+                payload=ParseSourceRequest(source_id=source_id, days=7, skip_undated=True),
+                db=db,
+                user=None,
+            )
+
+        discover_mock.assert_awaited_once()
+        self.assertFalse(discover_mock.await_args.kwargs["skip_undated"])
 
     async def test_create_source_happy_path(self):
         """Создание источника: моки справочников языка/страны, проверка полей ответа."""

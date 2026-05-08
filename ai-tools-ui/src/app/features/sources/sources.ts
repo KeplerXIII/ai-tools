@@ -49,7 +49,7 @@ export class Sources implements OnInit {
   expandedSourceId: string | null = null;
 
   parseDays = 3;
-  /** Соответствует skip_undated в API: не брать материалы без даты (обход и после извлечения). */
+  /** Соответствует skip_undated в API: после извлечения не сохранять материалы без итоговой даты. */
   parseSkipUndated = true;
   parsingSourceId: string | null = null;
   lastParsedSourceId: string | null = null;

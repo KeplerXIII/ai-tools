@@ -334,7 +334,9 @@ async def parse_source(
         source.url,
         rss_url=source.rss_url,
         days=payload.days,
-        skip_undated=payload.skip_undated,
+        # Не отсеиваем бездатные ссылки на этапе discovery: часть дат появляется
+        # только после trafilatura/extract. Флаг skip_undated применяем ниже по final_pub.
+        skip_undated=False,
     )
     depth_threshold_utc = datetime.now(UTC) - timedelta(days=payload.days)
     created_by_id = user.id if user else None
