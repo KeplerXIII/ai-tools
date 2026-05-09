@@ -1,5 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { firstValueFrom, Subscription, timer } from 'rxjs';
 
 import { DocumentListItem } from '../documents/documents-api';
@@ -22,12 +23,29 @@ type CounterFlashKind = 'up' | 'down' | 'same';
 type JobFlashKind = 'new' | 'changed';
 type JobFieldKey = keyof ProcessingJobRow;
 
+/** Поля таблицы, по которым имеет смысл сортировать в UI */
+type JobSortField =
+  | 'created_at'
+  | 'started_at'
+  | 'finished_at'
+  | 'duration_ms'
+  | 'job_type'
+  | 'status'
+  | 'model_name'
+  | 'provider'
+  | 'queue_name'
+  | 'document_id'
+  | 'id'
+  | 'batch_id';
+
+const EMPTY_FILTER = '__empty__';
+
 const BULK_FEEDBACK_HIDE_MS = 6000;
 
 @Component({
   selector: 'app-processing-dashboard',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, FormsModule],
   templateUrl: './processing-dashboard.html',
   styleUrl: './processing-dashboard.scss',
 })
@@ -73,6 +91,33 @@ export class ProcessingDashboard implements OnInit, OnDestroy {
   private applySnapshotTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly bulkFeedbackTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
+  /** Фильтры по значимым полям (пустая строка — без фильтра) */
+  filterJobType = '';
+  filterStatus = '';
+  filterModelName = '';
+  filterQueueName = '';
+  filterProvider = '';
+  /** Подстрока по id, document_id, batch_id, queue_job_key */
+  filterSearch = '';
+
+  sortField: JobSortField = 'created_at';
+  sortDir: 'asc' | 'desc' = 'desc';
+
+  readonly jobSortOptions: { value: JobSortField; label: string }[] = [
+    { value: 'created_at', label: 'Дата создания' },
+    { value: 'started_at', label: 'Старт' },
+    { value: 'finished_at', label: 'Завершение' },
+    { value: 'duration_ms', label: 'Длительность (мс)' },
+    { value: 'job_type', label: 'Тип задачи' },
+    { value: 'status', label: 'Статус' },
+    { value: 'model_name', label: 'Модель' },
+    { value: 'provider', label: 'Провайдер' },
+    { value: 'queue_name', label: 'Очередь' },
+    { value: 'document_id', label: 'document_id' },
+    { value: 'id', label: 'id' },
+    { value: 'batch_id', label: 'batch_id' },
+  ];
+
   constructor(
     private readonly api: ProcessingDashboardApi,
     private readonly documentsApi: DocumentsApi,
@@ -103,6 +148,139 @@ export class ProcessingDashboard implements OnInit, OnDestroy {
 
   trackJob(_: number, job: ProcessingJobRow): string {
     return job.id;
+  }
+
+  /** Отфильтрованные и отсортированные строки для таблицы */
+  get displayedJobs(): ProcessingJobRow[] {
+    const q = this.filterSearch.trim().toLowerCase();
+    const rows = this.jobs.filter((j) => {
+      if (this.filterJobType && j.job_type !== this.filterJobType) {
+        return false;
+      }
+      if (this.filterStatus && j.status !== this.filterStatus) {
+        return false;
+      }
+      if (this.filterQueueName) {
+        const qn = j.queue_name ?? '';
+        if (this.filterQueueName === EMPTY_FILTER) {
+          if (qn !== '') {
+            return false;
+          }
+        } else if (qn !== this.filterQueueName) {
+          return false;
+        }
+      }
+      if (this.filterProvider) {
+        const p = j.provider ?? '';
+        if (this.filterProvider === EMPTY_FILTER) {
+          if (p !== '') {
+            return false;
+          }
+        } else if (p !== this.filterProvider) {
+          return false;
+        }
+      }
+      if (this.filterModelName) {
+        const m = j.model_name ?? '';
+        if (this.filterModelName === EMPTY_FILTER) {
+          if (m !== '') {
+            return false;
+          }
+        } else if (m !== this.filterModelName) {
+          return false;
+        }
+      }
+      if (q) {
+        const hay = [j.id, j.document_id, j.batch_id ?? '', j.queue_job_key ?? ''].join(' ').toLowerCase();
+        if (!hay.includes(q)) {
+          return false;
+        }
+      }
+      return true;
+    });
+    const dir = this.sortDir === 'asc' ? 1 : -1;
+    return [...rows].sort((a, b) => {
+      if (this.sortField === 'duration_ms') {
+        const aN = a.duration_ms;
+        const bN = b.duration_ms;
+        const aNull = aN == null;
+        const bNull = bN == null;
+        if (aNull && bNull) {
+          return 0;
+        }
+        if (aNull) {
+          return 1;
+        }
+        if (bNull) {
+          return -1;
+        }
+        return dir * (aN < bN ? -1 : aN > bN ? 1 : 0);
+      }
+      return dir * this.compareJobField(a, b, this.sortField);
+    });
+  }
+
+  get uniqueJobTypes(): string[] {
+    return this.sortedUnique(this.jobs.map((j) => j.job_type));
+  }
+
+  get uniqueStatuses(): string[] {
+    return this.sortedUnique(this.jobs.map((j) => j.status));
+  }
+
+  get uniqueModelNames(): string[] {
+    return this.sortedUnique(this.jobs.map((j) => j.model_name ?? ''));
+  }
+
+  get uniqueQueueNames(): string[] {
+    return this.sortedUnique(this.jobs.map((j) => j.queue_name ?? ''));
+  }
+
+  get uniqueProviders(): string[] {
+    return this.sortedUnique(this.jobs.map((j) => j.provider ?? ''));
+  }
+
+  get modelNameSelectOptions(): { value: string; label: string }[] {
+    return this.uniqueModelNames.map((v) =>
+      v === '' ? { value: EMPTY_FILTER, label: '(не задано)' } : { value: v, label: v },
+    );
+  }
+
+  get queueNameSelectOptions(): { value: string; label: string }[] {
+    return this.uniqueQueueNames.map((v) =>
+      v === '' ? { value: EMPTY_FILTER, label: '(не задано)' } : { value: v, label: v },
+    );
+  }
+
+  get providerSelectOptions(): { value: string; label: string }[] {
+    return this.uniqueProviders.map((v) =>
+      v === '' ? { value: EMPTY_FILTER, label: '(не задано)' } : { value: v, label: v },
+    );
+  }
+
+  clearJobFilters(): void {
+    this.filterJobType = '';
+    this.filterStatus = '';
+    this.filterModelName = '';
+    this.filterQueueName = '';
+    this.filterProvider = '';
+    this.filterSearch = '';
+    this.cdr.detectChanges();
+  }
+
+  toggleSortDir(): void {
+    this.sortDir = this.sortDir === 'asc' ? 'desc' : 'asc';
+    this.cdr.detectChanges();
+  }
+
+  private sortedUnique(values: string[]): string[] {
+    return [...new Set(values)].sort((a, b) => a.localeCompare(b));
+  }
+
+  private compareJobField(a: ProcessingJobRow, b: ProcessingJobRow, field: JobSortField): number {
+    const sa = String(a[field] ?? '');
+    const sb = String(b[field] ?? '');
+    return sa.localeCompare(sb, undefined, { numeric: true, sensitivity: 'base' });
   }
 
   private startStream(): void {

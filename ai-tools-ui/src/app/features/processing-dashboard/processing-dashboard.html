@@ -149,6 +149,64 @@
 
   <section class="jobs-panel">
     <h2>Processing Jobs (все поля)</h2>
+    <div class="jobs-toolbar">
+      <span class="jobs-toolbar__summary">Показано {{ displayedJobs.length }} из {{ jobs.length }}</span>
+      <label class="jobs-toolbar__field">
+        <span class="jobs-toolbar__label">Тип</span>
+        <select class="jobs-toolbar__select" [(ngModel)]="filterJobType">
+          <option value="">Все</option>
+          <option *ngFor="let t of uniqueJobTypes" [value]="t">{{ t }}</option>
+        </select>
+      </label>
+      <label class="jobs-toolbar__field">
+        <span class="jobs-toolbar__label">Статус</span>
+        <select class="jobs-toolbar__select" [(ngModel)]="filterStatus">
+          <option value="">Все</option>
+          <option *ngFor="let s of uniqueStatuses" [value]="s">{{ s }}</option>
+        </select>
+      </label>
+      <label class="jobs-toolbar__field">
+        <span class="jobs-toolbar__label">Модель</span>
+        <select class="jobs-toolbar__select" [(ngModel)]="filterModelName">
+          <option value="">Все</option>
+          <option *ngFor="let o of modelNameSelectOptions" [value]="o.value">{{ o.label }}</option>
+        </select>
+      </label>
+      <label class="jobs-toolbar__field">
+        <span class="jobs-toolbar__label">Очередь</span>
+        <select class="jobs-toolbar__select" [(ngModel)]="filterQueueName">
+          <option value="">Все</option>
+          <option *ngFor="let o of queueNameSelectOptions" [value]="o.value">{{ o.label }}</option>
+        </select>
+      </label>
+      <label class="jobs-toolbar__field">
+        <span class="jobs-toolbar__label">Провайдер</span>
+        <select class="jobs-toolbar__select" [(ngModel)]="filterProvider">
+          <option value="">Все</option>
+          <option *ngFor="let o of providerSelectOptions" [value]="o.value">{{ o.label }}</option>
+        </select>
+      </label>
+      <label class="jobs-toolbar__field jobs-toolbar__field--grow">
+        <span class="jobs-toolbar__label">Поиск (id / документ / batch / ключ)</span>
+        <input
+          class="jobs-toolbar__input"
+          type="search"
+          [(ngModel)]="filterSearch"
+          placeholder="Подстрока…"
+          autocomplete="off"
+        />
+      </label>
+      <label class="jobs-toolbar__field">
+        <span class="jobs-toolbar__label">Сортировка</span>
+        <select class="jobs-toolbar__select" [(ngModel)]="sortField">
+          <option *ngFor="let o of jobSortOptions" [value]="o.value">{{ o.label }}</option>
+        </select>
+      </label>
+      <button class="jobs-toolbar__dir" type="button" (click)="toggleSortDir()" [attr.title]="sortDir === 'asc' ? 'По возрастанию' : 'По убыванию'">
+        {{ sortDir === 'asc' ? 'По возрастанию' : 'По убыванию' }}
+      </button>
+      <button class="jobs-toolbar__reset" type="button" (click)="clearJobFilters()">Сбросить фильтры</button>
+    </div>
     <div class="table-wrap">
       <table class="jobs-table">
         <thead>
@@ -171,7 +229,7 @@
           </tr>
         </thead>
         <tbody>
-          <tr *ngFor="let job of jobs; trackBy: trackJob" [ngClass]="'row-flash-' + (jobFlash[job.id] || 'none')">
+          <tr *ngFor="let job of displayedJobs; trackBy: trackJob" [ngClass]="'row-flash-' + (jobFlash[job.id] || 'none')">
             <td [class.cell-flash]="isCellFlashing(job.id, 'id')">{{ job.id }}</td>
             <td [class.cell-flash]="isCellFlashing(job.id, 'document_id')">{{ job.document_id }}</td>
             <td [class.cell-flash]="isCellFlashing(job.id, 'job_type')">{{ job.job_type }}</td>
