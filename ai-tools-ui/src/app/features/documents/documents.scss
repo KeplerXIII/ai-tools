@@ -169,37 +169,56 @@
   gap: 12px;
 }
 
-.document-row-top {
-  display: grid;
+.document-row-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px 16px;
   width: 100%;
-  grid-template-columns: minmax(0, 1fr) 100px 110px 110px 110px 90px minmax(220px, 280px) auto 36px;
-  align-items: center;
-  gap: 10px;
 }
 
-.row-cell {
-  display: flex;
-  align-items: center;
-  min-height: 42px;
-}
-
-.row-cell_title {
+.document-row-head__title-block {
+  flex: 1 1 240px;
   min-width: 0;
-  flex: 1 1 auto;
   display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.document-row-head__tools {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-shrink: 0;
 }
 
-.row-cell_flag {
-  justify-content: center;
+.document-row-flags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 20px;
+  width: 100%;
+  padding-top: 12px;
+  border-top: 1px solid #e8eef5;
 }
 
-.row-cell_statuses {
-  min-width: 260px;
-  flex: 1 1 320px;
+.document-flags-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 18px;
+  min-width: 0;
 }
 
-.row-cell_delete {
+.document-statuses-wrap {
+  flex: 1 1 200px;
+  min-width: 0;
+  display: flex;
   justify-content: flex-end;
 }
 
@@ -307,22 +326,6 @@
   border-color: #991b1b;
 }
 
-.document-title-line {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  min-width: 0;
-}
-
-.document-title-main {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-  flex: 1 1 auto;
-}
-
 .document-row__strip-date {
   flex-shrink: 0;
   font-size: 13px;
@@ -335,10 +338,11 @@
 .document-row__title {
   margin: 0;
   font-size: 18px;
-  line-height: 1.2;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  font-weight: 600;
+  line-height: 1.35;
+  color: #0f172a;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .document-row__title_link {
