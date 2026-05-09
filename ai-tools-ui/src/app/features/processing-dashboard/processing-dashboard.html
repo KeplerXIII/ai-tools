@@ -14,37 +14,136 @@
   <div class="state-box success" *ngIf="purgeMessage">{{ purgeMessage }}</div>
   <div class="state-box error" *ngIf="purgeError">{{ purgeError }}</div>
 
-  <section class="counters-panel" *ngIf="counters">
-    <h2>Счётчики документов</h2>
-    <div class="counter-grid">
-      <article class="counter-card" [ngClass]="'flash-' + (counterFlash.documents_total || 'same')">
-        <div class="counter-label">Всего документов</div>
-        <div class="counter-value">{{ counters.documents_total }}</div>
-      </article>
-      <article class="counter-card" [ngClass]="'flash-' + (counterFlash.with_translations || 'same')">
-        <div class="counter-label">С переводами</div>
-        <div class="counter-value">{{ counters.with_translations }}</div>
-      </article>
-      <article class="counter-card" [ngClass]="'flash-' + (counterFlash.with_annotations || 'same')">
-        <div class="counter-label">С аннотациями</div>
-        <div class="counter-value">{{ counters.with_annotations }}</div>
-      </article>
-      <article class="counter-card" [ngClass]="'flash-' + (counterFlash.categorized || 'same')">
-        <div class="counter-label">Категоризированные</div>
-        <div class="counter-value">{{ counters.categorized }}</div>
-      </article>
-      <article class="counter-card" [ngClass]="'flash-' + (counterFlash.with_entities || 'same')">
-        <div class="counter-label">С извлечёнными сущностями</div>
-        <div class="counter-value">{{ counters.with_entities }}</div>
-      </article>
-      <article class="counter-card" [ngClass]="'flash-' + (counterFlash.tagged_original_lang || 'same')">
-        <div class="counter-label">Тегированные (исходный язык)</div>
-        <div class="counter-value">{{ counters.tagged_original_lang }}</div>
-      </article>
-      <article class="counter-card" [ngClass]="'flash-' + (counterFlash.tagged_translated_lang || 'same')">
-        <div class="counter-label">Тегированные (переведённый язык)</div>
-        <div class="counter-value">{{ counters.tagged_translated_lang }}</div>
-      </article>
+  <section class="counters-panel bulk-pipeline-panel" *ngIf="counters">
+    <h2>Массовая обработка</h2>
+    <p class="bulk-pipeline-hint">
+      Счётчики отражают, сколько документов уже прошли этап. Нажмите узел, чтобы поставить в очередь обработку для документов, у которых этот этап ещё не выполнен.
+    </p>
+
+    <div class="bulk-pipeline">
+      <div class="bulk-pipeline__root">
+        <div class="flow-node flow-node_static" [ngClass]="'flash-' + (counterFlash.documents_total || 'same')">
+          <span class="flow-node__label">Всего документов</span>
+          <span class="flow-node__value">{{ counters.documents_total }}</span>
+        </div>
+      </div>
+
+      <div class="bulk-connector bulk-connector--from-root" aria-hidden="true">
+        <svg class="bulk-connector__svg" viewBox="0 0 100 32" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
+          <path
+            class="bulk-connector__path"
+            d="M 50 1 L 50 12 M 16.67 12 L 83.33 12 M 16.67 12 L 16.67 31 M 50 12 L 50 31 M 83.33 12 L 83.33 31"
+          />
+        </svg>
+      </div>
+
+      <div class="bulk-pipeline__row bulk-pipeline__row--3">
+        <button
+          type="button"
+          class="flow-node flow-node_action"
+          [ngClass]="'flash-' + (counterFlash.with_entities || 'same')"
+          [disabled]="bulkExtractorLoading"
+          (click)="enqueueExtractorMissing()"
+        >
+          <span class="flow-node__label">С извлечёнными сущностями</span>
+          <span class="flow-node__value">{{ counters.with_entities }}</span>
+          <span class="flow-node__cta">{{ bulkExtractorLoading ? 'Постановка…' : 'Догнать без сущностей' }}</span>
+        </button>
+
+        <button
+          type="button"
+          class="flow-node flow-node_action flow-node_action_primary"
+          [ngClass]="'flash-' + (counterFlash.with_translations || 'same')"
+          [disabled]="bulkTranslateLoading"
+          (click)="enqueueTranslateMissing()"
+        >
+          <span class="flow-node__label">Переведённые</span>
+          <span class="flow-node__value">{{ counters.with_translations }}</span>
+          <span class="flow-node__cta">{{ bulkTranslateLoading ? 'Постановка…' : 'Догнать без перевода' }}</span>
+        </button>
+
+        <button
+          type="button"
+          class="flow-node flow-node_action"
+          [ngClass]="'flash-' + (counterFlash.tagged_original_lang || 'same')"
+          [disabled]="bulkTagOriginalLoading"
+          (click)="enqueueTaggerMissingOriginal()"
+        >
+          <span class="flow-node__label">Тегированы (язык оригинала)</span>
+          <span class="flow-node__value">{{ counters.tagged_original_lang }}</span>
+          <span class="flow-node__cta">{{ bulkTagOriginalLoading ? 'Постановка…' : 'Догнать теги оригинала' }}</span>
+        </button>
+      </div>
+
+      <div class="bulk-connector bulk-connector--from-translated" aria-hidden="true">
+        <svg class="bulk-connector__svg" viewBox="0 0 100 32" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
+          <path
+            class="bulk-connector__path"
+            d="M 50 1 L 50 12 M 16.67 12 L 83.33 12 M 16.67 12 L 16.67 31 M 50 12 L 50 31 M 83.33 12 L 83.33 31"
+          />
+        </svg>
+      </div>
+
+      <div class="bulk-pipeline__row bulk-pipeline__row--3">
+        <button
+          type="button"
+          class="flow-node flow-node_action"
+          [ngClass]="'flash-' + (counterFlash.with_annotations || 'same')"
+          [disabled]="bulkAnnotateLoading"
+          (click)="enqueueAnnotateMissing()"
+        >
+          <span class="flow-node__label">С аннотациями</span>
+          <span class="flow-node__value">{{ counters.with_annotations }}</span>
+          <span class="flow-node__cta">{{ bulkAnnotateLoading ? 'Постановка…' : 'Догнать аннотацию' }}</span>
+        </button>
+        <button
+          type="button"
+          class="flow-node flow-node_action"
+          [ngClass]="'flash-' + (counterFlash.tagged_translated_lang || 'same')"
+          [disabled]="bulkTagTranslatedLoading"
+          (click)="enqueueTaggerMissingTranslated()"
+        >
+          <span class="flow-node__label">Тегированы (русский)</span>
+          <span class="flow-node__value">{{ counters.tagged_translated_lang }}</span>
+          <span class="flow-node__cta">{{ bulkTagTranslatedLoading ? 'Постановка…' : 'Догнать теги RU' }}</span>
+        </button>
+        <button
+          type="button"
+          class="flow-node flow-node_action"
+          [ngClass]="'flash-' + (counterFlash.categorized || 'same')"
+          [disabled]="bulkCategorizeLoading"
+          (click)="enqueueCategorizeMissing()"
+        >
+          <span class="flow-node__label">Категоризированные</span>
+          <span class="flow-node__value">{{ counters.categorized }}</span>
+          <span class="flow-node__cta">{{ bulkCategorizeLoading ? 'Постановка…' : 'Догнать категории' }}</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="bulk-messages" *ngIf="bulkTranslateMessage || bulkTranslateError">
+      <div class="state-inline state-inline_success" *ngIf="bulkTranslateMessage">{{ bulkTranslateMessage }}</div>
+      <div class="state-inline state-inline_error" *ngIf="bulkTranslateError">{{ bulkTranslateError }}</div>
+    </div>
+    <div class="bulk-messages" *ngIf="bulkAnnotateMessage || bulkAnnotateError">
+      <div class="state-inline state-inline_success" *ngIf="bulkAnnotateMessage">{{ bulkAnnotateMessage }}</div>
+      <div class="state-inline state-inline_error" *ngIf="bulkAnnotateError">{{ bulkAnnotateError }}</div>
+    </div>
+    <div class="bulk-messages" *ngIf="bulkCategorizeMessage || bulkCategorizeError">
+      <div class="state-inline state-inline_success" *ngIf="bulkCategorizeMessage">{{ bulkCategorizeMessage }}</div>
+      <div class="state-inline state-inline_error" *ngIf="bulkCategorizeError">{{ bulkCategorizeError }}</div>
+    </div>
+    <div class="bulk-messages" *ngIf="bulkExtractorMessage || bulkExtractorError">
+      <div class="state-inline state-inline_success" *ngIf="bulkExtractorMessage">{{ bulkExtractorMessage }}</div>
+      <div class="state-inline state-inline_error" *ngIf="bulkExtractorError">{{ bulkExtractorError }}</div>
+    </div>
+    <div class="bulk-messages" *ngIf="bulkTagOriginalMessage || bulkTagOriginalError">
+      <div class="state-inline state-inline_success" *ngIf="bulkTagOriginalMessage">{{ bulkTagOriginalMessage }}</div>
+      <div class="state-inline state-inline_error" *ngIf="bulkTagOriginalError">{{ bulkTagOriginalError }}</div>
+    </div>
+    <div class="bulk-messages" *ngIf="bulkTagTranslatedMessage || bulkTagTranslatedError">
+      <div class="state-inline state-inline_success" *ngIf="bulkTagTranslatedMessage">{{ bulkTagTranslatedMessage }}</div>
+      <div class="state-inline state-inline_error" *ngIf="bulkTagTranslatedError">{{ bulkTagTranslatedError }}</div>
     </div>
   </section>
 
