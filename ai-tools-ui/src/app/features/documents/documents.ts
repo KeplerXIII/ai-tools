@@ -51,9 +51,6 @@ export class Documents implements OnInit {
   bulkTagTranslatedLoading = false;
   bulkTagTranslatedMessage = '';
   bulkTagTranslatedError = '';
-  pollingBatchId = '';
-  pollingControlMessage = '';
-  pollingControlError = '';
 
   selectedStatusCode = '';
   selectedDocumentTypeCode = '';
@@ -298,29 +295,6 @@ export class Documents implements OnInit {
         this.bulkTagTranslatedError = 'Не удалось поставить документы на извлечение тегов перевода';
       },
     });
-  }
-
-  stopPollingByBatchId(): void {
-    const batchId = this.pollingBatchId.trim();
-    if (!batchId) {
-      this.pollingControlError = 'Укажите batch_id';
-      this.pollingControlMessage = '';
-      return;
-    }
-
-    const stoppedTranslate = this.translateBatchNotifier.stopTrackingByBatchId(batchId);
-    const stoppedAnnotate = this.annotateBatchNotifier.stopTrackingByBatchId(batchId);
-    const stoppedCategorize = this.categorizeBatchNotifier.stopTrackingByBatchId(batchId);
-    const stoppedExtractor = this.extractorBatchNotifier.stopTrackingByBatchId(batchId);
-    const stoppedTagger = this.taggerBatchNotifier.stopTrackingByBatchId(batchId);
-    if (stoppedTranslate || stoppedAnnotate || stoppedCategorize || stoppedExtractor || stoppedTagger) {
-      this.pollingControlMessage = `Поллинг для батча ${batchId} остановлен`;
-      this.pollingControlError = '';
-      return;
-    }
-
-    this.pollingControlError = `Активный поллинг для батча ${batchId} не найден`;
-    this.pollingControlMessage = '';
   }
 
   sourceFilterLabel(src: SourceListItem): string {

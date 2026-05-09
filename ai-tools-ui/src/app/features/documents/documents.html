@@ -97,11 +97,6 @@
       >
         {{ bulkTagTranslatedLoading ? 'Постановка...' : 'Tagger: теги по переводу' }}
       </button>
-      <label class="filter-item filter-item_batch-stop">
-        <span>Остановить поллинг batch_id</span>
-        <input type="text" [(ngModel)]="pollingBatchId" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
-      </label>
-      <button class="stop-polling-btn" type="button" (click)="stopPollingByBatchId()">Остановить поллинг</button>
     </div>
     @if (bulkTranslateMessage) {
       <div class="state-message state-message_success">{{ bulkTranslateMessage }}</div>
@@ -138,12 +133,6 @@
     }
     @if (bulkTagTranslatedError) {
       <div class="state-message state-message_error">{{ bulkTagTranslatedError }}</div>
-    }
-    @if (pollingControlMessage) {
-      <div class="state-message state-message_success">{{ pollingControlMessage }}</div>
-    }
-    @if (pollingControlError) {
-      <div class="state-message state-message_error">{{ pollingControlError }}</div>
     }
   </header>
 
