@@ -18,8 +18,8 @@ type TaggerSource = 'original' | 'translated';
 })
 export class TaggerBatchNotifierService {
   private readonly storageKeys: Record<TaggerSource, string> = {
-    original: 'tagger_missing_batch_original',
-    translated: 'tagger_missing_batch_translated',
+    original: 'tagger_batch_original',
+    translated: 'tagger_batch_translated',
   };
   private pollSubs: Partial<Record<TaggerSource, Subscription>> = {};
   private hideTimer: ReturnType<typeof setTimeout> | null = null;
@@ -70,7 +70,7 @@ export class TaggerBatchNotifierService {
   private startPolling(source: TaggerSource, batchId: string): void {
     this.pollSubs[source]?.unsubscribe();
     this.pollSubs[source] = timer(0, 5000).subscribe(() => {
-      this.documentsApi.getTaggerMissingBatchStatus(batchId).subscribe({
+      this.documentsApi.getTaggerBatchStatus(batchId).subscribe({
         next: (status) => this.handleStatus(source, status),
         error: (err: HttpErrorResponse) => {
           if (err.status === 404) {

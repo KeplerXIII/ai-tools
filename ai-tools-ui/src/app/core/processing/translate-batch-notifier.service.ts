@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { BehaviorSubject, Subscription, timer } from 'rxjs';
 
-import { DocumentsApi, TranslateMissingBatchStatusResponse } from '../../features/documents/documents-api';
+import { DocumentsApi, TranslateBatchStatusResponse } from '../../features/documents/documents-api';
 
 type ToastKind = 'success' | 'error';
 
@@ -15,7 +15,7 @@ export interface GlobalToast {
   providedIn: 'root',
 })
 export class TranslateBatchNotifierService {
-  private readonly storageKey = 'translate_missing_batch_id';
+  private readonly storageKey = 'translate_batch_id';
   private pollSub: Subscription | null = null;
   private hideTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -61,7 +61,7 @@ export class TranslateBatchNotifierService {
   private startPolling(batchId: string): void {
     this.pollSub?.unsubscribe();
     this.pollSub = timer(0, 5000).subscribe(() => {
-      this.documentsApi.getTranslateMissingBatchStatus(batchId).subscribe({
+      this.documentsApi.getTranslateBatchStatus(batchId).subscribe({
         next: (status) => this.handleStatus(status),
         error: (err: HttpErrorResponse) => {
           if (err.status === 404) {
@@ -72,7 +72,7 @@ export class TranslateBatchNotifierService {
     });
   }
 
-  private handleStatus(status: TranslateMissingBatchStatusResponse): void {
+  private handleStatus(status: TranslateBatchStatusResponse): void {
     if (!status.done) {
       return;
     }

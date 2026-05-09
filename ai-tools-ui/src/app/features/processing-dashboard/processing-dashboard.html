@@ -43,7 +43,7 @@
           class="flow-node flow-node_action"
           [ngClass]="'flash-' + (counterFlash.with_entities || 'same')"
           [disabled]="bulkExtractorLoading"
-          (click)="enqueueExtractorMissing()"
+          (click)="enqueueExtractor()"
         >
           <span class="flow-node__label">С извлечёнными сущностями</span>
           <span class="flow-node__value">{{ counters.with_entities }}</span>
@@ -55,7 +55,7 @@
           class="flow-node flow-node_action flow-node_action_primary"
           [ngClass]="'flash-' + (counterFlash.with_translations || 'same')"
           [disabled]="bulkTranslateLoading"
-          (click)="enqueueTranslateMissing()"
+          (click)="enqueueTranslate()"
         >
           <span class="flow-node__label">Переведённые</span>
           <span class="flow-node__value">{{ counters.with_translations }}</span>
@@ -67,7 +67,7 @@
           class="flow-node flow-node_action"
           [ngClass]="'flash-' + (counterFlash.tagged_original_lang || 'same')"
           [disabled]="bulkTagOriginalLoading"
-          (click)="enqueueTaggerMissingOriginal()"
+          (click)="enqueueTaggerOriginal()"
         >
           <span class="flow-node__label">Тегированы (язык оригинала)</span>
           <span class="flow-node__value">{{ counters.tagged_original_lang }}</span>
@@ -90,7 +90,7 @@
           class="flow-node flow-node_action"
           [ngClass]="'flash-' + (counterFlash.with_annotations || 'same')"
           [disabled]="bulkAnnotateLoading"
-          (click)="enqueueAnnotateMissing()"
+          (click)="enqueueAnnotate()"
         >
           <span class="flow-node__label">С аннотациями</span>
           <span class="flow-node__value">{{ counters.with_annotations }}</span>
@@ -101,7 +101,7 @@
           class="flow-node flow-node_action"
           [ngClass]="'flash-' + (counterFlash.tagged_translated_lang || 'same')"
           [disabled]="bulkTagTranslatedLoading"
-          (click)="enqueueTaggerMissingTranslated()"
+          (click)="enqueueTaggerTranslated()"
         >
           <span class="flow-node__label">Тегированы (русский)</span>
           <span class="flow-node__value">{{ counters.tagged_translated_lang }}</span>
@@ -112,7 +112,7 @@
           class="flow-node flow-node_action"
           [ngClass]="'flash-' + (counterFlash.categorized || 'same')"
           [disabled]="bulkCategorizeLoading"
-          (click)="enqueueCategorizeMissing()"
+          (click)="enqueueCategorize()"
         >
           <span class="flow-node__label">Категоризированные</span>
           <span class="flow-node__value">{{ counters.categorized }}</span>

@@ -1,16 +1,17 @@
 from __future__ import annotations
 
 from typing import Literal
+from uuid import UUID
 
 from pydantic import BaseModel, Field
 
 
-class EnqueueTranslateMissingRequest(BaseModel):
+class EnqueueTranslateRequest(BaseModel):
+    document_ids: list[UUID] = Field(..., min_length=1, max_length=10_000)
     target_lang: str = Field(default="ru", min_length=2, max_length=8)
-    limit: int | None = Field(default=None, ge=1, le=10_000)
 
 
-class EnqueueTranslateMissingResponse(BaseModel):
+class EnqueueTranslateResponse(BaseModel):
     ok: bool = True
     batch_id: str
     queue: str
@@ -30,11 +31,11 @@ class TranslateBatchStatusResponse(BaseModel):
     done: bool
 
 
-class EnqueueAnnotateMissingRequest(BaseModel):
-    limit: int | None = Field(default=None, ge=1, le=10_000)
+class EnqueueAnnotateRequest(BaseModel):
+    document_ids: list[UUID] = Field(..., min_length=1, max_length=10_000)
 
 
-class EnqueueAnnotateMissingResponse(BaseModel):
+class EnqueueAnnotateResponse(BaseModel):
     ok: bool = True
     batch_id: str
     queue: str
@@ -54,11 +55,11 @@ class AnnotateBatchStatusResponse(BaseModel):
     done: bool
 
 
-class EnqueueCategorizeMissingRequest(BaseModel):
-    limit: int | None = Field(default=None, ge=1, le=10_000)
+class EnqueueCategorizeRequest(BaseModel):
+    document_ids: list[UUID] = Field(..., min_length=1, max_length=10_000)
 
 
-class EnqueueCategorizeMissingResponse(BaseModel):
+class EnqueueCategorizeResponse(BaseModel):
     ok: bool = True
     batch_id: str
     queue: str
@@ -78,11 +79,11 @@ class CategorizeBatchStatusResponse(BaseModel):
     done: bool
 
 
-class EnqueueExtractorMissingRequest(BaseModel):
-    limit: int | None = Field(default=None, ge=1, le=10_000)
+class EnqueueExtractorRequest(BaseModel):
+    document_ids: list[UUID] = Field(..., min_length=1, max_length=10_000)
 
 
-class EnqueueExtractorMissingResponse(BaseModel):
+class EnqueueExtractorResponse(BaseModel):
     ok: bool = True
     batch_id: str
     queue: str
@@ -102,12 +103,12 @@ class ExtractorBatchStatusResponse(BaseModel):
     done: bool
 
 
-class EnqueueTaggerMissingRequest(BaseModel):
-    limit: int | None = Field(default=None, ge=1, le=10_000)
+class EnqueueTaggerRequest(BaseModel):
+    document_ids: list[UUID] = Field(..., min_length=1, max_length=10_000)
     max_tags: int = Field(default=10, ge=1, le=100)
 
 
-class EnqueueTaggerMissingResponse(BaseModel):
+class EnqueueTaggerResponse(BaseModel):
     ok: bool = True
     batch_id: str
     queue: str

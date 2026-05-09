@@ -49,6 +49,8 @@ export interface DocumentListItem {
   statuses: DocumentStatusItem[];
   has_translation: boolean;
   has_annotation: boolean;
+  has_translated_summary: boolean;
+  has_original_content: boolean;
   has_categories: boolean;
   has_entities: boolean;
   has_tags: boolean;
@@ -75,7 +77,7 @@ export interface DocumentTypeCatalogItem {
   description: string | null;
 }
 
-export interface TranslateMissingDocumentsResponse {
+export interface EnqueueTranslateResponse {
   ok: boolean;
   batch_id: string;
   queue: string;
@@ -83,7 +85,7 @@ export interface TranslateMissingDocumentsResponse {
   enqueued: number;
 }
 
-export interface TranslateMissingBatchStatusResponse {
+export interface TranslateBatchStatusResponse {
   ok: boolean;
   batch_id: string;
   scanned: number;
@@ -95,7 +97,7 @@ export interface TranslateMissingBatchStatusResponse {
   done: boolean;
 }
 
-export interface AnnotateMissingDocumentsResponse {
+export interface EnqueueAnnotateResponse {
   ok: boolean;
   batch_id: string;
   queue: string;
@@ -103,7 +105,7 @@ export interface AnnotateMissingDocumentsResponse {
   enqueued: number;
 }
 
-export interface AnnotateMissingBatchStatusResponse {
+export interface AnnotateBatchStatusResponse {
   ok: boolean;
   batch_id: string;
   scanned: number;
@@ -115,7 +117,7 @@ export interface AnnotateMissingBatchStatusResponse {
   done: boolean;
 }
 
-export interface CategorizeMissingDocumentsResponse {
+export interface EnqueueCategorizeResponse {
   ok: boolean;
   batch_id: string;
   queue: string;
@@ -123,7 +125,7 @@ export interface CategorizeMissingDocumentsResponse {
   enqueued: number;
 }
 
-export interface CategorizeMissingBatchStatusResponse {
+export interface CategorizeBatchStatusResponse {
   ok: boolean;
   batch_id: string;
   scanned: number;
@@ -135,7 +137,7 @@ export interface CategorizeMissingBatchStatusResponse {
   done: boolean;
 }
 
-export interface ExtractorMissingDocumentsResponse {
+export interface EnqueueExtractorResponse {
   ok: boolean;
   batch_id: string;
   queue: string;
@@ -143,7 +145,7 @@ export interface ExtractorMissingDocumentsResponse {
   enqueued: number;
 }
 
-export interface ExtractorMissingBatchStatusResponse {
+export interface ExtractorBatchStatusResponse {
   ok: boolean;
   batch_id: string;
   scanned: number;
@@ -155,7 +157,7 @@ export interface ExtractorMissingBatchStatusResponse {
   done: boolean;
 }
 
-export interface TaggerMissingDocumentsResponse {
+export interface EnqueueTaggerResponse {
   ok: boolean;
   batch_id: string;
   queue: string;
@@ -164,7 +166,7 @@ export interface TaggerMissingDocumentsResponse {
   text_source: 'original' | 'translated';
 }
 
-export interface TaggerMissingBatchStatusResponse {
+export interface TaggerBatchStatusResponse {
   ok: boolean;
   batch_id: string;
   scanned: number;
@@ -183,6 +185,8 @@ export interface ListDocumentsFilters {
   dateFrom?: string;
   dateTo?: string;
   usePublishedDate?: boolean;
+  limit?: number;
+  offset?: number;
 }
 
 @Injectable({
@@ -209,6 +213,12 @@ export class DocumentsApi {
       params = params.set('date_to', `${filters.dateTo}T23:59:59`);
     }
     params = params.set('use_published_date', filters.usePublishedDate ? 'true' : 'false');
+    if (filters.limit != null) {
+      params = params.set('limit', String(filters.limit));
+    }
+    if (filters.offset != null) {
+      params = params.set('offset', String(filters.offset));
+    }
 
     return this.http.get<DocumentListResponse>('/api/v1/documents', { params });
   }
@@ -225,87 +235,70 @@ export class DocumentsApi {
     return this.http.delete<{ ok: boolean; document_id: string }>(`/api/v1/documents/${documentId}`);
   }
 
-  enqueueTranslateMissingDocuments(
-    payload: { target_lang?: string; limit?: number } = {},
-  ): Observable<TranslateMissingDocumentsResponse> {
-    return this.http.post<TranslateMissingDocumentsResponse>(
-      '/api/v1/processing/documents/translate-missing',
+  enqueueTranslateDocuments(payload: {
+    document_ids: string[];
+    target_lang?: string;
+  }): Observable<EnqueueTranslateResponse> {
+    return this.http.post<EnqueueTranslateResponse>('/api/v1/processing/documents/translate', payload);
+  }
+
+  getTranslateBatchStatus(batchId: string): Observable<TranslateBatchStatusResponse> {
+    return this.http.get<TranslateBatchStatusResponse>(
+      `/api/v1/processing/documents/translate/${batchId}`,
+    );
+  }
+
+  enqueueAnnotateDocuments(payload: { document_ids: string[] }): Observable<EnqueueAnnotateResponse> {
+    return this.http.post<EnqueueAnnotateResponse>('/api/v1/processing/documents/annotate', payload);
+  }
+
+  getAnnotateBatchStatus(batchId: string): Observable<AnnotateBatchStatusResponse> {
+    return this.http.get<AnnotateBatchStatusResponse>(
+      `/api/v1/processing/documents/annotate/${batchId}`,
+    );
+  }
+
+  enqueueCategorizeDocuments(payload: { document_ids: string[] }): Observable<EnqueueCategorizeResponse> {
+    return this.http.post<EnqueueCategorizeResponse>('/api/v1/processing/documents/categorize', payload);
+  }
+
+  getCategorizeBatchStatus(batchId: string): Observable<CategorizeBatchStatusResponse> {
+    return this.http.get<CategorizeBatchStatusResponse>(
+      `/api/v1/processing/documents/categorize/${batchId}`,
+    );
+  }
+
+  enqueueExtractorDocuments(payload: { document_ids: string[] }): Observable<EnqueueExtractorResponse> {
+    return this.http.post<EnqueueExtractorResponse>('/api/v1/processing/documents/extractor', payload);
+  }
+
+  getExtractorBatchStatus(batchId: string): Observable<ExtractorBatchStatusResponse> {
+    return this.http.get<ExtractorBatchStatusResponse>(
+      `/api/v1/processing/documents/extractor/${batchId}`,
+    );
+  }
+
+  enqueueTaggerOriginalDocuments(payload: {
+    document_ids: string[];
+    max_tags?: number;
+  }): Observable<EnqueueTaggerResponse> {
+    return this.http.post<EnqueueTaggerResponse>(
+      '/api/v1/processing/documents/tagger-original',
       payload,
     );
   }
 
-  getTranslateMissingBatchStatus(batchId: string): Observable<TranslateMissingBatchStatusResponse> {
-    return this.http.get<TranslateMissingBatchStatusResponse>(
-      `/api/v1/processing/documents/translate-missing/${batchId}`,
-    );
-  }
-
-  enqueueAnnotateMissingDocuments(
-    payload: { limit?: number } = {},
-  ): Observable<AnnotateMissingDocumentsResponse> {
-    return this.http.post<AnnotateMissingDocumentsResponse>(
-      '/api/v1/processing/documents/annotate-missing',
+  enqueueTaggerTranslatedDocuments(payload: {
+    document_ids: string[];
+    max_tags?: number;
+  }): Observable<EnqueueTaggerResponse> {
+    return this.http.post<EnqueueTaggerResponse>(
+      '/api/v1/processing/documents/tagger-translated',
       payload,
     );
   }
 
-  getAnnotateMissingBatchStatus(batchId: string): Observable<AnnotateMissingBatchStatusResponse> {
-    return this.http.get<AnnotateMissingBatchStatusResponse>(
-      `/api/v1/processing/documents/annotate-missing/${batchId}`,
-    );
-  }
-
-  enqueueCategorizeMissingDocuments(
-    payload: { limit?: number } = {},
-  ): Observable<CategorizeMissingDocumentsResponse> {
-    return this.http.post<CategorizeMissingDocumentsResponse>(
-      '/api/v1/processing/documents/categorize-missing',
-      payload,
-    );
-  }
-
-  getCategorizeMissingBatchStatus(batchId: string): Observable<CategorizeMissingBatchStatusResponse> {
-    return this.http.get<CategorizeMissingBatchStatusResponse>(
-      `/api/v1/processing/documents/categorize-missing/${batchId}`,
-    );
-  }
-
-  enqueueExtractorMissingDocuments(
-    payload: { limit?: number } = {},
-  ): Observable<ExtractorMissingDocumentsResponse> {
-    return this.http.post<ExtractorMissingDocumentsResponse>(
-      '/api/v1/processing/documents/extractor-missing',
-      payload,
-    );
-  }
-
-  getExtractorMissingBatchStatus(batchId: string): Observable<ExtractorMissingBatchStatusResponse> {
-    return this.http.get<ExtractorMissingBatchStatusResponse>(
-      `/api/v1/processing/documents/extractor-missing/${batchId}`,
-    );
-  }
-
-  enqueueTaggerMissingOriginalDocuments(
-    payload: { limit?: number; max_tags?: number } = {},
-  ): Observable<TaggerMissingDocumentsResponse> {
-    return this.http.post<TaggerMissingDocumentsResponse>(
-      '/api/v1/processing/documents/tagger-missing-original',
-      payload,
-    );
-  }
-
-  enqueueTaggerMissingTranslatedDocuments(
-    payload: { limit?: number; max_tags?: number } = {},
-  ): Observable<TaggerMissingDocumentsResponse> {
-    return this.http.post<TaggerMissingDocumentsResponse>(
-      '/api/v1/processing/documents/tagger-missing-translated',
-      payload,
-    );
-  }
-
-  getTaggerMissingBatchStatus(batchId: string): Observable<TaggerMissingBatchStatusResponse> {
-    return this.http.get<TaggerMissingBatchStatusResponse>(
-      `/api/v1/processing/documents/tagger-missing/${batchId}`,
-    );
+  getTaggerBatchStatus(batchId: string): Observable<TaggerBatchStatusResponse> {
+    return this.http.get<TaggerBatchStatusResponse>(`/api/v1/processing/documents/tagger/${batchId}`);
   }
 }

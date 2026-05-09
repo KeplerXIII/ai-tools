@@ -164,6 +164,8 @@ class DocumentListItem(BaseModel):
     statuses: list[DocumentStatusItem] = []
     has_translation: bool = False
     has_annotation: bool = False
+    has_translated_summary: bool = False
+    has_original_content: bool = False
     has_categories: bool = False
     has_entities: bool = False
     has_tags: bool = False

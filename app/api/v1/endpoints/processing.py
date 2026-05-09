@@ -8,7 +8,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
-from sqlalchemy import delete, func, or_, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_optional_started_by_id
@@ -19,17 +19,17 @@ from app.infrastructure.db.session import AsyncSessionLocal, get_db
 from app.schemas.processing import (
     AnnotateBatchStatusResponse,
     CategorizeBatchStatusResponse,
+    EnqueueAnnotateRequest,
+    EnqueueAnnotateResponse,
+    EnqueueCategorizeRequest,
+    EnqueueCategorizeResponse,
+    EnqueueExtractorRequest,
+    EnqueueExtractorResponse,
+    EnqueueTaggerRequest,
+    EnqueueTaggerResponse,
+    EnqueueTranslateRequest,
+    EnqueueTranslateResponse,
     ExtractorBatchStatusResponse,
-    EnqueueCategorizeMissingRequest,
-    EnqueueCategorizeMissingResponse,
-    EnqueueAnnotateMissingRequest,
-    EnqueueAnnotateMissingResponse,
-    EnqueueExtractorMissingRequest,
-    EnqueueExtractorMissingResponse,
-    EnqueueTaggerMissingRequest,
-    EnqueueTaggerMissingResponse,
-    EnqueueTranslateMissingRequest,
-    EnqueueTranslateMissingResponse,
     TaggerBatchStatusResponse,
     TranslateBatchStatusResponse,
 )
@@ -69,6 +69,48 @@ from app.services.processing.translate_batch_store import (
 )
 
 router = APIRouter(prefix="/processing", tags=["processing"])
+
+
+def _dedupe_document_ids_preserve_order(document_ids: list[UUID]) -> list[UUID]:
+    return list(dict.fromkeys(document_ids))
+
+
+async def _require_documents_exist(db: AsyncSession, document_ids: list[UUID]) -> list[str]:
+    ordered = _dedupe_document_ids_preserve_order(document_ids)
+    if not ordered:
+        raise HTTPException(status_code=422, detail="Список document_ids пуст")
+    rows = (await db.scalars(select(Document.id).where(Document.id.in_(ordered)))).all()
+    found: set[UUID] = set(rows)
+    missing = [str(i) for i in ordered if i not in found]
+    if missing:
+        head = ", ".join(missing[:20])
+        suffix = "…" if len(missing) > 20 else ""
+        raise HTTPException(
+            status_code=422,
+            detail=f"Документы не найдены: {head}{suffix}",
+        )
+    return [str(i) for i in ordered]
+
+
+async def _filter_out_active_jobs(
+    db: AsyncSession,
+    document_ids: list[str],
+    job_type: JobType,
+    *,
+    queue_job_key_like: str | None = None,
+) -> list[str]:
+    if not document_ids:
+        return []
+    uuids = [UUID(d) for d in document_ids]
+    stmt = select(ProcessingJob.document_id).where(
+        ProcessingJob.document_id.in_(uuids),
+        ProcessingJob.job_type == job_type,
+        ProcessingJob.status.in_((JobStatus.RUNNING, JobStatus.PENDING)),
+    )
+    if queue_job_key_like is not None:
+        stmt = stmt.where(ProcessingJob.queue_job_key.like(queue_job_key_like))
+    busy = set((await db.scalars(stmt)).all())
+    return [d for d in document_ids if UUID(d) not in busy]
 
 
 def _sse_event(event: str, payload: dict) -> bytes:
@@ -160,34 +202,14 @@ async def _collect_dashboard_payload(session: AsyncSession) -> dict:
     }
 
 
-@router.post("/documents/translate-missing", response_model=EnqueueTranslateMissingResponse)
-async def enqueue_translate_missing_documents(
-    payload: EnqueueTranslateMissingRequest,
+@router.post("/documents/translate", response_model=EnqueueTranslateResponse)
+async def enqueue_translate_documents(
+    payload: EnqueueTranslateRequest,
     db: AsyncSession = Depends(get_db),
     started_by_id: UUID | None = Depends(get_optional_started_by_id),
-) -> EnqueueTranslateMissingResponse:
-    q = (
-        select(Document.id)
-        .where(
-            or_(
-                Document.translated_content.is_(None),
-                Document.translated_content == "",
-                func.btrim(Document.translated_content) == "",
-            ),
-            ~select(ProcessingJob.id)
-            .where(
-                ProcessingJob.document_id == Document.id,
-                ProcessingJob.job_type == JobType.TRANSLATE,
-                ProcessingJob.status.in_((JobStatus.RUNNING, JobStatus.PENDING)),
-            )
-            .exists(),
-        )
-        .order_by(Document.created_at.asc())
-    )
-    if payload.limit is not None:
-        q = q.limit(payload.limit)
-    rows = await db.execute(q)
-    document_ids = [str(row.id) for row in rows]
+) -> EnqueueTranslateResponse:
+    document_ids = await _require_documents_exist(db, payload.document_ids)
+    document_ids = await _filter_out_active_jobs(db, document_ids, JobType.TRANSLATE)
     batch_id = str(uuid.uuid4())
     await init_translate_batch(batch_id, scanned=len(document_ids))
 
@@ -204,7 +226,7 @@ async def enqueue_translate_missing_documents(
             )
             if not lock_acquired:
                 continue
-            queue_job_key = f"translate-missing:{batch_id}:{document_id}"
+            queue_job_key = f"translate:{batch_id}:{document_id}"
             pending_job = ProcessingJob(
                 document_id=UUID(document_id),
                 job_type=JobType.TRANSLATE,
@@ -218,6 +240,8 @@ async def enqueue_translate_missing_documents(
             )
             db.add(pending_job)
             await db.flush()
+            # Commit before enqueue so workers see processing_job_id (same as tagger).
+            await db.commit()
             job = await queue.enqueue(
                 "translate_document_job",
                 key=queue_job_key,
@@ -234,11 +258,11 @@ async def enqueue_translate_missing_documents(
             else:
                 pending_job.status = JobStatus.CANCELLED
                 pending_job.finished_at = datetime.now(UTC)
-        await db.commit()
+                await db.commit()
     finally:
         await queue.disconnect()
 
-    return EnqueueTranslateMissingResponse(
+    return EnqueueTranslateResponse(
         batch_id=batch_id,
         queue=queue.name,
         scanned=len(document_ids),
@@ -246,8 +270,8 @@ async def enqueue_translate_missing_documents(
     )
 
 
-@router.get("/documents/translate-missing/{batch_id}", response_model=TranslateBatchStatusResponse)
-async def get_translate_missing_batch_status(batch_id: str) -> TranslateBatchStatusResponse:
+@router.get("/documents/translate/{batch_id}", response_model=TranslateBatchStatusResponse)
+async def get_translate_batch_status(batch_id: str) -> TranslateBatchStatusResponse:
     payload = await get_translate_batch(batch_id)
     if payload is None:
         raise HTTPException(status_code=404, detail="Батч не найден")
@@ -272,36 +296,14 @@ async def get_translate_missing_batch_status(batch_id: str) -> TranslateBatchSta
     )
 
 
-@router.post("/documents/annotate-missing", response_model=EnqueueAnnotateMissingResponse)
-async def enqueue_annotate_missing_documents(
-    payload: EnqueueAnnotateMissingRequest,
+@router.post("/documents/annotate", response_model=EnqueueAnnotateResponse)
+async def enqueue_annotate_documents(
+    payload: EnqueueAnnotateRequest,
     db: AsyncSession = Depends(get_db),
     started_by_id: UUID | None = Depends(get_optional_started_by_id),
-) -> EnqueueAnnotateMissingResponse:
-    q = (
-        select(Document.id)
-        .where(
-            Document.translated_content.is_not(None),
-            func.btrim(Document.translated_content) != "",
-            or_(
-                Document.translated_summary.is_(None),
-                Document.translated_summary == "",
-                func.btrim(Document.translated_summary) == "",
-            ),
-            ~select(ProcessingJob.id)
-            .where(
-                ProcessingJob.document_id == Document.id,
-                ProcessingJob.job_type == JobType.SUMMARY,
-                ProcessingJob.status.in_((JobStatus.RUNNING, JobStatus.PENDING)),
-            )
-            .exists(),
-        )
-        .order_by(Document.created_at.asc())
-    )
-    if payload.limit is not None:
-        q = q.limit(payload.limit)
-    rows = await db.execute(q)
-    document_ids = [str(row.id) for row in rows]
+) -> EnqueueAnnotateResponse:
+    document_ids = await _require_documents_exist(db, payload.document_ids)
+    document_ids = await _filter_out_active_jobs(db, document_ids, JobType.SUMMARY)
     batch_id = str(uuid.uuid4())
     await init_annotate_batch(batch_id, scanned=len(document_ids))
 
@@ -318,7 +320,7 @@ async def enqueue_annotate_missing_documents(
             )
             if not lock_acquired:
                 continue
-            queue_job_key = f"annotate-missing:{batch_id}:{document_id}"
+            queue_job_key = f"annotate:{batch_id}:{document_id}"
             pending_job = ProcessingJob(
                 document_id=UUID(document_id),
                 job_type=JobType.SUMMARY,
@@ -332,6 +334,7 @@ async def enqueue_annotate_missing_documents(
             )
             db.add(pending_job)
             await db.flush()
+            await db.commit()
             job = await queue.enqueue(
                 "annotate_document_job",
                 key=queue_job_key,
@@ -347,11 +350,11 @@ async def enqueue_annotate_missing_documents(
             else:
                 pending_job.status = JobStatus.CANCELLED
                 pending_job.finished_at = datetime.now(UTC)
-        await db.commit()
+                await db.commit()
     finally:
         await queue.disconnect()
 
-    return EnqueueAnnotateMissingResponse(
+    return EnqueueAnnotateResponse(
         batch_id=batch_id,
         queue=queue.name,
         scanned=len(document_ids),
@@ -359,8 +362,8 @@ async def enqueue_annotate_missing_documents(
     )
 
 
-@router.get("/documents/annotate-missing/{batch_id}", response_model=AnnotateBatchStatusResponse)
-async def get_annotate_missing_batch_status(batch_id: str) -> AnnotateBatchStatusResponse:
+@router.get("/documents/annotate/{batch_id}", response_model=AnnotateBatchStatusResponse)
+async def get_annotate_batch_status(batch_id: str) -> AnnotateBatchStatusResponse:
     payload = await get_annotate_batch(batch_id)
     if payload is None:
         raise HTTPException(status_code=404, detail="Батч не найден")
@@ -385,34 +388,14 @@ async def get_annotate_missing_batch_status(batch_id: str) -> AnnotateBatchStatu
     )
 
 
-@router.post("/documents/categorize-missing", response_model=EnqueueCategorizeMissingResponse)
-async def enqueue_categorize_missing_documents(
-    payload: EnqueueCategorizeMissingRequest,
+@router.post("/documents/categorize", response_model=EnqueueCategorizeResponse)
+async def enqueue_categorize_documents(
+    payload: EnqueueCategorizeRequest,
     db: AsyncSession = Depends(get_db),
     started_by_id: UUID | None = Depends(get_optional_started_by_id),
-) -> EnqueueCategorizeMissingResponse:
-    q = (
-        select(Document.id)
-        .where(
-            Document.translated_content.is_not(None),
-            func.btrim(Document.translated_content) != "",
-            ~select(DocumentCategory.document_id)
-            .where(DocumentCategory.document_id == Document.id)
-            .exists(),
-            ~select(ProcessingJob.id)
-            .where(
-                ProcessingJob.document_id == Document.id,
-                ProcessingJob.job_type == JobType.CATEGORIZE,
-                ProcessingJob.status.in_((JobStatus.RUNNING, JobStatus.PENDING)),
-            )
-            .exists(),
-        )
-        .order_by(Document.created_at.asc())
-    )
-    if payload.limit is not None:
-        q = q.limit(payload.limit)
-    rows = await db.execute(q)
-    document_ids = [str(row.id) for row in rows]
+) -> EnqueueCategorizeResponse:
+    document_ids = await _require_documents_exist(db, payload.document_ids)
+    document_ids = await _filter_out_active_jobs(db, document_ids, JobType.CATEGORIZE)
     batch_id = str(uuid.uuid4())
     await init_categorize_batch(batch_id, scanned=len(document_ids))
 
@@ -429,7 +412,7 @@ async def enqueue_categorize_missing_documents(
             )
             if not lock_acquired:
                 continue
-            queue_job_key = f"categorize-missing:{batch_id}:{document_id}"
+            queue_job_key = f"categorize:{batch_id}:{document_id}"
             pending_job = ProcessingJob(
                 document_id=UUID(document_id),
                 job_type=JobType.CATEGORIZE,
@@ -443,6 +426,7 @@ async def enqueue_categorize_missing_documents(
             )
             db.add(pending_job)
             await db.flush()
+            await db.commit()
             job = await queue.enqueue(
                 "categorize_document_job",
                 key=queue_job_key,
@@ -458,11 +442,11 @@ async def enqueue_categorize_missing_documents(
             else:
                 pending_job.status = JobStatus.CANCELLED
                 pending_job.finished_at = datetime.now(UTC)
-        await db.commit()
+                await db.commit()
     finally:
         await queue.disconnect()
 
-    return EnqueueCategorizeMissingResponse(
+    return EnqueueCategorizeResponse(
         batch_id=batch_id,
         queue=queue.name,
         scanned=len(document_ids),
@@ -470,8 +454,8 @@ async def enqueue_categorize_missing_documents(
     )
 
 
-@router.get("/documents/categorize-missing/{batch_id}", response_model=CategorizeBatchStatusResponse)
-async def get_categorize_missing_batch_status(batch_id: str) -> CategorizeBatchStatusResponse:
+@router.get("/documents/categorize/{batch_id}", response_model=CategorizeBatchStatusResponse)
+async def get_categorize_batch_status(batch_id: str) -> CategorizeBatchStatusResponse:
     payload = await get_categorize_batch(batch_id)
     if payload is None:
         raise HTTPException(status_code=404, detail="Батч не найден")
@@ -496,34 +480,14 @@ async def get_categorize_missing_batch_status(batch_id: str) -> CategorizeBatchS
     )
 
 
-@router.post("/documents/extractor-missing", response_model=EnqueueExtractorMissingResponse)
-async def enqueue_extractor_missing_documents(
-    payload: EnqueueExtractorMissingRequest,
+@router.post("/documents/extractor", response_model=EnqueueExtractorResponse)
+async def enqueue_extractor_documents(
+    payload: EnqueueExtractorRequest,
     db: AsyncSession = Depends(get_db),
     started_by_id: UUID | None = Depends(get_optional_started_by_id),
-) -> EnqueueExtractorMissingResponse:
-    q = (
-        select(Document.id)
-        .where(
-            Document.original_content.is_not(None),
-            func.btrim(Document.original_content) != "",
-            ~select(DocumentEntity.document_id)
-            .where(DocumentEntity.document_id == Document.id)
-            .exists(),
-            ~select(ProcessingJob.id)
-            .where(
-                ProcessingJob.document_id == Document.id,
-                ProcessingJob.job_type == JobType.ENTITY_EXTRACT,
-                ProcessingJob.status.in_((JobStatus.RUNNING, JobStatus.PENDING)),
-            )
-            .exists(),
-        )
-        .order_by(Document.created_at.asc())
-    )
-    if payload.limit is not None:
-        q = q.limit(payload.limit)
-    rows = await db.execute(q)
-    document_ids = [str(row.id) for row in rows]
+) -> EnqueueExtractorResponse:
+    document_ids = await _require_documents_exist(db, payload.document_ids)
+    document_ids = await _filter_out_active_jobs(db, document_ids, JobType.ENTITY_EXTRACT)
     batch_id = str(uuid.uuid4())
     await init_extractor_batch(batch_id, scanned=len(document_ids))
 
@@ -540,7 +504,7 @@ async def enqueue_extractor_missing_documents(
             )
             if not lock_acquired:
                 continue
-            queue_job_key = f"extractor-missing:{batch_id}:{document_id}"
+            queue_job_key = f"extractor:{batch_id}:{document_id}"
             pending_job = ProcessingJob(
                 document_id=UUID(document_id),
                 job_type=JobType.ENTITY_EXTRACT,
@@ -554,6 +518,7 @@ async def enqueue_extractor_missing_documents(
             )
             db.add(pending_job)
             await db.flush()
+            await db.commit()
             job = await queue.enqueue(
                 "extractor_document_job",
                 key=queue_job_key,
@@ -569,11 +534,11 @@ async def enqueue_extractor_missing_documents(
             else:
                 pending_job.status = JobStatus.CANCELLED
                 pending_job.finished_at = datetime.now(UTC)
-        await db.commit()
+                await db.commit()
     finally:
         await queue.disconnect()
 
-    return EnqueueExtractorMissingResponse(
+    return EnqueueExtractorResponse(
         batch_id=batch_id,
         queue=queue.name,
         scanned=len(document_ids),
@@ -581,8 +546,8 @@ async def enqueue_extractor_missing_documents(
     )
 
 
-@router.get("/documents/extractor-missing/{batch_id}", response_model=ExtractorBatchStatusResponse)
-async def get_extractor_missing_batch_status(batch_id: str) -> ExtractorBatchStatusResponse:
+@router.get("/documents/extractor/{batch_id}", response_model=ExtractorBatchStatusResponse)
+async def get_extractor_batch_status(batch_id: str) -> ExtractorBatchStatusResponse:
     payload = await get_extractor_batch(batch_id)
     if payload is None:
         raise HTTPException(status_code=404, detail="Батч не найден")
@@ -607,56 +572,23 @@ async def get_extractor_missing_batch_status(batch_id: str) -> ExtractorBatchSta
     )
 
 
-async def _enqueue_tagger_missing_documents(
+async def _enqueue_tagger_documents(
     *,
-    payload: EnqueueTaggerMissingRequest,
+    payload: EnqueueTaggerRequest,
     use_translation: bool,
     db: AsyncSession,
     started_by_id: UUID | None,
-) -> EnqueueTaggerMissingResponse:
+) -> EnqueueTaggerResponse:
     source = "translated" if use_translation else "original"
-    same_source_active_key_prefix = f"tagger-missing-{source}:"
+    same_source_active_key_prefix = f"tagger-{source}:"
 
-    has_text_filter = (
-        (
-            Document.translated_content.is_not(None),
-            func.btrim(Document.translated_content) != "",
-        )
-        if use_translation
-        else (
-            Document.original_content.is_not(None),
-            func.btrim(Document.original_content) != "",
-        )
+    document_ids = await _require_documents_exist(db, payload.document_ids)
+    document_ids = await _filter_out_active_jobs(
+        db,
+        document_ids,
+        JobType.TAG,
+        queue_job_key_like=f"{same_source_active_key_prefix}%",
     )
-    language_id_expr = Document.translated_language_id if use_translation else Document.original_language_id
-
-    q = (
-        select(Document.id)
-        .where(
-            *has_text_filter,
-            ~select(DocumentTag.document_id)
-            .join(Tag, Tag.id == DocumentTag.tag_id)
-            .where(
-                DocumentTag.document_id == Document.id,
-                Tag.language_id == language_id_expr,
-            )
-            .exists(),
-            ~select(ProcessingJob.id)
-            .where(
-                ProcessingJob.document_id == Document.id,
-                ProcessingJob.job_type == JobType.TAG,
-                ProcessingJob.status.in_((JobStatus.RUNNING, JobStatus.PENDING)),
-                ProcessingJob.queue_job_key.like(f"{same_source_active_key_prefix}%"),
-            )
-            .exists(),
-        )
-        .order_by(Document.created_at.asc())
-    )
-    if payload.limit is not None:
-        q = q.limit(payload.limit)
-
-    rows = await db.execute(q)
-    document_ids = [str(row.id) for row in rows]
     batch_id = str(uuid.uuid4())
     await init_tagger_batch(batch_id, scanned=len(document_ids))
 
@@ -674,7 +606,7 @@ async def _enqueue_tagger_missing_documents(
             )
             if not lock_acquired:
                 continue
-            queue_job_key = f"tagger-missing-{source}:{batch_id}:{document_id}"
+            queue_job_key = f"tagger-{source}:{batch_id}:{document_id}"
             pending_job = ProcessingJob(
                 document_id=UUID(document_id),
                 job_type=JobType.TAG,
@@ -711,7 +643,7 @@ async def _enqueue_tagger_missing_documents(
     finally:
         await queue.disconnect()
 
-    return EnqueueTaggerMissingResponse(
+    return EnqueueTaggerResponse(
         batch_id=batch_id,
         queue=queue.name,
         scanned=len(document_ids),
@@ -720,13 +652,13 @@ async def _enqueue_tagger_missing_documents(
     )
 
 
-@router.post("/documents/tagger-missing-original", response_model=EnqueueTaggerMissingResponse)
-async def enqueue_tagger_missing_original_documents(
-    payload: EnqueueTaggerMissingRequest,
+@router.post("/documents/tagger-original", response_model=EnqueueTaggerResponse)
+async def enqueue_tagger_original_documents(
+    payload: EnqueueTaggerRequest,
     db: AsyncSession = Depends(get_db),
     started_by_id: UUID | None = Depends(get_optional_started_by_id),
-) -> EnqueueTaggerMissingResponse:
-    return await _enqueue_tagger_missing_documents(
+) -> EnqueueTaggerResponse:
+    return await _enqueue_tagger_documents(
         payload=payload,
         use_translation=False,
         db=db,
@@ -734,13 +666,13 @@ async def enqueue_tagger_missing_original_documents(
     )
 
 
-@router.post("/documents/tagger-missing-translated", response_model=EnqueueTaggerMissingResponse)
-async def enqueue_tagger_missing_translated_documents(
-    payload: EnqueueTaggerMissingRequest,
+@router.post("/documents/tagger-translated", response_model=EnqueueTaggerResponse)
+async def enqueue_tagger_translated_documents(
+    payload: EnqueueTaggerRequest,
     db: AsyncSession = Depends(get_db),
     started_by_id: UUID | None = Depends(get_optional_started_by_id),
-) -> EnqueueTaggerMissingResponse:
-    return await _enqueue_tagger_missing_documents(
+) -> EnqueueTaggerResponse:
+    return await _enqueue_tagger_documents(
         payload=payload,
         use_translation=True,
         db=db,
@@ -748,8 +680,8 @@ async def enqueue_tagger_missing_translated_documents(
     )
 
 
-@router.get("/documents/tagger-missing/{batch_id}", response_model=TaggerBatchStatusResponse)
-async def get_tagger_missing_batch_status(batch_id: str) -> TaggerBatchStatusResponse:
+@router.get("/documents/tagger/{batch_id}", response_model=TaggerBatchStatusResponse)
+async def get_tagger_batch_status(batch_id: str) -> TaggerBatchStatusResponse:
     payload = await get_tagger_batch(batch_id)
     if payload is None:
         raise HTTPException(status_code=404, detail="Батч не найден")

@@ -15,7 +15,7 @@ export interface GlobalToast {
   providedIn: 'root',
 })
 export class ExtractorBatchNotifierService {
-  private readonly storageKey = 'extractor_missing_batch_id';
+  private readonly storageKey = 'extractor_batch_id';
   private pollSub: Subscription | null = null;
   private hideTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -60,7 +60,7 @@ export class ExtractorBatchNotifierService {
   private startPolling(batchId: string): void {
     this.pollSub?.unsubscribe();
     this.pollSub = timer(0, 5000).subscribe(() => {
-      this.documentsApi.getExtractorMissingBatchStatus(batchId).subscribe({
+      this.documentsApi.getExtractorBatchStatus(batchId).subscribe({
         next: (status) => this.handleStatus(status),
         error: (err: HttpErrorResponse) => {
           if (err.status === 404) {

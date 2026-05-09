@@ -15,7 +15,7 @@ export interface GlobalToast {
   providedIn: 'root',
 })
 export class CategorizeBatchNotifierService {
-  private readonly storageKey = 'categorize_missing_batch_id';
+  private readonly storageKey = 'categorize_batch_id';
   private pollSub: Subscription | null = null;
   private hideTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -60,7 +60,7 @@ export class CategorizeBatchNotifierService {
   private startPolling(batchId: string): void {
     this.pollSub?.unsubscribe();
     this.pollSub = timer(0, 5000).subscribe(() => {
-      this.documentsApi.getCategorizeMissingBatchStatus(batchId).subscribe({
+      this.documentsApi.getCategorizeBatchStatus(batchId).subscribe({
         next: (status) => this.handleStatus(status),
         error: (err: HttpErrorResponse) => {
           if (err.status === 404) {

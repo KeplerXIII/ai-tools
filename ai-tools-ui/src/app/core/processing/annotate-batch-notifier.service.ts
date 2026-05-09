@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { BehaviorSubject, Subscription, timer } from 'rxjs';
 
-import { AnnotateMissingBatchStatusResponse, DocumentsApi } from '../../features/documents/documents-api';
+import { AnnotateBatchStatusResponse, DocumentsApi } from '../../features/documents/documents-api';
 
 type ToastKind = 'success' | 'error';
 
@@ -15,7 +15,7 @@ export interface GlobalToast {
   providedIn: 'root',
 })
 export class AnnotateBatchNotifierService {
-  private readonly storageKey = 'annotate_missing_batch_id';
+  private readonly storageKey = 'annotate_batch_id';
   private pollSub: Subscription | null = null;
   private hideTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -60,7 +60,7 @@ export class AnnotateBatchNotifierService {
   private startPolling(batchId: string): void {
     this.pollSub?.unsubscribe();
     this.pollSub = timer(0, 5000).subscribe(() => {
-      this.documentsApi.getAnnotateMissingBatchStatus(batchId).subscribe({
+      this.documentsApi.getAnnotateBatchStatus(batchId).subscribe({
         next: (status) => this.handleStatus(status),
         error: (err: HttpErrorResponse) => {
           if (err.status === 404) {
@@ -71,7 +71,7 @@ export class AnnotateBatchNotifierService {
     });
   }
 
-  private handleStatus(status: AnnotateMissingBatchStatusResponse): void {
+  private handleStatus(status: AnnotateBatchStatusResponse): void {
     if (!status.done) {
       return;
     }
