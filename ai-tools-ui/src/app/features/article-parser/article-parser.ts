@@ -1,37 +1,27 @@
-import { ChangeDetectorRef, Component, DestroyRef, ElementRef, OnInit, ViewChild } from '@angular/core';
+import { ChangeDetectorRef, Component, DestroyRef, NgZone, OnInit, ViewChild } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { FloatLabelModule } from 'primeng/floatlabel';
 import { InputTextModule } from 'primeng/inputtext';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
-import { SkeletonModule } from 'primeng/skeleton';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { TextareaModule } from 'primeng/textarea';
 import { ArticleParserUrlFormComponent } from './ui/article-parser-url-form/article-parser-url-form';
 import { ArticleParserStatusComponent } from './ui/article-parser-status/article-parser-status';
 import { ArticleParserMetaComponent } from './ui/article-parser-meta/article-parser-meta';
 import { ArticleParserCategoriesComponent } from './ui/article-parser-categories/article-parser-categories';
 import { ArticleParserEntitiesComponent } from './ui/article-parser-entities/article-parser-entities';
+import { ArticleParserOriginalTextComponent } from './ui/article-parser-original-text/article-parser-original-text';
+import { ArticleParserTranslationComponent } from './ui/article-parser-translation/article-parser-translation';
+import { ArticleParserAnnotationComponent } from './ui/article-parser-annotation/article-parser-annotation';
+import { ArticleParserArticleLoadingComponent } from './ui/article-parser-article-loading/article-parser-article-loading';
 import {
   ArticleParserApi,
   DocumentTagsResponse,
 } from './api/article-parser-api';
 import { ArticleParserState } from './model/article-parser-state';
-import {
-  ButtonVariant,
-  OutlineButtonComponent,
-} from '../../shared/ui/outline-button/outline-button.component';
-import { buildHighlightedArticleTextByGroups } from './lib/article-highlighter';
 import { scrollToElement } from './lib/scroll-to-element';
-
-export type ArticleParserBlock =
-  | 'original'
-  | 'translation'
-  | 'annotation';
 
 @Component({
   selector: 'app-article-parser',
@@ -41,27 +31,27 @@ export type ArticleParserBlock =
     MatCardModule,
     MatFormFieldModule,
     MatInputModule,
-    MatProgressSpinnerModule,
-    FloatLabelModule,
     InputTextModule,
-    OutlineButtonComponent,
     ArticleParserUrlFormComponent,
     ArticleParserStatusComponent,
     ArticleParserMetaComponent,
     ArticleParserCategoriesComponent,
     ArticleParserEntitiesComponent,
-    SkeletonModule,
-    TextareaModule,
+    ArticleParserOriginalTextComponent,
+    ArticleParserTranslationComponent,
+    ArticleParserAnnotationComponent,
+    ArticleParserArticleLoadingComponent,
   ],
   templateUrl: './article-parser.html',
   styleUrl: './article-parser.scss',
 })
 export class ArticleParser implements OnInit {
-  @ViewChild('translationSkeleton') translationSkeleton?: ElementRef;
-  @ViewChild('annotationSkeleton') annotationSkeleton?: ElementRef;
-  @ViewChild('originalTextPreview') originalTextPreview?: ElementRef<HTMLElement>;
-  @ViewChild('originalTextEditor') originalTextEditor?: ElementRef<HTMLElement>;
-  readonly ButtonVariant = ButtonVariant;
+  @ViewChild(ArticleParserOriginalTextComponent)
+  originalTextComponent?: ArticleParserOriginalTextComponent;
+  @ViewChild(ArticleParserTranslationComponent)
+  translationComponent?: ArticleParserTranslationComponent;
+  @ViewChild(ArticleParserAnnotationComponent)
+  annotationComponent?: ArticleParserAnnotationComponent;
   loadingArticle = false;
   loadingEntitiesSection = false;
   loadingCategories = false;
@@ -75,18 +65,14 @@ export class ArticleParser implements OnInit {
   translatedTagsError = '';
   summaryError = '';
 
-  isEditingOriginalBlock = false;
-  isEditingTranslationBlock = false;
-  isEditingAnnotationBlock = false;
-
   private buffer = '';
-  private originalTextViewportScroll = 0;
   private lastAutoloadKey = '';
 
   constructor(
     private api: ArticleParserApi,
     public state: ArticleParserState,
     private cdr: ChangeDetectorRef,
+    private ngZone: NgZone,
     private route: ActivatedRoute,
     private destroyRef: DestroyRef,
   ) {}
@@ -123,6 +109,8 @@ export class ArticleParser implements OnInit {
     this.state.error = '';
     this.originalTagsError = '';
     this.translationError = '';
+    this.translatedTagsError = '';
+    this.summaryError = '';
     this.loadingCategories = false;
     this.state.article = null;
     this.state.entities = null;
@@ -171,19 +159,24 @@ export class ArticleParser implements OnInit {
     this.state.annotation = '';
     this.state.translatedTags = [];
 
-    scrollToElement(() => this.translationSkeleton, this.cdr);
+    scrollToElement(() => this.translationComponent?.translationSkeleton, this.cdr);
 
     this.api.translateToRussianStream(this.state.article.document_id).subscribe({
       next: (chunk) => {
-        this.state.translatedText += chunk;
-        this.cdr.detectChanges();
+        this.ngZone.run(() => {
+          this.state.translatedText += chunk;
+        });
       },
       error: () => {
-        this.translationError = 'Ошибка при потоковом переводе статьи';
-        this.loadingTranslation = false;
+        this.ngZone.run(() => {
+          this.translationError = 'Ошибка при потоковом переводе статьи';
+          this.loadingTranslation = false;
+        });
       },
       complete: () => {
-        this.loadingTranslation = false;
+        this.ngZone.run(() => {
+          this.loadingTranslation = false;
+        });
       },
     });
   }
@@ -196,21 +189,24 @@ export class ArticleParser implements OnInit {
     this.state.annotation = '';
     this.buffer = '';
 
-    scrollToElement(() => this.annotationSkeleton, this.cdr);
+    scrollToElement(() => this.annotationComponent?.annotationSkeleton, this.cdr);
 
     this.api.summarizeStream(this.state.article.document_id, 'translated').subscribe({
       next: (chunk) => {
-        this.state.annotation += chunk;
-        this.cdr.detectChanges();
+        this.ngZone.run(() => {
+          this.state.annotation += chunk;
+        });
       },
       error: () => {
-        this.summaryError = 'Ошибка при потоковом формировании аннотации';
-        this.loadingSummary = false;
-        this.cdr.detectChanges();
+        this.ngZone.run(() => {
+          this.summaryError = 'Ошибка при потоковом формировании аннотации';
+          this.loadingSummary = false;
+        });
       },
       complete: () => {
-        this.loadingSummary = false;
-        this.cdr.detectChanges();
+        this.ngZone.run(() => {
+          this.loadingSummary = false;
+        });
       },
     });
   }
@@ -219,7 +215,6 @@ export class ArticleParser implements OnInit {
     this.state.clear();
     this.articleError = '';
     this.originalTagsError = '';
-    this.translationError = '';
     this.translationError = '';
     this.translatedTagsError = '';
     this.summaryError = '';
@@ -268,122 +263,13 @@ export class ArticleParser implements OnInit {
   // =========================
 
   // =========================
-  // РЕДАКТИРОВАНИЕ
+  // РЕДАКТИРОВАНИЕ (блоки в дочерних компонентах)
   // =========================
 
-  toggleBlockEdit(block: ArticleParserBlock): void {
-    switch (block) {
-      case 'original':
-        if (!this.isEditingOriginalBlock) {
-          const docId = this.state.article?.document_id;
-          if (docId) {
-            this.state.error = '';
-            this.api.lockDocument(docId).subscribe({
-              error: () => {
-                this.state.error = 'Не удалось заблокировать документ для редактирования';
-                this.cdr.detectChanges();
-              },
-            });
-          }
-        }
-        if (!this.isEditingOriginalBlock) {
-          this.originalTextViewportScroll = this.originalTextPreview?.nativeElement?.scrollTop ?? 0;
-        } else {
-          const ta = this.getOriginalTextTextarea();
-          this.originalTextViewportScroll = ta?.scrollTop ?? 0;
-        }
-        this.isEditingOriginalBlock = !this.isEditingOriginalBlock;
-        this.scheduleRestoreOriginalTextScroll();
-        if (!this.isEditingOriginalBlock) {
-          const docId = this.state.article?.document_id;
-          if (docId && this.state.article) {
-            this.state.error = '';
-            this.api
-              .saveDocument(docId, {
-                original_content: this.state.article.text ?? '',
-              })
-              .subscribe({
-                error: () => {
-                  this.state.error = 'Не удалось сохранить исходный текст';
-                  this.cdr.detectChanges();
-                },
-              });
-          }
-        }
-        break;
-      case 'translation':
-        if (!this.isEditingTranslationBlock) {
-          const docId = this.state.article?.document_id;
-          if (docId) {
-            this.state.error = '';
-            this.api.lockDocument(docId).subscribe({
-              error: () => {
-                this.state.error = 'Не удалось заблокировать документ для редактирования';
-                this.cdr.detectChanges();
-              },
-            });
-          }
-        }
-        this.isEditingTranslationBlock = !this.isEditingTranslationBlock;
-        if (!this.isEditingTranslationBlock) {
-          const docId = this.state.article?.document_id;
-          if (docId) {
-            this.state.error = '';
-            this.api
-              .saveDocument(docId, {
-                translated_content: this.state.translatedText ?? '',
-              })
-              .subscribe({
-                error: () => {
-                  this.state.error = 'Не удалось сохранить перевод';
-                  this.cdr.detectChanges();
-                },
-              });
-          }
-        }
-        break;
-      case 'annotation':
-        if (!this.isEditingAnnotationBlock) {
-          const docId = this.state.article?.document_id;
-          if (docId) {
-            this.state.error = '';
-            this.api.lockDocument(docId).subscribe({
-              error: () => {
-                this.state.error = 'Не удалось заблокировать документ для редактирования';
-                this.cdr.detectChanges();
-              },
-            });
-          }
-        }
-        this.isEditingAnnotationBlock = !this.isEditingAnnotationBlock;
-        if (!this.isEditingAnnotationBlock) {
-          const docId = this.state.article?.document_id;
-          if (docId) {
-            const hasTranslation = !!this.state.translatedText?.trim();
-            this.state.error = '';
-            this.api
-              .saveDocument(
-                docId,
-                hasTranslation
-                  ? { translated_summary: this.state.annotation ?? '' }
-                  : { original_summary: this.state.annotation ?? '' },
-              )
-              .subscribe({
-                error: () => {
-                  this.state.error = 'Не удалось сохранить аннотацию';
-                  this.cdr.detectChanges();
-                },
-              });
-          }
-        }
-        break;
-    }
-  }
-
   private resetBlockEditors(): void {
-    this.isEditingOriginalBlock = false;
-    this.isEditingTranslationBlock = false;
-    this.isEditingAnnotationBlock = false;
+    this.originalTextComponent?.resetEdit();
+    this.translationComponent?.resetTranslationEdit();
+    this.annotationComponent?.resetAnnotationEdit();
   }
 
   private reloadTagsFromServer(kind: 'original' | 'translated'): void {
@@ -418,13 +304,6 @@ export class ArticleParser implements OnInit {
     });
   }
 
-  autoResize(event: Event): void {
-    const textarea = event.target as HTMLTextAreaElement;
-
-    textarea.style.height = 'auto';
-    textarea.style.height = `${textarea.scrollHeight}px`;
-  }
-
   get isLoading(): boolean {
     return (
       this.loadingArticle ||
@@ -439,60 +318,5 @@ export class ArticleParser implements OnInit {
 
   get isDisabled(): boolean {
     return this.isLoading;
-  }
-
-  get highlightedArticleText(): string {
-    const text = this.state.article?.text || '';
-    const ent = this.state.entities;
-
-    const sortDesc = (a: string, b: string) => b.length - a.length;
-    const military = [...(ent?.military_equipment || [])]
-      .map((e) => e.name)
-      .filter(Boolean)
-      .sort(sortDesc);
-    const manufacturers = [...(ent?.manufacturers || [])]
-      .map((e) => e.name)
-      .filter(Boolean)
-      .sort(sortDesc);
-    const contracts = [...(ent?.contracts || [])]
-      .map((e) => e.name)
-      .filter(Boolean)
-      .sort(sortDesc);
-
-    return buildHighlightedArticleTextByGroups(text, [
-      { className: 'highlighted-entity-military', entities: military },
-      { className: 'highlighted-entity-manufacturer', entities: manufacturers },
-      { className: 'highlighted-entity-contract', entities: contracts },
-    ]);
-  }
-
-  private getOriginalTextTextarea(): HTMLTextAreaElement | null {
-    const host = this.originalTextEditor?.nativeElement;
-    if (!host) {
-      return null;
-    }
-    return host.querySelector('textarea');
-  }
-
-  /** Keep viewport and in-block scroll when swapping preview ↔ textarea */
-  private scheduleRestoreOriginalTextScroll(): void {
-    const savedInnerScroll = this.originalTextViewportScroll;
-    const savedWinX = window.scrollX;
-    const savedWinY = window.scrollY;
-
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        window.scrollTo(savedWinX, savedWinY);
-
-        const textarea = this.getOriginalTextTextarea();
-        const preview = this.originalTextPreview?.nativeElement;
-        if (this.isEditingOriginalBlock && textarea) {
-          textarea.scrollTop = savedInnerScroll;
-          textarea.focus({ preventScroll: true });
-        } else if (!this.isEditingOriginalBlock && preview) {
-          preview.scrollTop = savedInnerScroll;
-        }
-      });
-    });
   }
 }

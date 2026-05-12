@@ -1,4 +1,4 @@
-import { Component, Input, OnChanges, SimpleChanges } from '@angular/core';
+import { ChangeDetectorRef, Component, Input, OnChanges, SimpleChanges } from '@angular/core';
 import { MenuItem } from 'primeng/api';
 import { ChipModule } from 'primeng/chip';
 import { SpeedDialModule } from 'primeng/speeddial';
@@ -16,12 +16,17 @@ export class ArticleParserStatusComponent implements OnChanges {
 
   availableDocumentStatuses: { code: string; name_ru: string; description: string | null }[] = [];
   documentStatusTags: { code: string; label: string }[] = [];
+  /** Стабильная ссылка для p-speeddial: геттер давал новый массив на каждом CD и ломал привязку пунктов. */
+  statusSpeedDialItems: MenuItem[] = [];
   loadingDocumentStatuses = false;
   documentStatusError = '';
   isEditingStatusBlock = false;
   pendingStatusCode = '';
 
-  constructor(private api: ArticleParserApi) {}
+  constructor(
+    private api: ArticleParserApi,
+    private cdr: ChangeDetectorRef,
+  ) {}
 
   ngOnChanges(changes: SimpleChanges): void {
     if (!changes['article']) {
@@ -30,6 +35,8 @@ export class ArticleParserStatusComponent implements OnChanges {
 
     if (!this.article) {
       this.documentStatusTags = [];
+      this.availableDocumentStatuses = [];
+      this.statusSpeedDialItems = [];
       this.documentStatusError = '';
       this.loadingDocumentStatuses = false;
       this.isEditingStatusBlock = false;
@@ -43,6 +50,23 @@ export class ArticleParserStatusComponent implements OnChanges {
 
   toggleEdit(): void {
     this.isEditingStatusBlock = !this.isEditingStatusBlock;
+  }
+
+  /**
+   * Закрывает SpeedDial (через toggleCallback → hide) и добавляет статус по id пункта,
+   * не полагаясь только на item.command (document click / смена model на CD).
+   */
+  onStatusSpeedDialItemClick(
+    event: MouseEvent,
+    menuItem: MenuItem,
+    toggleCallback: (e: Event, item: MenuItem) => void,
+  ): void {
+    event.stopPropagation();
+    const code = typeof menuItem.id === 'string' ? menuItem.id.trim() : '';
+    if (code) {
+      this.onDocumentStatusSelected(code);
+    }
+    toggleCallback(event, { ...menuItem, command: undefined });
   }
 
   onDocumentStatusSelected(code: string | null | undefined): void {
@@ -74,6 +98,7 @@ export class ArticleParserStatusComponent implements OnChanges {
       error: () => {
         this.documentStatusError = 'Не удалось удалить статус';
         this.loadingDocumentStatuses = false;
+        this.cdr.detectChanges();
       },
     });
   }
@@ -87,8 +112,9 @@ export class ArticleParserStatusComponent implements OnChanges {
     return this.availableDocumentStatuses.filter((status) => !assigned.has(status.code));
   }
 
-  get statusSpeedDialItems(): MenuItem[] {
-    return this.unassignedDocumentStatuses.map((status) => ({
+  private rebuildStatusSpeedDialItems(): void {
+    this.statusSpeedDialItems = this.unassignedDocumentStatuses.map((status) => ({
+      id: status.code,
       label: status.name_ru,
       command: () => this.onDocumentStatusSelected(status.code),
     }));
@@ -110,6 +136,7 @@ export class ArticleParserStatusComponent implements OnChanges {
       error: () => {
         this.documentStatusError = 'Не удалось добавить статус';
         this.loadingDocumentStatuses = false;
+        this.cdr.detectChanges();
       },
     });
   }
@@ -117,6 +144,7 @@ export class ArticleParserStatusComponent implements OnChanges {
   private syncDocumentStatusTagsFromArticle(): void {
     if (!this.article) {
       this.documentStatusTags = [];
+      this.statusSpeedDialItems = [];
       return;
     }
 
@@ -127,15 +155,19 @@ export class ArticleParserStatusComponent implements OnChanges {
         label: status.name_ru || status.code,
       }))
       .filter((status) => !!status.code);
+    this.rebuildStatusSpeedDialItems();
   }
 
   private loadAvailableDocumentStatuses(): void {
     this.api.getAvailableDocumentStatuses().subscribe({
       next: (statuses) => {
         this.availableDocumentStatuses = statuses;
+        this.rebuildStatusSpeedDialItems();
+        this.cdr.detectChanges();
       },
       error: () => {
         this.documentStatusError = 'Не удалось загрузить справочник статусов';
+        this.cdr.detectChanges();
       },
     });
   }
@@ -148,10 +180,12 @@ export class ArticleParserStatusComponent implements OnChanges {
         }
         this.syncDocumentStatusTagsFromArticle();
         this.loadingDocumentStatuses = false;
+        this.cdr.detectChanges();
       },
       error: () => {
         this.documentStatusError = 'Статусы обновлены, но не удалось получить актуальный список';
         this.loadingDocumentStatuses = false;
+        this.cdr.detectChanges();
       },
     });
   }

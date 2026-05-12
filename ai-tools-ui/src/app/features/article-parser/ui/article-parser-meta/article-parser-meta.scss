@@ -1,3 +1,5 @@
+@use './article-parser-meta-images-dialog.shared.scss';
+
 /* См. app-article-parser-status: без этого хост схлопывается при align-items: start в .article-grid. */
 :host {
   display: contents;
@@ -181,10 +183,35 @@
   min-width: 0;
 }
 
+.image-prew-title-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.image-prew-title-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.image-prew-title-wrapper .image-prew-manage-btn {
+  width: 2.125rem;
+  height: 2.125rem;
+  flex-shrink: 0;
+
+  .pi {
+    font-size: 1.4rem;
+    line-height: 1;
+  }
+}
+
 .meta-block-one {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 20px;
   width: 100%;
 }
 
@@ -221,8 +248,7 @@
 }
 
 :host ::ng-deep .prew-image-block .p-image img:not(.p-image-original) {
-  max-height: 260px;
-  border-radius: 12px;
+  border-radius: 6px;
 }
 
 :host ::ng-deep .prew-image-block .p-image-preview-indicator {
@@ -254,4 +280,10 @@
 .image-preview-icon {
   font-size: 2rem;
   color: var(--light-grey-text-color);
+}
+
+.pick-main-image-btn {
+  border-right: 1px solid var(--light-grey-text-color);
+  padding-right: 10px;
+  margin-right: 10px;
 }

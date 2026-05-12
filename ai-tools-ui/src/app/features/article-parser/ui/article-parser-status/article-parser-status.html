@@ -18,13 +18,13 @@
                 }"
                 [disabled]="loadingDocumentStatuses"
               >
-                <ng-template #item let-item let-toggleCallback="toggleCallback">
+                <ng-template #item let-menuItem let-toggleCallback="toggleCallback">
                   <button
                     type="button"
                     class="status-speed-dial-item"
-                    (click)="toggleCallback($event, item)"
+                    (click)="onStatusSpeedDialItemClick($event, menuItem, toggleCallback)"
                   >
-                    {{ item.label }}
+                    {{ menuItem.label }}
                   </button>
                 </ng-template>
               </p-speeddial>

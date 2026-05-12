@@ -32,7 +32,11 @@
             "
             (click)="toggleEdit()"
           >
-            <i class="pi" [class.pi-pen-to-square]="!isEditingMetaBlock" [class.pi-check-square]="isEditingMetaBlock"></i>
+            <i
+              class="pi"
+              [class.pi-pen-to-square]="!isEditingMetaBlock"
+              [class.pi-check-square]="isEditingMetaBlock"
+            ></i>
           </button>
         </div>
       </div>
@@ -93,7 +97,9 @@
             pInputText
             id="article_main_image"
             name="article_main_image"
-            [ngModel]="isEditingMetaBlock ? article.main_image : article.main_image || 'Нет информации'"
+            [ngModel]="
+              isEditingMetaBlock ? article.main_image : article.main_image || 'Нет информации'
+            "
             (ngModelChange)="isEditingMetaBlock && article && (article.main_image = $event)"
             [disabled]="!isEditingMetaBlock"
             placeholder="https://example.com/image.jpg"
@@ -104,20 +110,58 @@
     </div>
   </div>
 
-  @if (mainImageUrl) {
+  @if (showImagePreview()) {
     <div class="prew-image-block">
-      <p class="image-prew-title">Предпросмотр изображения:</p>
-      <p-image
-        [src]="mainImageUrl"
-        alt="Главное изображение статьи"
-        [preview]="true"
-        width="500"
-        (onImageError)="onImageError($event)"
-      >
-        <ng-template pTemplate="indicator">
-          <i class="pi pi-search-plus image-preview-icon"></i>
-        </ng-template>
-      </p-image>
+      @if (hasGalleryImages()) {
+        <div class="image-prew-title-wrapper">
+          <p class="image-prew-title">Предпросмотр изображений:</p>
+          <div class="image-prew-title-actions">
+            <button
+              type="button"
+              class="pick-main-image-btn block-edit-toggle no-print-field image-prew-manage-btn"
+              aria-label="Назначить главное изображение"
+              (click)="mainImagePickDialog.open()"
+            >
+              <i class="pi pi-star"></i>
+            </button>
+            <button
+              type="button"
+              class="block-edit-toggle no-print-field image-prew-manage-btn"
+              aria-label="Удаление изображений статьи"
+              (click)="imagesDeleteDialog.open()"
+            >
+              <i class="pi pi-trash"></i>
+            </button>
+          </div>
+        </div>
+
+        <app-article-parser-meta-galleria [items]="galleriaItems" />
+
+        <app-article-parser-meta-images-delete-dialog
+          #imagesDeleteDialog
+          [article]="article"
+          [galleriaItems]="galleriaItems"
+        />
+
+        <app-article-parser-meta-main-image-pick-dialog
+          #mainImagePickDialog
+          [article]="article"
+          [galleriaItems]="galleriaItems"
+        />
+      } @else {
+        <p class="image-prew-title">Предпросмотр изображения:</p>
+        <p-image
+          [src]="mainImageUrl"
+          alt="Главное изображение статьи"
+          [preview]="true"
+          width="500"
+          (onImageError)="onImageError($event)"
+        >
+          <ng-template pTemplate="indicator">
+            <i class="pi pi-search-plus image-preview-icon"></i>
+          </ng-template>
+        </p-image>
+      }
     </div>
   }
 </section>

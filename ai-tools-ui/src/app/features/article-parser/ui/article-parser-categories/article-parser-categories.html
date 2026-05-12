@@ -15,11 +15,10 @@
         } @else {
           <p-treeselect
             class="categories-treeselect"
-            [(ngModel)]="selectedCategoryNodes"
+            panelStyleClass="categories-treeselect-panel"
+            [(ngModel)]="selectedCategoryNode"
             [options]="categoryTreeNodes"
-            display="chip"
-            [metaKeySelection]="false"
-            selectionMode="checkbox"
+            selectionMode="single"
             placeholder="Добавить категорию"
             [filter]="true"
             [loading]="loadingCategoryPickerCatalog"
@@ -27,7 +26,6 @@
             [virtualScrollItemSize]="35"
             [virtualScrollOptions]="{ scrollHeight: '200px' }"
             (ngModelChange)="onCategoryTreeSelectChange($event)"
-            (onHide)="onCategoryTreeHide()"
           />
         }
       </div>
@@ -83,6 +81,7 @@
             <p-knob
               [ngModel]="categoryKnobValue(cat)"
               [style.--p-knob-value-background]="categoryKnobColor(cat)"
+              [rangeColor]="'var(--super-light-grey-text-color)'"
               [disabled]="true"
               [size]="65"
               [strokeWidth]="8"
@@ -91,7 +90,10 @@
             />
 
             <span class="categories-knob-label">
-              {{ cat.name_ru || cat.name || cat.code }}
+              @if (categoryParentLabel(cat); as parentLabel) {
+                <span class="categories-knob-label-parent">{{ parentLabel }}</span>
+              }
+              <span class="categories-knob-label-own">{{ cat.name_ru || cat.name || cat.code }}</span>
             </span>
 
             @if (isEditingCategoriesBlock && !loadingDocumentCategoriesMutation) {

@@ -1,0 +1,275 @@
+:host {
+  display: contents;
+}
+
+.panel {
+  background: var(--table-row-color);
+  width: 100%;
+  border: 1px solid var(--super-light-grey-text-color);
+  border-radius: 10px;
+  padding: 16px;
+  align-self: start;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.02),
+    0 4px 8px rgba(0, 0, 0, 0.02);
+}
+
+.full {
+  margin-top: 24px;
+}
+
+.title-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.translation-title-row {
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.translation-title-row .panel-title {
+  margin-bottom: 0;
+}
+
+.panel-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--font-size-xxl);
+  font-weight: 600;
+  color: var(--primary-text-color);
+  margin-bottom: 10px;
+}
+
+.translation-title-trailing {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.title-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-right: 1px solid var(--light-grey-text-color);
+  padding-right: 10px;
+}
+
+.teg-btn-wrapper,
+.summary-btn-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.field-error {
+  min-height: 18px;
+  margin-top: 8px;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--error-text-color);
+}
+
+.block-edit-toggle {
+  flex-shrink: 0;
+  padding-left: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  color: var(--light-grey-text-color);
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    color 0.5s ease;
+
+  .pi {
+    font-size: 1.4rem;
+    line-height: 1;
+  }
+}
+
+.block-edit-toggle:hover {
+  border-color: #818cf8;
+  color: var(--primary-text-color);
+}
+
+.block-edit-toggle:focus-visible {
+  outline: 2px solid #818cf8;
+  outline-offset: 2px;
+}
+
+.block-edit-toggle--active {
+  border-color: #86efac;
+  color: var(--accent-color-success);
+}
+
+.block-edit-toggle--active:hover {
+  border-color: #4ade80;
+  color: #14532d;
+}
+
+.sceleton-translate-text {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.prime-field {
+  display: block;
+  width: 100%;
+  --p-floatlabel-focus-color: var(--primary-text-color-light);
+}
+
+:host ::ng-deep .prime-field textarea.p-inputtextarea {
+  width: 100%;
+  display: block;
+}
+
+:host ::ng-deep p-floatlabel.textarea-field.prime-field {
+  display: block !important;
+  width: 100% !important;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+:host ::ng-deep .textarea-field .p-textarea {
+  width: 100% !important;
+  max-width: 100%;
+  display: block !important;
+  box-sizing: border-box;
+}
+
+:host ::ng-deep .textarea-field .p-textarea textarea {
+  width: 100% !important;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box !important;
+}
+
+:host ::ng-deep .textarea-field label,
+:host ::ng-deep .textarea-field:has(textarea:focus) label,
+:host ::ng-deep .textarea-field:has(textarea:not(:placeholder-shown)) label,
+:host ::ng-deep .textarea-field textarea:focus ~ label {
+  left: 8px !important;
+  inset-inline-start: 8px !important;
+  top: 0 !important;
+
+  transform: translateY(-50%) !important;
+  transform-origin: left center !important;
+  transition: none !important;
+
+  background: #ffffff;
+  padding: 0 4px;
+
+  font-size: 15px !important;
+}
+
+:host ::ng-deep .textarea-field textarea {
+  width: 100% !important;
+  box-sizing: border-box !important;
+
+  font-family: var(--font-family-base) !important;
+  font-weight: var(--font-weight-medium) !important;
+  font-size: var(--font-size-detail) !important;
+  line-height: 1.5 !important;
+
+  padding: 17px !important;
+  background: none !important;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 0 !important;
+  color: var(--primary-text-color) !important;
+}
+
+:host ::ng-deep .textarea-field textarea:focus {
+  outline: none !important;
+  box-shadow: none !important;
+  border: 1px solid #cbd5e1 !important;
+}
+
+:host ::ng-deep .textarea-field textarea:disabled,
+:host ::ng-deep .textarea-field textarea:read-only {
+  opacity: 0.8 !important;
+  background: none !important;
+  color: var(--primary-text-color) !important;
+  border: 1px solid transparent !important;
+}
+
+:host ::ng-deep #translated_text {
+  font-family: var(--font-family-base) !important;
+  font-weight: var(--font-weight-light) !important;
+  font-size: var(--font-size-detail) !important;
+}
+
+#translated_text {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 #f1f5f9;
+}
+
+#translated_text::-webkit-scrollbar {
+  width: 6px;
+}
+
+#translated_text::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 10px;
+}
+
+#translated_text::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 10px;
+}
+
+#translated_text::-webkit-scrollbar-button,
+#translated_text::-webkit-scrollbar-button:single-button {
+  display: none;
+  width: 0;
+  height: 0;
+  background: transparent;
+}
+
+.full-width {
+  width: 100%;
+}
+
+.custom-textarea-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 #f1f5f9;
+}
+
+.custom-textarea-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+  -webkit-appearance: none;
+}
+
+.custom-textarea-scroll::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 10px;
+}
+
+.custom-textarea-scroll::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 10px;
+}
+
+.custom-textarea-scroll::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+.custom-textarea-scroll::-webkit-scrollbar-button,
+.custom-textarea-scroll::-webkit-scrollbar-button:single-button {
+  display: none;
+  width: 0;
+  height: 0;
+  background: transparent;
+}

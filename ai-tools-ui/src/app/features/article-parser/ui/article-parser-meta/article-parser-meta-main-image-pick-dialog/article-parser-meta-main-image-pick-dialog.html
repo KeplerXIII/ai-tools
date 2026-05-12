@@ -1,0 +1,78 @@
+<p-dialog
+  [(visible)]="dialogVisible"
+  [modal]="true"
+  [dismissableMask]="true"
+  [closable]="true"
+  [closeOnEscape]="true"
+  [draggable]="false"
+  [appendTo]="'self'"
+  [style]="{ width: 'min(36rem, 94vw)' }"
+  styleClass="article-meta-images-dialog article-meta-main-pick-dialog"
+  header="Главное изображение"
+  (onHide)="onDialogHide()"
+>
+  <p class="images-manage-intro">
+    Выберите фотографию, которая будет главной для статьи.
+  </p>
+  <div class="images-manage-list">
+    @for (row of rows; track row.url; let i = $index) {
+      <div class="images-manage-row images-manage-row--pick-main">
+        <p-radiobutton
+          name="articleMainImagePick"
+          [inputId]="'article-meta-main-rb-' + i"
+          [value]="row.url"
+          [(ngModel)]="selectedUrl"
+        />
+        <div class="images-manage-body">
+          <div class="images-manage-thumb-wrap">
+            <img
+              [src]="row.url"
+              [attr.alt]="row.alt || row.title || 'Превью'"
+              class="images-manage-thumb"
+            />
+          </div>
+          <div class="images-manage-caption">
+            @if (row.isMain) {
+              <span class="images-manage-current-badge">Сейчас главное</span>
+            }
+            @if (row.title) {
+              <div class="images-manage-title">{{ row.title }}</div>
+            }
+            @if (row.alt) {
+              <div class="images-manage-alt">{{ row.alt }}</div>
+            }
+            @if (!row.title && !row.alt) {
+              <span class="images-manage-muted">Нет подписи</span>
+            }
+          </div>
+        </div>
+      </div>
+    }
+  </div>
+  <ng-template pTemplate="footer">
+    <div class="images-manage-footer">
+      @if (!canPersist) {
+        <p class="images-manage-footer-hint">
+          Сохранение недоступно: у документа нет идентификатора на сервере.
+        </p>
+      }
+      <div class="images-manage-footer-actions">
+        <button type="button" class="images-manage-btn images-manage-btn--ghost" (click)="close()">
+          Отмена
+        </button>
+        <button
+          type="button"
+          class="images-manage-btn images-manage-btn--primary"
+          [disabled]="applyDisabled"
+          (click)="apply()"
+        >
+          @if (saveLoading) {
+            Сохранение…
+          } @else {
+            Назначить главным
+          }
+        </button>
+      </div>
+    </div>
+  </ng-template>
+</p-dialog>

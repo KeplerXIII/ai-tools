@@ -65,142 +65,6 @@
     0 4px 10px rgba(0, 0, 0, 0.06);
 }
 
-:host ::ng-deep .textarea-field label,
-:host ::ng-deep .textarea-field:has(textarea:focus) label,
-:host ::ng-deep .textarea-field:has(textarea:not(:placeholder-shown)) label,
-:host ::ng-deep .textarea-field textarea:focus ~ label {
-  left: 8px !important;
-  inset-inline-start: 8px !important;
-  top: 0 !important;
-
-  transform: translateY(-50%) !important;
-  transform-origin: left center !important;
-  transition: none !important;
-
-  background: #ffffff;
-  padding: 0 4px;
-
-  font-size: 15px !important;
-}
-
-:host ::ng-deep .textarea-field textarea {
-  width: 100% !important;
-  box-sizing: border-box !important;
-
-  font-family: var(--font-family-base) !important;
-  font-weight: var(--font-weight-medium) !important;
-  font-size: var(--font-size-detail) !important;
-  line-height: 1.5 !important;
-
-  padding: 17px !important;
-  background: none !important;
-  border: 1px solid #cbd5e1 !important;
-  border-radius: 0 !important;
-  color: var(--primary-text-color) !important;
-}
-
-:host ::ng-deep .textarea-field textarea:focus {
-  outline: none !important;
-  box-shadow: none !important;
-  border: 1px solid #cbd5e1 !important;
-}
-
-:host ::ng-deep .textarea-field textarea:disabled {
-  opacity: 0.8 !important;
-  background: none !important;
-  color: var(--primary-text-color) !important;
-  border: 1px solid transparent !important;
-}
-
-:host ::ng-deep #article_text,
-#translated_text,
-#annotation {
-  font-family: var(--font-family-base) !important;
-  font-weight: var(--font-weight-light) !important;
-  font-size: var(--font-size-detail) !important;
-}
-
-#article_text,
-#translated_text,
-#annotation {
-  scrollbar-width: thin;
-  scrollbar-color: #cbd5e1 #f1f5f9;
-}
-
-#article_text::-webkit-scrollbar,
-#translated_text::-webkit-scrollbar,
-#annotation::-webkit-scrollbar {
-  width: 6px;
-}
-
-#article_text::-webkit-scrollbar-track,
-#translated_text::-webkit-scrollbar-track,
-#annotation::-webkit-scrollbar-track {
-  background: #f1f5f9;
-  border-radius: 10px;
-}
-
-#article_text::-webkit-scrollbar-thumb,
-#translated_text::-webkit-scrollbar-thumb,
-#annotation::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 10px;
-}
-
-#article_text::-webkit-scrollbar-button,
-#translated_text::-webkit-scrollbar-button,
-#annotation::-webkit-scrollbar-button {
-  display: none;
-  width: 0;
-  height: 0;
-  background: transparent;
-}
-
-#article_text::-webkit-scrollbar-button:single-button,
-#translated_text::-webkit-scrollbar-button:single-button,
-#annotation::-webkit-scrollbar-button:single-button {
-  display: none;
-  width: 0;
-  height: 0;
-}
-
-.prime-field {
-  display: block;
-  width: 100%;
-  --p-floatlabel-focus-color: var(--primary-text-color-light);
-}
-
-.prime-field input {
-  width: 100%;
-}
-
-:host ::ng-deep .prime-field textarea.p-inputtextarea {
-  width: 100%;
-  display: block;
-}
-
-/* PrimeNG FloatLabel + Textarea: inner host must stretch or the field shrinks vs block layout */
-:host ::ng-deep p-floatlabel.textarea-field.prime-field {
-  display: block !important;
-  width: 100% !important;
-  max-width: 100%;
-  box-sizing: border-box;
-}
-
-:host ::ng-deep .textarea-field .p-textarea {
-  width: 100% !important;
-  max-width: 100%;
-  display: block !important;
-  box-sizing: border-box;
-}
-
-:host ::ng-deep .textarea-field .p-textarea textarea {
-  width: 100% !important;
-  max-width: 100%;
-  min-width: 0;
-  box-sizing: border-box !important;
-}
-
 .tool-card {
   max-width: 1400px;
   font-family: var(--font-family-base);
@@ -233,29 +97,6 @@
   margin-top: 24px;
   align-items: start;
   width: 100%;
-}
-
-.title-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.panel {
-  background: var(--table-row-color);
-  width: 100%;
-  border: 1px solid var(--super-light-grey-text-color);
-  border-radius: 10px;
-  padding: 16px;
-  align-self: start;
-  box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.02),
-    0 4px 8px rgba(0, 0, 0, 0.02);
-}
-
-.meta-panel {
-  display: flex;
-  gap: 20px;
 }
 
 .status-add-chip,
@@ -395,21 +236,6 @@
   padding: 4px 2px;
 }
 
-.prew-image-block {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.image-prew-title {
-  color: var(--primary-text-color);
-  font-weight: var(--font-weight-medium);
-}
-
-.full {
-  margin-top: 24px;
-}
-
 .panel-title {
   display: flex;
   align-items: center;
@@ -418,14 +244,6 @@
   font-weight: 600;
   color: var(--primary-text-color);
   margin-bottom: 10px;
-}
-
-.meta-list {
-  display: grid;
-  gap: 8px;
-  color: #334155;
-  font-size: 14px;
-  margin-bottom: 20px;
 }
 
 .field-error {
@@ -550,33 +368,6 @@
   font-size: var(--font-size-table);
 }
 
-@media (max-width: 1000px) {
-  .article-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-.meta-block-one {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  width: 100%;
-}
-
-.meta-wrapper {
-  width: 100%;
-  min-width: 0;
-}
-
-.meta-block-one-title {
-  display: inline-block;
-  color: var(--light-grey-text-color);
-}
-
-.meta-block-one-text {
-  color: var(--light-grey-text-color);
-}
-
 .status-tags {
   margin-top: 0;
   justify-content: flex-end;
@@ -606,56 +397,8 @@
   border-radius: 20px;
 }
 
-.title-wrapper {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.block-edit-toggle {
-  flex-shrink: 0;
-  padding-left: 10px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  color: var(--light-grey-text-color);
-  cursor: pointer;
-  transition:
-    border-color 0.15s ease,
-    background 0.15s ease,
-    color 0.5s ease;
-
-  .pi {
-    font-size: 1.4rem;
-    line-height: 1;
-  }
-}
-
-.block-edit-toggle:hover {
-  border-color: #818cf8;
-  color: var(--primary-text-color);
-}
-
-.block-edit-toggle:focus-visible {
-  outline: 2px solid #818cf8;
-  outline-offset: 2px;
-}
-
-.block-edit-toggle--active {
-  border-color: #86efac;
-  color: var(--accent-color-success);
-}
-
-.block-edit-toggle--active:hover {
-  border-color: #4ade80;
-  color: #14532d;
-}
-
 .status-title-trailing,
-.entities-title-trailing,
-.original-title-trailing,
-.translation-title-trailing {
+.entities-title-trailing {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -670,30 +413,6 @@
   justify-content: flex-end;
 }
 
-.annotation-title-row .panel-title {
-  margin-bottom: 0;
-}
-
-.translation-title-row .panel-title,
-.original-title-row .panel-title {
-  margin-bottom: 0;
-}
-
-.translate-teg-btn {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-}
-
-.teg-btn-wrapper,
-.translate-btn-wrapper,
-.summary-btn-wrapper {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
-}
-
 .entities-sceleton-wrapper {
   display: flex;
   flex-direction: column;
@@ -703,76 +422,12 @@
   min-width: 0;
 }
 
-.sceleton-translate-text {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.loading-original-tag-wrapper-btn {
-  margin-top: 10px;
-  display: flex;
-  gap: 10px;
-}
-
 .empty-entities-message {
   margin-top: 10px;
   font-size: var(--font-size-xl);
   font-weight: var(--font-weight-medium);
   color: var(--light-grey-text-color);
   text-transform: uppercase;
-}
-
-.highlighted-article-text {
-  width: 100%;
-  box-sizing: border-box;
-  min-height: 220px;
-  max-height: 320px;
-  overflow-y: auto;
-  padding: 17px;
-  font-family: var(--font-family-base);
-  font-weight: var(--font-weight-light);
-  font-size: var(--font-size-detail);
-  line-height: 1.5;
-  color: var(--primary-text-color);
-  white-space: pre-wrap;
-}
-
-/* Same vertical size as .highlighted-article-text (FloatLabel removed — it stole height) */
-.article-original-editor {
-  width: 100%;
-  box-sizing: border-box;
-}
-
-:host ::ng-deep .article-original-editor .p-textarea {
-  width: 100% !important;
-  max-width: 100%;
-  display: block !important;
-  box-sizing: border-box;
-  min-height: 220px;
-  max-height: 320px;
-}
-
-:host ::ng-deep .article-original-editor textarea#article_text {
-  width: 100% !important;
-  min-height: 220px !important;
-  max-height: 320px !important;
-  overflow-y: auto !important;
-  box-sizing: border-box !important;
-  padding: 17px !important;
-  font-family: var(--font-family-base) !important;
-  font-weight: var(--font-weight-light) !important;
-  font-size: var(--font-size-detail) !important;
-  line-height: 1.5 !important;
-  border: 1px solid #cbd5e1 !important;
-  border-radius: 0 !important;
-  color: var(--primary-text-color) !important;
-  background: none !important;
-}
-
-:host ::ng-deep .article-original-editor textarea#article_text:focus {
-  outline: none !important;
-  box-shadow: none !important;
 }
 
 :host ::ng-deep .highlighted-entity-military,
@@ -796,37 +451,4 @@
 :host ::ng-deep .highlighted-entity-contract {
   color: #6b21a8;
   background: #f3e8ff;
-}
-
-.custom-textarea-scroll {
-  scrollbar-width: thin;
-  scrollbar-color: #cbd5e1 #f1f5f9;
-}
-
-.custom-textarea-scroll::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-  -webkit-appearance: none;
-}
-
-.custom-textarea-scroll::-webkit-scrollbar-track {
-  background: #f1f5f9;
-  border-radius: 10px;
-}
-
-.custom-textarea-scroll::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 10px;
-}
-
-.custom-textarea-scroll::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
-}
-
-.custom-textarea-scroll::-webkit-scrollbar-button,
-.custom-textarea-scroll::-webkit-scrollbar-button:single-button {
-  display: none;
-  width: 0;
-  height: 0;
-  background: transparent;
 }

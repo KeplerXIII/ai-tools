@@ -56,14 +56,23 @@
       <h4 class="entity-row-title">Упоминания образцов ВВТ:</h4>
       <div class="tags entity-tags-military">
         @if (isEditingEntitiesBlock) {
-          <div class="entity-add-wrapper">
+          <div
+            class="entity-add-wrapper"
+            [attr.data-active-entity-picker]="entityPickerOpen === 'military_equipment' ? '' : null"
+          >
             <button
               type="button"
               class="entity-add-chip"
-              [disabled]="loadingDocumentEntitiesMutation"
+              [disabled]="
+                loadingDocumentEntitiesMutation || entityPickerLoadingSection === 'military_equipment'
+              "
               (click)="toggleEntityPicker('military_equipment')"
             >
-              +
+              @if (entityPickerLoadingSection === 'military_equipment') {
+                <i class="pi pi-spinner pi-spin" aria-hidden="true"></i>
+              } @else {
+                <i class="pi pi-plus" aria-hidden="true"></i>
+              }
             </button>
 
             @if (entityPickerOpen === 'military_equipment') {
@@ -71,6 +80,7 @@
                 <p-select
                   #entityPickerSelect
                   class="entity-picker-select"
+                  panelStyleClass="entity-picker-select-panel--light"
                   [options]="entityPickerCatalogItems"
                   [(ngModel)]="selectedEntityPickerItem"
                   optionLabel="name"
@@ -80,6 +90,7 @@
                   [disabled]="loadingDocumentEntitiesMutation"
                   appendTo="body"
                   (ngModelChange)="onEntityPickerSelect($event)"
+                  (onHide)="onEntityPickerOverlayHide()"
                 />
               </div>
             }
@@ -103,20 +114,30 @@
       <h4 class="entity-row-title">Производители:</h4>
       <div class="tags entity-tags-manufacturer">
         @if (isEditingEntitiesBlock) {
-          <div class="entity-add-wrapper">
+          <div
+            class="entity-add-wrapper"
+            [attr.data-active-entity-picker]="entityPickerOpen === 'manufacturers' ? '' : null"
+          >
             <button
               type="button"
               class="entity-add-chip"
-              [disabled]="loadingDocumentEntitiesMutation"
+              [disabled]="
+                loadingDocumentEntitiesMutation || entityPickerLoadingSection === 'manufacturers'
+              "
               (click)="toggleEntityPicker('manufacturers')"
             >
-              +
+              @if (entityPickerLoadingSection === 'manufacturers') {
+                <i class="pi pi-spinner pi-spin" aria-hidden="true"></i>
+              } @else {
+                <i class="pi pi-plus" aria-hidden="true"></i>
+              }
             </button>
             @if (entityPickerOpen === 'manufacturers') {
               <div class="entity-picker-popover">
                 <p-select
                   #entityPickerSelect
                   class="entity-picker-select"
+                  panelStyleClass="entity-picker-select-panel--light"
                   [options]="entityPickerCatalogItems"
                   [(ngModel)]="selectedEntityPickerItem"
                   optionLabel="name"
@@ -126,6 +147,7 @@
                   [disabled]="loadingDocumentEntitiesMutation"
                   appendTo="body"
                   (ngModelChange)="onEntityPickerSelect($event)"
+                  (onHide)="onEntityPickerOverlayHide()"
                 />
               </div>
             }
@@ -148,20 +170,30 @@
       <h4 class="entity-row-title">Контракты:</h4>
       <div class="tags entity-tags-contract">
         @if (isEditingEntitiesBlock) {
-          <div class="entity-add-wrapper">
+          <div
+            class="entity-add-wrapper"
+            [attr.data-active-entity-picker]="entityPickerOpen === 'contracts' ? '' : null"
+          >
             <button
               type="button"
               class="entity-add-chip"
-              [disabled]="loadingDocumentEntitiesMutation"
+              [disabled]="
+                loadingDocumentEntitiesMutation || entityPickerLoadingSection === 'contracts'
+              "
               (click)="toggleEntityPicker('contracts')"
             >
-              +
+              @if (entityPickerLoadingSection === 'contracts') {
+                <i class="pi pi-spinner pi-spin" aria-hidden="true"></i>
+              } @else {
+                <i class="pi pi-plus" aria-hidden="true"></i>
+              }
             </button>
             @if (entityPickerOpen === 'contracts') {
               <div class="entity-picker-popover">
                 <p-select
                   #entityPickerSelect
                   class="entity-picker-select"
+                  panelStyleClass="entity-picker-select-panel--light"
                   [options]="entityPickerCatalogItems"
                   [(ngModel)]="selectedEntityPickerItem"
                   optionLabel="name"
@@ -171,6 +203,7 @@
                   [disabled]="loadingDocumentEntitiesMutation"
                   appendTo="body"
                   (ngModelChange)="onEntityPickerSelect($event)"
+                  (onHide)="onEntityPickerOverlayHide()"
                 />
               </div>
             }
@@ -207,19 +240,30 @@
       <h4 class="entity-row-title">Теги (оригинал):</h4>
       <div class="tags original">
         @if (isEditingEntitiesBlock) {
-          <div class="entity-add-wrapper">
+          <div
+            class="entity-add-wrapper"
+            [attr.data-active-tag-picker]="tagPickerOpen === 'original' ? '' : null"
+          >
             <button
               type="button"
               class="entity-add-chip"
-              [disabled]="loadingDocumentTagsMutation"
+              [disabled]="
+                loadingDocumentTagsMutation || tagPickerLoadingScope === 'original'
+              "
               (click)="toggleTagPicker('original')"
             >
-              +
+              @if (tagPickerLoadingScope === 'original') {
+                <i class="pi pi-spinner pi-spin" aria-hidden="true"></i>
+              } @else {
+                <i class="pi pi-plus" aria-hidden="true"></i>
+              }
             </button>
             @if (tagPickerOpen === 'original') {
               <div class="entity-picker-popover">
                 <p-select
+                  #tagPickerSelect
                   class="entity-picker-select"
+                  panelStyleClass="entity-picker-select-panel--light"
                   [options]="tagPickerCatalogItems"
                   [(ngModel)]="selectedTagPickerItem"
                   optionLabel="name"
@@ -229,6 +273,7 @@
                   [disabled]="loadingDocumentTagsMutation"
                   appendTo="body"
                   (ngModelChange)="onTagPickerSelect($event)"
+                  (onHide)="onTagPickerOverlayHide()"
                 />
               </div>
             }
@@ -266,19 +311,30 @@
       <h4 class="entity-row-title">Теги (русский):</h4>
       <div class="tags translated">
         @if (isEditingEntitiesBlock) {
-          <div class="entity-add-wrapper">
+          <div
+            class="entity-add-wrapper"
+            [attr.data-active-tag-picker]="tagPickerOpen === 'translated' ? '' : null"
+          >
             <button
               type="button"
               class="entity-add-chip"
-              [disabled]="loadingDocumentTagsMutation"
+              [disabled]="
+                loadingDocumentTagsMutation || tagPickerLoadingScope === 'translated'
+              "
               (click)="toggleTagPicker('translated')"
             >
-              +
+              @if (tagPickerLoadingScope === 'translated') {
+                <i class="pi pi-spinner pi-spin" aria-hidden="true"></i>
+              } @else {
+                <i class="pi pi-plus" aria-hidden="true"></i>
+              }
             </button>
             @if (tagPickerOpen === 'translated') {
               <div class="entity-picker-popover">
                 <p-select
+                  #tagPickerSelect
                   class="entity-picker-select"
+                  panelStyleClass="entity-picker-select-panel--light"
                   [options]="tagPickerCatalogItems"
                   [(ngModel)]="selectedTagPickerItem"
                   optionLabel="name"
@@ -288,6 +344,7 @@
                   [disabled]="loadingDocumentTagsMutation"
                   appendTo="body"
                   (ngModelChange)="onTagPickerSelect($event)"
+                  (onHide)="onTagPickerOverlayHide()"
                 />
               </div>
             }

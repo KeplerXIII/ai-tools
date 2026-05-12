@@ -11,7 +11,6 @@ import {
   ViewChild,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { forkJoin } from 'rxjs';
 import { ChipModule } from 'primeng/chip';
 import { SkeletonModule } from 'primeng/skeleton';
 import {
@@ -65,7 +64,7 @@ export class ArticleParserCategoriesComponent implements OnChanges, OnDestroy {
   isEditingCategoriesBlock = false;
 
   categoryTreeNodes: TreeNode<DocumentCategoryCatalogRef>[] = [];
-  selectedCategoryNodes: TreeNode<DocumentCategoryCatalogRef>[] = [];
+  selectedCategoryNode: TreeNode<DocumentCategoryCatalogRef> | null = null;
 
   constructor(
     private api: ArticleParserApi,
@@ -140,6 +139,15 @@ export class ArticleParserCategoriesComponent implements OnChanges, OnDestroy {
     });
   }
 
+  categoryParentLabel(cat: DocumentCategoryRef): string {
+    // Не показываем самый верхний доменный узел (например, "Оборона и безопасность")
+    // для категорий верхнего рабочего уровня.
+    if (Number(cat.level || 0) <= 2) {
+      return '';
+    }
+    return (cat.parent_name_ru || cat.parent_name || cat.parent_code || '').trim();
+  }
+
   categoryChipLabel(cat: DocumentCategoryRef): string {
     const title = (cat.name_ru || cat.name || cat.code).trim();
     const confPct =
@@ -195,6 +203,33 @@ export class ArticleParserCategoriesComponent implements OnChanges, OnDestroy {
       });
     }
 
+    // Иногда API может прислать дочерние узлы без полного набора родительских записей.
+    // Создаём минимальные placeholder-узлы родителей, чтобы не терять иерархию.
+    for (const item of items) {
+      const parentId = item.parent_id ? String(item.parent_id) : '';
+      if (!parentId || byId.has(parentId)) {
+        continue;
+      }
+
+      const parentLabel = item.parent_name_ru || item.parent_name || item.parent_code || parentId;
+      byId.set(parentId, {
+        key: parentId,
+        label: parentLabel,
+        data: {
+          category_id: parentId,
+          code: item.parent_code || parentId,
+          name: item.parent_name || parentLabel,
+          name_ru: item.parent_name_ru || parentLabel,
+          level: Math.max(1, Number(item.level || 1) - 1),
+          parent_id: null,
+          parent_code: null,
+          parent_name: null,
+          parent_name_ru: null,
+        },
+        children: [],
+      });
+    }
+
     for (const item of items) {
       const node = byId.get(String(item.category_id));
       if (!node) {
@@ -220,43 +255,63 @@ export class ArticleParserCategoriesComponent implements OnChanges, OnDestroy {
     };
 
     sortTree(roots);
-    return roots;
+    return this.hoistTopLevelBranches(roots);
+  }
+
+  /**
+   * Корневые узлы-домены (например «Оборона и безопасность») не выбираем:
+   * в выпадающем списке показываем сразу их дочерние узлы как верхний уровень.
+   */
+  private hoistTopLevelBranches(
+    roots: TreeNode<DocumentCategoryCatalogRef>[],
+  ): TreeNode<DocumentCategoryCatalogRef>[] {
+    const merged = roots.flatMap((node) => {
+      const level = Number(node.data?.level || 0);
+      const isDomainTopLevel = level <= 1;
+      if (isDomainTopLevel && node.children?.length) {
+        return node.children;
+      }
+      return [node];
+    });
+    merged.sort((a, b) => String(a.label || '').localeCompare(String(b.label || '')));
+    return merged;
   }
 
   onCategoryTreeSelectChange(
-    value: TreeNode<DocumentCategoryCatalogRef>[] | null,
+    value: TreeNode<DocumentCategoryCatalogRef> | null,
   ): void {
-    this.selectedCategoryNodes = value ?? [];
-  }
+    this.selectedCategoryNode = value ?? null;
 
-  onCategoryTreeHide(): void {
     const docId = this.article?.document_id;
-    if (!docId || this.loadingDocumentCategoriesMutation) {
+    if (!value || !docId || this.loadingDocumentCategoriesMutation) {
       return;
     }
 
-    const selectedIds = new Set(
-      (this.selectedCategoryNodes || [])
-        .map((node) => String(node?.key || node?.data?.category_id || ''))
-        .filter(Boolean),
-    );
-    const existingIds = new Set((this.state.categories || []).map((cat) => String(cat.category_id)));
+    const id = String(value.key ?? value.data?.category_id ?? '');
+    if (!id) {
+      return;
+    }
 
-    const idsToAdd = [...selectedIds].filter((id) => !existingIds.has(id));
-    if (!idsToAdd.length) {
+    const existingIds = new Set((this.state.categories || []).map((cat) => String(cat.category_id)));
+    if (existingIds.has(id)) {
+      queueMicrotask(() => {
+        this.selectedCategoryNode = null;
+        this.cdr.detectChanges();
+      });
       return;
     }
 
     this.loadingDocumentCategoriesMutation = true;
     this.categoriesError = '';
 
-    forkJoin(idsToAdd.map((id) => this.api.assignDocumentCategory(docId, id))).subscribe({
+    this.api.assignDocumentCategory(docId, id).subscribe({
       next: () => {
         this.refreshDocumentCategoriesFromServer(docId, true);
       },
       error: () => {
-        this.categoriesError = 'Не удалось добавить категории';
+        this.categoriesError = 'Не удалось добавить категорию';
         this.loadingDocumentCategoriesMutation = false;
+        this.selectedCategoryNode = null;
       },
     });
   }
@@ -282,7 +337,7 @@ export class ArticleParserCategoriesComponent implements OnChanges, OnDestroy {
 
     this.api.assignDocumentCategory(docId, item.category_id).subscribe({
       next: () => {
-        this.selectedCategoryNodes = [];
+        this.selectedCategoryNode = null;
         this.refreshDocumentCategoriesFromServer(docId);
       },
       error: () => {
@@ -297,7 +352,7 @@ export class ArticleParserCategoriesComponent implements OnChanges, OnDestroy {
       next: (res) => {
         this.state.categories = res.categories || [];
         if (resetTreeSelect) {
-          this.selectedCategoryNodes = [];
+          this.selectedCategoryNode = null;
         } else {
           this.syncSelectedNodesFromAssignedCategories();
         }
@@ -335,15 +390,12 @@ export class ArticleParserCategoriesComponent implements OnChanges, OnDestroy {
     this.categoryPickerSearch = '';
     this.categoryPickerCatalogItems = [];
     this.categoryTreeNodes = [];
-    this.selectedCategoryNodes = [];
+    this.selectedCategoryNode = null;
     this.loadingCategoryPickerCatalog = false;
   }
 
   private syncSelectedNodesFromAssignedCategories(): void {
-    const selectedIds = new Set((this.state.categories || []).map((cat) => String(cat.category_id)));
-    this.selectedCategoryNodes = this.categoryTreeNodes.filter((node) =>
-      selectedIds.has(String(node.key || node.data?.category_id)),
-    );
+    this.selectedCategoryNode = null;
   }
 
   categoryKnobValue(cat: DocumentCategoryRef): number {
