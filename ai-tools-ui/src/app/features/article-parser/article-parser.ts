@@ -1,4 +1,4 @@
-import { ChangeDetectorRef, Component, DestroyRef, OnInit, ViewChild } from '@angular/core';
+import { ChangeDetectorRef, Component, DestroyRef, NgZone, OnInit, ViewChild } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -72,6 +72,7 @@ export class ArticleParser implements OnInit {
     private api: ArticleParserApi,
     public state: ArticleParserState,
     private cdr: ChangeDetectorRef,
+    private ngZone: NgZone,
     private route: ActivatedRoute,
     private destroyRef: DestroyRef,
   ) {}
@@ -162,15 +163,20 @@ export class ArticleParser implements OnInit {
 
     this.api.translateToRussianStream(this.state.article.document_id).subscribe({
       next: (chunk) => {
-        this.state.translatedText += chunk;
-        this.cdr.detectChanges();
+        this.ngZone.run(() => {
+          this.state.translatedText += chunk;
+        });
       },
       error: () => {
-        this.translationError = 'Ошибка при потоковом переводе статьи';
-        this.loadingTranslation = false;
+        this.ngZone.run(() => {
+          this.translationError = 'Ошибка при потоковом переводе статьи';
+          this.loadingTranslation = false;
+        });
       },
       complete: () => {
-        this.loadingTranslation = false;
+        this.ngZone.run(() => {
+          this.loadingTranslation = false;
+        });
       },
     });
   }
@@ -187,17 +193,20 @@ export class ArticleParser implements OnInit {
 
     this.api.summarizeStream(this.state.article.document_id, 'translated').subscribe({
       next: (chunk) => {
-        this.state.annotation += chunk;
-        this.cdr.detectChanges();
+        this.ngZone.run(() => {
+          this.state.annotation += chunk;
+        });
       },
       error: () => {
-        this.summaryError = 'Ошибка при потоковом формировании аннотации';
-        this.loadingSummary = false;
-        this.cdr.detectChanges();
+        this.ngZone.run(() => {
+          this.summaryError = 'Ошибка при потоковом формировании аннотации';
+          this.loadingSummary = false;
+        });
       },
       complete: () => {
-        this.loadingSummary = false;
-        this.cdr.detectChanges();
+        this.ngZone.run(() => {
+          this.loadingSummary = false;
+        });
       },
     });
   }

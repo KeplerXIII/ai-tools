@@ -39,7 +39,7 @@
           name="annotation"
           class="full-width custom-textarea-scroll no-print-textarea"
           [(ngModel)]="state.annotation"
-          [disabled]="!isEditingAnnotationBlock"
+          [readOnly]="!isEditingAnnotationBlock"
           rows="6"
           placeholder="Аннотация доступна после перевода"
           style="resize: none"

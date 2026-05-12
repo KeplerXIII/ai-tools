@@ -73,7 +73,7 @@
           name="translated_text"
           class="full-width custom-textarea-scroll no-print-textarea"
           [(ngModel)]="state.translatedText"
-          [disabled]="!isEditingTranslationBlock"
+          [readOnly]="!isEditingTranslationBlock"
           rows="8"
           placeholder="Здесь появится перевод"
           style="resize: none"
