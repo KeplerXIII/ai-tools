@@ -1,0 +1,50 @@
+@if (state.annotation.trim() || loadingSummary) {
+  <section class="panel full print-annotation-after-tags">
+    <div class="title-wrapper annotation-title-row">
+      <h3 class="panel-title">Аннотация</h3>
+
+      <button
+        type="button"
+        class="block-edit-toggle no-print-field"
+        [class.block-edit-toggle--active]="isEditingAnnotationBlock"
+        [attr.aria-pressed]="isEditingAnnotationBlock"
+        [attr.aria-label]="
+          isEditingAnnotationBlock ? 'Завершить редактирование блока' : 'Редактировать блок'
+        "
+        (click)="toggleAnnotationEdit()"
+      >
+        <i
+          class="pi"
+          [class.pi-pen-to-square]="!isEditingAnnotationBlock"
+          [class.pi-check-square]="isEditingAnnotationBlock"
+        ></i>
+      </button>
+    </div>
+
+    @if (loadingSummary && !state.annotation) {
+      <div #annotationSkeleton class="sceleton-translate-text">
+        <p-skeleton height="1rem" borderRadius="12px" />
+        <p-skeleton height="1rem" borderRadius="12px" />
+        <p-skeleton height="1rem" borderRadius="12px" />
+        <p-skeleton height="1rem" borderRadius="12px" />
+        <p-skeleton height="1rem" borderRadius="12px" />
+      </div>
+    }
+    @if (state.annotation) {
+      <div class="print-text-block">{{ state.annotation }}</div>
+      <p-floatlabel variant="on" class="prime-field full-width textarea-field no-print-field">
+        <textarea
+          pTextarea
+          id="annotation"
+          name="annotation"
+          class="full-width custom-textarea-scroll no-print-textarea"
+          [(ngModel)]="state.annotation"
+          [disabled]="!isEditingAnnotationBlock"
+          rows="6"
+          placeholder="Аннотация доступна после перевода"
+          style="resize: none"
+        ></textarea>
+      </p-floatlabel>
+    }
+  </section>
+}

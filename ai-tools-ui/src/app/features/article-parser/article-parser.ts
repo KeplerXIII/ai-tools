@@ -1,16 +1,12 @@
-import { ChangeDetectorRef, Component, DestroyRef, ElementRef, OnInit, ViewChild } from '@angular/core';
+import { ChangeDetectorRef, Component, DestroyRef, OnInit, ViewChild } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { FloatLabelModule } from 'primeng/floatlabel';
 import { InputTextModule } from 'primeng/inputtext';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
-import { SkeletonModule } from 'primeng/skeleton';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { TextareaModule } from 'primeng/textarea';
 import { ArticleParserUrlFormComponent } from './ui/article-parser-url-form/article-parser-url-form';
 import { ArticleParserStatusComponent } from './ui/article-parser-status/article-parser-status';
 import { ArticleParserMetaComponent } from './ui/article-parser-meta/article-parser-meta';
@@ -18,14 +14,14 @@ import { ArticleParserCategoriesComponent } from './ui/article-parser-categories
 import { ArticleParserEntitiesComponent } from './ui/article-parser-entities/article-parser-entities';
 import { ArticleParserOriginalTextComponent } from './ui/article-parser-original-text/article-parser-original-text';
 import { ArticleParserTranslationComponent } from './ui/article-parser-translation/article-parser-translation';
+import { ArticleParserAnnotationComponent } from './ui/article-parser-annotation/article-parser-annotation';
+import { ArticleParserArticleLoadingComponent } from './ui/article-parser-article-loading/article-parser-article-loading';
 import {
   ArticleParserApi,
   DocumentTagsResponse,
 } from './api/article-parser-api';
 import { ArticleParserState } from './model/article-parser-state';
 import { scrollToElement } from './lib/scroll-to-element';
-
-export type ArticleParserBlock = 'annotation';
 
 @Component({
   selector: 'app-article-parser',
@@ -35,8 +31,6 @@ export type ArticleParserBlock = 'annotation';
     MatCardModule,
     MatFormFieldModule,
     MatInputModule,
-    MatProgressSpinnerModule,
-    FloatLabelModule,
     InputTextModule,
     ArticleParserUrlFormComponent,
     ArticleParserStatusComponent,
@@ -45,18 +39,19 @@ export type ArticleParserBlock = 'annotation';
     ArticleParserEntitiesComponent,
     ArticleParserOriginalTextComponent,
     ArticleParserTranslationComponent,
-    SkeletonModule,
-    TextareaModule,
+    ArticleParserAnnotationComponent,
+    ArticleParserArticleLoadingComponent,
   ],
   templateUrl: './article-parser.html',
   styleUrl: './article-parser.scss',
 })
 export class ArticleParser implements OnInit {
-  @ViewChild('annotationSkeleton') annotationSkeleton?: ElementRef;
   @ViewChild(ArticleParserOriginalTextComponent)
   originalTextComponent?: ArticleParserOriginalTextComponent;
   @ViewChild(ArticleParserTranslationComponent)
   translationComponent?: ArticleParserTranslationComponent;
+  @ViewChild(ArticleParserAnnotationComponent)
+  annotationComponent?: ArticleParserAnnotationComponent;
   loadingArticle = false;
   loadingEntitiesSection = false;
   loadingCategories = false;
@@ -69,8 +64,6 @@ export class ArticleParser implements OnInit {
   translationError = '';
   translatedTagsError = '';
   summaryError = '';
-
-  isEditingAnnotationBlock = false;
 
   private buffer = '';
   private lastAutoloadKey = '';
@@ -190,7 +183,7 @@ export class ArticleParser implements OnInit {
     this.state.annotation = '';
     this.buffer = '';
 
-    scrollToElement(() => this.annotationSkeleton, this.cdr);
+    scrollToElement(() => this.annotationComponent?.annotationSkeleton, this.cdr);
 
     this.api.summarizeStream(this.state.article.document_id, 'translated').subscribe({
       next: (chunk) => {
@@ -261,52 +254,13 @@ export class ArticleParser implements OnInit {
   // =========================
 
   // =========================
-  // РЕДАКТИРОВАНИЕ
+  // РЕДАКТИРОВАНИЕ (блоки в дочерних компонентах)
   // =========================
-
-  toggleBlockEdit(block: ArticleParserBlock): void {
-    if (block !== 'annotation') {
-      return;
-    }
-    if (!this.isEditingAnnotationBlock) {
-      const docId = this.state.article?.document_id;
-      if (docId) {
-        this.state.error = '';
-        this.api.lockDocument(docId).subscribe({
-          error: () => {
-            this.state.error = 'Не удалось заблокировать документ для редактирования';
-            this.cdr.detectChanges();
-          },
-        });
-      }
-    }
-    this.isEditingAnnotationBlock = !this.isEditingAnnotationBlock;
-    if (!this.isEditingAnnotationBlock) {
-      const docId = this.state.article?.document_id;
-      if (docId) {
-        const hasTranslation = !!this.state.translatedText?.trim();
-        this.state.error = '';
-        this.api
-          .saveDocument(
-            docId,
-            hasTranslation
-              ? { translated_summary: this.state.annotation ?? '' }
-              : { original_summary: this.state.annotation ?? '' },
-          )
-          .subscribe({
-            error: () => {
-              this.state.error = 'Не удалось сохранить аннотацию';
-              this.cdr.detectChanges();
-            },
-          });
-      }
-    }
-  }
 
   private resetBlockEditors(): void {
     this.originalTextComponent?.resetEdit();
     this.translationComponent?.resetTranslationEdit();
-    this.isEditingAnnotationBlock = false;
+    this.annotationComponent?.resetAnnotationEdit();
   }
 
   private reloadTagsFromServer(kind: 'original' | 'translated'): void {

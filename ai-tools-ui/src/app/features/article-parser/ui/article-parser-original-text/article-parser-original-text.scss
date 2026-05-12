@@ -117,6 +117,8 @@
   display: flex;
   gap: 10px;
   align-items: center;
+  border-right: 1px solid var(--light-grey-text-color);
+  padding-right: 10px;
 }
 
 .teg-btn-wrapper,

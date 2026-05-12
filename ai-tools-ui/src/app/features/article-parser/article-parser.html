@@ -16,53 +16,7 @@
   }
 
   @if (loadingArticle) {
-    <div class="article-grid">
-      <section class="panel meta-panel">
-        <div class="meta-wrapper">
-          <div class="title-wrapper">
-            <p-skeleton width="12rem" height="1.5rem" borderRadius="12px" />
-          </div>
-
-          <div class="meta-list">
-            <div class="meta-block-one">
-              <p-skeleton height="1rem" borderRadius="12px" />
-              <p-skeleton height="1rem" borderRadius="12px" />
-              <p-skeleton height="1rem" borderRadius="12px" />
-              <p-skeleton height="1rem" borderRadius="12px" />
-              <p-skeleton height="1rem" borderRadius="12px" />
-              <p-skeleton height="1rem" borderRadius="12px" />
-              <p-skeleton height="1rem" borderRadius="12px" />
-            </div>
-          </div>
-        </div>
-
-        <div class="prew-image-block">
-          <p-skeleton width="12rem" height="1.5rem" borderRadius="12px" />
-          <p-skeleton width="31rem" height="20rem" borderRadius="16px" />
-        </div>
-      </section>
-    </div>
-
-    <section class="panel full">
-      <div class="title-wrapper">
-        <p-skeleton width="12rem" height="1.5rem" borderRadius="12px" />
-
-        <div class="translate-teg-btn">
-          <p-skeleton width="12rem" height="2.5rem" borderRadius="20px" />
-          <p-skeleton width="12rem" height="2.5rem" borderRadius="20px" />
-        </div>
-      </div>
-
-      <div class="sceleton-translate-text">
-        <p-skeleton height="1rem" borderRadius="12px" />
-        <p-skeleton height="1rem" borderRadius="12px" />
-        <p-skeleton height="1rem" borderRadius="12px" />
-        <p-skeleton height="1rem" borderRadius="12px" />
-        <p-skeleton height="1rem" borderRadius="12px" />
-        <p-skeleton height="1rem" borderRadius="12px" />
-        <p-skeleton height="1rem" borderRadius="12px" />
-      </div>
-    </section>
+    <app-article-parser-article-loading />
   }
 
   @if (state.article) {
@@ -100,55 +54,6 @@
       (summarizeArticle)="summarizeArticle()"
     />
 
-    @if (state.annotation.trim() || loadingSummary) {
-      <section class="panel full print-annotation-after-tags">
-        <div class="title-wrapper annotation-title-row">
-          <h3 class="panel-title">Аннотация</h3>
-
-          <button
-            type="button"
-            class="block-edit-toggle no-print-field"
-            [class.block-edit-toggle--active]="isEditingAnnotationBlock"
-            [attr.aria-pressed]="isEditingAnnotationBlock"
-            [attr.aria-label]="
-              isEditingAnnotationBlock ? 'Завершить редактирование блока' : 'Редактировать блок'
-            "
-            (click)="toggleBlockEdit('annotation')"
-          >
-            <i
-              class="pi"
-              [class.pi-pencil]="!isEditingAnnotationBlock"
-              [class.pi-check]="isEditingAnnotationBlock"
-            ></i>
-          </button>
-        </div>
-
-        @if (loadingSummary && !state.annotation) {
-          <div #annotationSkeleton class="sceleton-translate-text">
-            <p-skeleton height="1rem" borderRadius="12px" />
-            <p-skeleton height="1rem" borderRadius="12px" />
-            <p-skeleton height="1rem" borderRadius="12px" />
-            <p-skeleton height="1rem" borderRadius="12px" />
-            <p-skeleton height="1rem" borderRadius="12px" />
-          </div>
-        }
-        @if (state.annotation) {
-          <div class="print-text-block">{{ state.annotation }}</div>
-          <p-floatlabel variant="on" class="prime-field full-width textarea-field no-print-field">
-            <textarea
-              pTextarea
-              id="annotation"
-              name="annotation"
-              class="full-width custom-textarea-scroll no-print-textarea"
-              [(ngModel)]="state.annotation"
-              [disabled]="!isEditingAnnotationBlock"
-              rows="6"
-              placeholder="Аннотация доступна после перевода"
-              style="resize: none"
-            ></textarea>
-          </p-floatlabel>
-        }
-      </section>
-    }
+    <app-article-parser-annotation [loadingSummary]="loadingSummary" />
   }
 </div>
