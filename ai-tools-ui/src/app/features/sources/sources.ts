@@ -1,11 +1,15 @@
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, OnInit } from '@angular/core';
+import { ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { finalize, switchMap, tap } from 'rxjs/operators';
+import { Subscription } from 'rxjs';
 import { DocumentTypeCatalogItem, DocumentsApi } from '../documents/documents-api';
 import {
   CountryCatalogItem,
   LanguageCatalogItem,
+  ParseSourceRunResponse,
+  ParseSourceRunSnapshotPayload,
   SourceCreateRequestBody,
   SourceListItem,
   SourcesApi,
@@ -20,7 +24,7 @@ type SortMode = 'created_desc' | 'created_asc' | 'user_asc';
   templateUrl: './sources.html',
   styleUrl: './sources.scss',
 })
-export class Sources implements OnInit {
+export class Sources implements OnInit, OnDestroy {
   items: SourceListItem[] = [];
   canFilterByAllUsers = false;
   listLoading = false;
@@ -55,10 +59,18 @@ export class Sources implements OnInit {
   lastParsedSourceId: string | null = null;
   parseFeedback = '';
   parseError = '';
+  private parseStreamSub: Subscription | null = null;
+  /** Текущий открытый SSE по ``parse_run_id`` (чтобы не дублировать подписку после ``loadSources``). */
+  private attachedParseRunId: string | null = null;
+
+  /** Чтобы после возврата на страницу снова показывались блок статистики и итог разбора. */
+  private readonly storageExpandedKey = 'ai-tools.sources.expandedSourceId';
+  private readonly storageParseUiKey = 'ai-tools.sources.lastParseUi';
 
   constructor(
     private readonly sourcesApi: SourcesApi,
     private readonly documentsApi: DocumentsApi,
+    private readonly cdr: ChangeDetectorRef,
   ) {}
 
   toggleCreateSection(): void {
@@ -70,6 +82,12 @@ export class Sources implements OnInit {
     this.loadCountriesCatalog();
     this.loadDocumentTypesCatalog();
     this.loadSources();
+  }
+
+  ngOnDestroy(): void {
+    this.parseStreamSub?.unsubscribe();
+    this.parseStreamSub = null;
+    this.attachedParseRunId = null;
   }
 
   loadDocumentTypesCatalog(): void {
@@ -152,13 +170,19 @@ export class Sources implements OnInit {
     this.formLanguageCode = en ? en.code : this.languagesCatalog[0].code;
   }
 
-  loadSources(): void {
-    this.listLoading = true;
+  loadSources(options?: { silent?: boolean }): void {
+    const silent = options?.silent ?? false;
+    if (!silent) {
+      this.listLoading = true;
+    }
     this.listError = '';
     this.sourcesApi.listSources().subscribe({
       next: (response) => {
         this.items = response.items;
         this.canFilterByAllUsers = response.can_filter_by_all_users;
+        this.applyExpandedFromStorage();
+        this.applyParseUiFromStorage();
+        this.reconcileActiveParseStreamsAfterListLoad();
         this.listLoading = false;
       },
       error: () => {
@@ -283,34 +307,225 @@ export class Sources implements OnInit {
     return 'Не удалось создать источник';
   }
 
+  private applyExpandedFromStorage(): void {
+    const stored = sessionStorage.getItem(this.storageExpandedKey);
+    if (!stored) {
+      return;
+    }
+    if (this.items.some((i) => i.source_id === stored)) {
+      this.expandedSourceId = stored;
+    } else {
+      sessionStorage.removeItem(this.storageExpandedKey);
+    }
+  }
+
+  private applyParseUiFromStorage(): void {
+    const raw = sessionStorage.getItem(this.storageParseUiKey);
+    if (!raw) {
+      return;
+    }
+    try {
+      const o = JSON.parse(raw) as {
+        sourceId: string;
+        feedback: string;
+        error: string;
+        status: string;
+      };
+      if (o.status !== 'completed' && o.status !== 'failed') {
+        return;
+      }
+      if (!this.items.some((i) => i.source_id === o.sourceId)) {
+        return;
+      }
+      this.lastParsedSourceId = o.sourceId;
+      this.parseFeedback = o.feedback ?? '';
+      this.parseError = o.error ?? '';
+    } catch {
+      sessionStorage.removeItem(this.storageParseUiKey);
+    }
+  }
+
+  private persistParseUiSnapshot(sourceId: string, status: string): void {
+    if (status !== 'completed' && status !== 'failed') {
+      return;
+    }
+    sessionStorage.setItem(
+      this.storageParseUiKey,
+      JSON.stringify({
+        sourceId,
+        feedback: this.parseFeedback,
+        error: this.parseError,
+        status,
+      }),
+    );
+  }
+
+  private formatParseProgress(
+    snap: Pick<ParseSourceRunSnapshotPayload, 'status' | 'phase' | 'found_total' | 'created_total'>,
+  ): string {
+    if (snap.status === 'failed') {
+      return 'Ошибка разбора';
+    }
+    if (snap.status === 'completed') {
+      return `Готово: ссылок ${snap.found_total ?? 0}, новых документов ${snap.created_total ?? 0}`;
+    }
+    const ph = snap.phase || '';
+    const found = snap.found_total;
+    const phaseLabels: Record<string, string> = {
+      queued: 'В очереди на воркер…',
+      discovery: 'Поиск страниц и RSS…',
+      extract:
+        found != null
+          ? `Загрузка и извлечение текста (найдено ссылок: ${found})…`
+          : 'Загрузка и извлечение текста…',
+      save: 'Сохранение документов в базу…',
+      complete: 'Завершение…',
+    };
+    return phaseLabels[ph] || `Статус: ${snap.status}`;
+  }
+
+  private applySnapToParseUi(sourceId: string, snap: ParseSourceRunResponse | ParseSourceRunSnapshotPayload): void {
+    this.lastParsedSourceId = sourceId;
+    this.parseFeedback = this.formatParseProgress(snap);
+    if (snap.status === 'failed') {
+      this.parseError = snap.error_message || 'Разбор завершился с ошибкой';
+    } else {
+      this.parseError = '';
+    }
+  }
+
+  private handleParseStreamSnapshot(sourceId: string, snap: ParseSourceRunSnapshotPayload): void {
+    this.applySnapToParseUi(sourceId, snap);
+    if (snap.status === 'completed' || snap.status === 'failed') {
+      this.attachedParseRunId = null;
+      this.persistParseUiSnapshot(sourceId, snap.status);
+    }
+  }
+
+  private onParseStreamFinalize(sourceId: string): void {
+    this.parsingSourceId = null;
+    this.lastParsedSourceId = sourceId;
+    this.loadSources({ silent: true });
+    this.cdr.markForCheck();
+  }
+
+  private onParseStreamError(err: unknown): void {
+    this.parseError =
+      err instanceof HttpErrorResponse ? this.formatParseError(err) : 'Поток разбора прерван';
+    this.parseFeedback = '';
+  }
+
+  /** После загрузки списка: подтянуть из БД незавершённые разборы и снова открыть SSE. */
+  private reconcileActiveParseStreamsAfterListLoad(): void {
+    this.sourcesApi.listActiveSourceParseRuns().subscribe({
+      next: (resp) => {
+        const visible = resp.items.filter((row) => this.items.some((s) => s.source_id === row.source_id));
+        if (!visible.length) {
+          return;
+        }
+        const expanded = this.expandedSourceId;
+        const pick =
+          (expanded ? visible.find((i) => i.source_id === expanded) : undefined) ?? visible[0];
+        this.subscribeParseRunStreamIfNeeded(pick.source_id, pick.parse_run);
+      },
+      error: () => {
+        /* не блокируем список источников */
+      },
+    });
+  }
+
+  /**
+   * Подписка на SSE по данным с сервера (без sessionStorage).
+   * Если снимок уже терминальный — только обновляем UI.
+   */
+  private subscribeParseRunStreamIfNeeded(sourceId: string, initial: ParseSourceRunResponse): void {
+    const parseRunId = String(initial.parse_run_id);
+    if (
+      this.attachedParseRunId === parseRunId &&
+      this.parseStreamSub !== null &&
+      !this.parseStreamSub.closed
+    ) {
+      return;
+    }
+    this.parseStreamSub?.unsubscribe();
+    this.parseStreamSub = null;
+
+    if (initial.status === 'completed' || initial.status === 'failed') {
+      this.applySnapToParseUi(sourceId, initial);
+      this.persistParseUiSnapshot(sourceId, initial.status);
+      this.parsingSourceId = null;
+      this.lastParsedSourceId = sourceId;
+      this.attachedParseRunId = null;
+      this.loadSources({ silent: true });
+      this.cdr.markForCheck();
+      return;
+    }
+
+    this.applySnapToParseUi(sourceId, initial);
+    this.parsingSourceId = sourceId;
+    this.attachedParseRunId = parseRunId;
+
+    this.parseStreamSub = this.sourcesApi.streamParseRun(parseRunId).pipe(
+      finalize(() => {
+        this.attachedParseRunId = null;
+        this.onParseStreamFinalize(sourceId);
+      }),
+    ).subscribe({
+      next: (snap) => {
+        this.handleParseStreamSnapshot(sourceId, snap);
+        this.cdr.markForCheck();
+      },
+      error: (err) => {
+        this.attachedParseRunId = null;
+        this.onParseStreamError(err);
+        this.cdr.markForCheck();
+      },
+    });
+  }
+
   runParse(src: SourceListItem): void {
     if (!src.is_active) {
       return;
     }
+    this.parseStreamSub?.unsubscribe();
+    this.parseStreamSub = null;
+    this.attachedParseRunId = null;
     this.parseError = '';
     this.parseFeedback = '';
     this.lastParsedSourceId = null;
+    sessionStorage.removeItem(this.storageParseUiKey);
     const days = Math.min(30, Math.max(1, Math.floor(Number(this.parseDays)) || 3));
     this.parseDays = days;
     this.parsingSourceId = src.source_id;
-    this.sourcesApi
+    this.parseStreamSub = this.sourcesApi
       .parseSource({
         source_id: src.source_id,
         days,
         skip_undated: this.parseSkipUndated,
       })
+      .pipe(
+        tap((enq) => {
+          this.attachedParseRunId = enq.parse_run_id;
+        }),
+        switchMap((enq) =>
+          this.sourcesApi.streamParseRun(enq.parse_run_id).pipe(
+            finalize(() => this.onParseStreamFinalize(src.source_id)),
+          ),
+        ),
+        finalize(() => {
+          this.parsingSourceId = null;
+          this.cdr.markForCheck();
+        }),
+      )
       .subscribe({
-        next: (res) => {
-          this.parsingSourceId = null;
-          this.lastParsedSourceId = src.source_id;
-          this.parseError = '';
-          this.parseFeedback = `Обработано ссылок: ${res.found_total}, создано документов: ${res.created_total}`;
-          this.loadSources();
+        next: (snap) => {
+          this.handleParseStreamSnapshot(src.source_id, snap);
+          this.cdr.markForCheck();
         },
-        error: (err: HttpErrorResponse) => {
-          this.parsingSourceId = null;
-          this.lastParsedSourceId = src.source_id;
-          this.parseError = this.formatParseError(err);
+        error: (err: unknown) => {
+          this.attachedParseRunId = null;
+          this.onParseStreamError(err);
+          this.cdr.markForCheck();
         },
       });
   }
@@ -365,6 +580,11 @@ export class Sources implements OnInit {
 
   toggleExpand(sourceId: string): void {
     this.expandedSourceId = this.expandedSourceId === sourceId ? null : sourceId;
+    if (this.expandedSourceId) {
+      sessionStorage.setItem(this.storageExpandedKey, this.expandedSourceId);
+    } else {
+      sessionStorage.removeItem(this.storageExpandedKey);
+    }
   }
 
   isExpanded(sourceId: string): boolean {

@@ -1,19 +1,19 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import UTC, datetime, timedelta
-from typing import Any
+import json
+from datetime import UTC, datetime
+from typing import Literal, cast
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-
-from app.api.error_mapping import map_app_error
-from app.domain.errors import ValidationError
-from sqlalchemy import func, select, update
+from fastapi.responses import StreamingResponse
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError, NoResultFound
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_current_user_optional
+from app.core.config import settings
 from app.infrastructure.db.models import (
     Country,
     Document,
@@ -21,60 +21,38 @@ from app.infrastructure.db.models import (
     DocumentStatusAssignment,
     DocumentType,
     Language,
+    ProcessingJob,
     Source,
+    SourceParseRun,
     User,
 )
-from app.infrastructure.db.session import get_db
+from app.infrastructure.db.session import AsyncSessionLocal, get_db
 from app.schemas.parsing import (
+    ActiveParseRunItem,
+    ActiveParseRunsResponse,
     CountryCatalogItem,
     LanguageCatalogItem,
     ParseSourceDocumentItem,
+    ParseSourceEnqueueResponse,
     ParseSourceRequest,
-    ParseSourceResponse,
+    ParseSourceRunResponse,
     SourceCreateRequest,
     SourceCreateResponse,
     SourceListItem,
     SourceListResponse,
 )
 from app.services.documents.db_refs import document_type_id_by_code
-from app.services.documents.document_pipeline import (
-    _published_at_from_extract_date,
-    create_document_after_extract,
-    get_document_by_source_url,
-)
 from app.services.documents.url_norm import normalize_source_url
-from app.services.parsing.source_discovery import DiscoveredUrl, discover_source_news_urls
+from app.services.parsing.parse_source_runner import list_unprocessed_by_source
+from app.services.processing.jobs import JobStatus, JobType
+from app.services.processing.saq_queue import get_saq_parse_queue
 
 router = APIRouter(prefix="/parsing", tags=["parsing"])
-PARSE_SOURCE_MAX_CONCURRENCY = 3
-PARSE_SOURCE_REQUEST_DELAY_SEC = 0.35
 
 
-def _published_at_from_parse_extract(extract_payload: dict) -> datetime | None:
-    raw_date = extract_payload.get("date")
-    extracted_date: str | None = None
-    if raw_date is not None:
-        ds = str(raw_date).strip()
-        if ds:
-            extracted_date = ds[:128]
-    return _published_at_from_extract_date(extracted_date)
-
-
-def _final_published_at_for_parse(item: DiscoveredUrl, extract_payload: dict) -> datetime | None:
-    if item.published_at is not None:
-        pub = item.published_at
-        return pub if pub.tzinfo else pub.replace(tzinfo=UTC)
-    return _published_at_from_parse_extract(extract_payload)
-
-
-def _published_at_within_depth(final_published_at: datetime, *, threshold_utc: datetime) -> bool:
-    pub = final_published_at if final_published_at.tzinfo else final_published_at.replace(tzinfo=UTC)
-    pub = pub.astimezone(UTC)
-    return pub >= threshold_utc
-
-
-async def _prepare_write_session(db: AsyncSession) -> None:
-    await db.rollback()
+def _sse_event(event: str, payload: dict) -> bytes:
+    data = json.dumps(payload, ensure_ascii=False, default=str)
+    return f"event: {event}\ndata: {data}\n\n".encode("utf-8")
 
 
 async def _language_id_by_code(db: AsyncSession, code: str) -> UUID:
@@ -90,6 +68,32 @@ async def _country_id_by_code(db: AsyncSession, code: str | None) -> UUID | None
     if not code:
         return None
     return await db.scalar(select(Country.id).where(Country.code == code.upper()))
+
+
+async def _parse_run_to_response(db: AsyncSession, run: SourceParseRun) -> ParseSourceRunResponse:
+    existing: list[ParseSourceDocumentItem] = []
+    new_items: list[ParseSourceDocumentItem] = []
+    if run.status == "completed" and run.new_document_ids:
+        new_ids = {UUID(x) for x in run.new_document_ids}
+        existing = await list_unprocessed_by_source(db, source_id=run.source_id)
+        new_items = await list_unprocessed_by_source(db, source_id=run.source_id, document_ids=new_ids)
+    elif run.status == "completed":
+        existing = await list_unprocessed_by_source(db, source_id=run.source_id)
+
+    return ParseSourceRunResponse(
+        parse_run_id=run.id,
+        source_id=run.source_id,
+        processing_job_id=run.processing_job_id,
+        phase=run.phase,
+        status=cast(Literal["pending", "running", "completed", "failed"], run.status),
+        found_total=run.found_total,
+        created_total=run.created_total,
+        error_message=run.error_message,
+        started_at=run.started_at,
+        finished_at=run.finished_at,
+        existing_unprocessed_by_source=existing,
+        new_unprocessed_by_source=new_items,
+    )
 
 
 @router.get("/languages/catalog", response_model=list[LanguageCatalogItem])
@@ -110,37 +114,6 @@ async def list_countries_catalog(
     result = await db.execute(select(Country).order_by(Country.name.asc()))
     countries = result.scalars().all()
     return [CountryCatalogItem.model_validate(c) for c in countries]
-
-
-async def _list_unprocessed_by_source(
-    db: AsyncSession,
-    *,
-    source_id: UUID,
-    document_ids: set[UUID] | None = None,
-) -> list[ParseSourceDocumentItem]:
-    q = (
-        select(Document)
-        .join(DocumentStatusAssignment, DocumentStatusAssignment.document_id == Document.id)
-        .join(DocumentStatus, DocumentStatus.id == DocumentStatusAssignment.status_id)
-        .where(Document.source_id == source_id, DocumentStatus.code == "unprocessed")
-        .order_by(Document.created_at.desc())
-    )
-    if document_ids is not None:
-        if not document_ids:
-            return []
-        q = q.where(Document.id.in_(document_ids))
-    rows = await db.execute(q)
-    items = rows.scalars().all()
-    return [
-        ParseSourceDocumentItem(
-            document_id=item.id,
-            title=item.title,
-            source_url=item.source_url,
-            published_at=item.published_at,
-            created_at=item.created_at,
-        )
-        for item in items
-    ]
 
 
 @router.get("/sources", response_model=SourceListResponse)
@@ -219,19 +192,30 @@ async def list_sources(
     )
 
 
-async def _extract_single_article_for_parse_source(
-    url: str,
-    *,
-    delay_sec: float,
-    download_html_func,
-    extract_article_text_func,
-) -> dict[str, Any] | None:
-    await asyncio.sleep(delay_sec)
-    try:
-        html = await download_html_func(url)
-        return await extract_article_text_func(html, url)
-    except HTTPException:
-        return None
+@router.get("/sources/active-parse-runs", response_model=ActiveParseRunsResponse)
+async def list_active_source_parse_runs(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Запуски разбора в ``pending`` / ``running`` по доступным источникам (для возврата на страницу без SSE в памяти)."""
+    stmt = (
+        select(SourceParseRun)
+        .join(Source, Source.id == SourceParseRun.source_id)
+        .where(SourceParseRun.status.in_(("pending", "running")))
+        .order_by(SourceParseRun.created_at.desc())
+    )
+    if not user.is_admin:
+        stmt = stmt.where(Source.user_id == user.id)
+    rows = (await db.execute(stmt)).scalars().all()
+    seen_sources: set[UUID] = set()
+    out: list[ActiveParseRunItem] = []
+    for run in rows:
+        if run.source_id in seen_sources:
+            continue
+        seen_sources.add(run.source_id)
+        body = await _parse_run_to_response(db, run)
+        out.append(ActiveParseRunItem(source_id=run.source_id, parse_run=body))
+    return ActiveParseRunsResponse(items=out)
 
 
 @router.post("/sources", response_model=SourceCreateResponse, status_code=status.HTTP_201_CREATED)
@@ -308,117 +292,168 @@ async def deactivate_source(
     return {"ok": True, "source_id": str(source_id), "is_active": source.is_active}
 
 
-@router.post("/sources/parse", response_model=ParseSourceResponse)
+@router.post(
+    "/sources/parse",
+    response_model=ParseSourceEnqueueResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
 async def parse_source(
     payload: ParseSourceRequest,
     db: AsyncSession = Depends(get_db),
     user: User | None = Depends(get_current_user_optional),
 ):
-    from app.services.parsing.extractor import download_html, extract_article_text
-
     source = await db.get(Source, payload.source_id)
     if source is None:
         raise HTTPException(status_code=404, detail="Источник не найден")
     if not source.is_active:
         raise HTTPException(status_code=400, detail="Источник неактивен")
-    source_id = source.id
+    if user is not None and not user.is_admin and source.user_id != user.id:
+        raise HTTPException(status_code=403, detail="Нет доступа к источнику")
 
     doc_type_row = (
         await db.execute(select(DocumentType.code).where(DocumentType.id == source.document_type_id))
     ).one_or_none()
     if doc_type_row is None:
         raise HTTPException(status_code=500, detail="У источника не задан тип документа")
-    document_type_code = doc_type_row[0]
 
-    discovered = await discover_source_news_urls(
-        source.url,
-        rss_url=source.rss_url,
+    run = SourceParseRun(
+        source_id=source.id,
+        status="pending",
+        phase="queued",
         days=payload.days,
-        # Не отсеиваем бездатные ссылки на этапе discovery: часть дат появляется
-        # только после trafilatura/extract. Флаг skip_undated применяем ниже по final_pub.
-        skip_undated=False,
+        skip_undated=payload.skip_undated,
+        created_by_id=user.id if user else None,
     )
-    depth_threshold_utc = datetime.now(UTC) - timedelta(days=payload.days)
-    created_by_id = user.id if user else None
+    db.add(run)
+    await db.flush()
 
-    new_doc_ids: set[UUID] = set()
-    candidates = []
-    for item in discovered:
-        existing = await get_document_by_source_url(db, item.url)
-        if existing is None:
-            candidates.append(item)
-
-    sem = asyncio.Semaphore(PARSE_SOURCE_MAX_CONCURRENCY)
-
-    async def _bounded_extract(item, idx: int):
-        async with sem:
-            delay = (idx % PARSE_SOURCE_MAX_CONCURRENCY) * PARSE_SOURCE_REQUEST_DELAY_SEC
-            extracted = await _extract_single_article_for_parse_source(
-                item.url,
-                delay_sec=delay,
-                download_html_func=download_html,
-                extract_article_text_func=extract_article_text,
-            )
-            return item, extracted
-
-    extracted_results = await asyncio.gather(
-        *[_bounded_extract(item, idx) for idx, item in enumerate(candidates)],
+    pj = ProcessingJob(
+        document_id=None,
+        source_id=source.id,
+        job_type=JobType.PARSE_SOURCE,
+        status=JobStatus.PENDING,
+        model_name="source-parse",
+        provider="parser",
+        batch_id=None,
+        queue_name=settings.saq_parse_queue_name,
+        queue_job_key=f"parse_source:{run.id}",
+        started_by_id=user.id if user else None,
     )
-
-    for item, extracted in extracted_results:
-        if extracted is None:
-            continue
-
-        final_pub = _final_published_at_for_parse(item, extracted)
-        if payload.skip_undated and final_pub is None:
-            continue
-        if final_pub is not None and not _published_at_within_depth(
-            final_pub,
-            threshold_utc=depth_threshold_utc,
-        ):
-            continue
-
-        await _prepare_write_session(db)
-        try:
-            async with db.begin():
-                doc = await create_document_after_extract(
-                    db,
-                    norm_url=normalize_source_url(item.url),
-                    extract_payload=extracted,
-                    created_by_id=created_by_id,
-                    document_type_code=document_type_code,
-                )
-                doc.source_id = source_id
-                if item.published_at is not None:
-                    doc.published_at = item.published_at
-
-                new_doc_ids.add(doc.id)
-        except ValidationError as exc:
-            await db.rollback()
-            raise map_app_error(exc) from exc
-        except IntegrityError:
-            await db.rollback()
-            continue
-
-    existing_unprocessed = await _list_unprocessed_by_source(db, source_id=source_id)
-    new_unprocessed = await _list_unprocessed_by_source(
-        db,
-        source_id=source_id,
-        document_ids=new_doc_ids,
-    )
-    await db.execute(
-        update(Source)
-        .where(Source.id == source_id)
-        .values(
-            last_parse_at=datetime.now(UTC),
-            last_parse_created_total=len(new_doc_ids),
-        ),
-    )
+    db.add(pj)
+    await db.flush()
+    run.processing_job_id = pj.id
     await db.commit()
-    return ParseSourceResponse(
-        source_id=source_id,
-        found_total=len(discovered),
-        created_total=len(new_doc_ids),
-        existing_unprocessed_by_source=existing_unprocessed,
-        new_unprocessed_by_source=new_unprocessed,
+
+    queue = get_saq_parse_queue()
+    await queue.connect()
+    try:
+        job = await queue.enqueue(
+            "parse_source_job",
+            key=f"parse_source:{run.id}",
+            parse_run_id=str(run.id),
+            timeout=settings.saq_parse_job_timeout_sec,
+        )
+    finally:
+        await queue.disconnect()
+
+    if job is None:
+        failed_run = await db.get(SourceParseRun, run.id)
+        failed_pj = await db.get(ProcessingJob, pj.id)
+        if failed_run is not None:
+            failed_run.status = "failed"
+            failed_run.finished_at = datetime.now(UTC)
+            failed_run.phase = "failed"
+            failed_run.error_message = "Не удалось поставить задачу в очередь (enqueue вернул None)"
+        if failed_pj is not None:
+            failed_pj.status = JobStatus.FAILED
+            failed_pj.finished_at = datetime.now(UTC)
+            failed_pj.error_message = "enqueue вернул None"
+        await db.commit()
+        raise HTTPException(
+            status_code=503,
+            detail="Очередь разбора недоступна, попробуйте позже",
+        )
+
+    return ParseSourceEnqueueResponse(
+        parse_run_id=run.id,
+        source_id=source.id,
+        processing_job_id=pj.id,
+        status="pending",
     )
+
+
+@router.get("/sources/parse-runs/{parse_run_id}/stream")
+async def stream_parse_source_run(
+    parse_run_id: UUID,
+    user: User = Depends(get_current_user),
+) -> StreamingResponse:
+    """SSE: статус и фаза разбора источника (без polling)."""
+
+    async def event_stream():
+        async with AsyncSessionLocal() as session:
+            run0 = await session.get(SourceParseRun, parse_run_id)
+            if run0 is None:
+                yield _sse_event("error", {"message": "Запуск разбора не найден"})
+                return
+            src0 = await session.get(Source, run0.source_id)
+            if src0 is None:
+                yield _sse_event("error", {"message": "Источник не найден"})
+                return
+            if not user.is_admin and src0.user_id != user.id:
+                yield _sse_event("error", {"message": "Нет доступа"})
+                return
+
+        previous_json: str | None = None
+        while True:
+            try:
+                async with AsyncSessionLocal() as session:
+                    run = await session.get(SourceParseRun, parse_run_id)
+                    if run is None:
+                        yield _sse_event("error", {"message": "Запуск разбора удалён"})
+                        return
+                    body = await _parse_run_to_response(session, run)
+                payload = {
+                    "snapshot_at": datetime.now(UTC).isoformat(),
+                    **body.model_dump(mode="json"),
+                }
+                stable = json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str)
+                if stable != previous_json:
+                    yield _sse_event("snapshot", payload)
+                    previous_json = stable
+                if run.status in ("completed", "failed"):
+                    return
+                yield b"event: heartbeat\ndata: ping\n\n"
+                await asyncio.sleep(1)
+            except asyncio.CancelledError:
+                return
+            except Exception as exc:
+                yield _sse_event("error", {"message": str(exc)})
+                await asyncio.sleep(2)
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@router.get("/sources/parse-runs/{parse_run_id}", response_model=ParseSourceRunResponse)
+async def get_parse_source_run(
+    parse_run_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    run = await db.get(SourceParseRun, parse_run_id)
+    if run is None:
+        raise HTTPException(status_code=404, detail="Запуск разбора не найден")
+    source = await db.get(Source, run.source_id)
+    if source is None:
+        raise HTTPException(status_code=404, detail="Источник не найден")
+    if not user.is_admin and source.user_id != user.id:
+        raise HTTPException(status_code=403, detail="Нет доступа к этому запуску разбора")
+
+    return await _parse_run_to_response(db, run)

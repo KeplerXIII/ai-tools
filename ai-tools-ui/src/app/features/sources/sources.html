@@ -294,9 +294,14 @@
                 </div>
                 @if (parseError && lastParsedSourceId === src.source_id) {
                   <div class="state-message state-message_error source-parse__message">{{ parseError }}</div>
-                }
-                @if (parseFeedback && lastParsedSourceId === src.source_id && !parseError) {
-                  <div class="state-message state-message_ok source-parse__message">{{ parseFeedback }}</div>
+                } @else if (parseFeedback && lastParsedSourceId === src.source_id) {
+                  <div
+                    class="state-message source-parse__message"
+                    [class.state-message_ok]="parsingSourceId !== src.source_id"
+                    [class.state-message_loading]="parsingSourceId === src.source_id"
+                  >
+                    {{ parseFeedback }}
+                  </div>
                 }
               </div>
             </div>

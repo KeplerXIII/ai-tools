@@ -121,7 +121,8 @@ def _sse_event(event: str, payload: dict) -> bytes:
 def _job_to_dict(job: ProcessingJob) -> dict:
     return {
         "id": str(job.id),
-        "document_id": str(job.document_id),
+        "document_id": str(job.document_id) if job.document_id else None,
+        "source_id": str(job.source_id) if job.source_id else None,
         "job_type": job.job_type,
         "status": job.status,
         "model_name": job.model_name,

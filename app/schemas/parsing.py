@@ -3,6 +3,8 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
+from typing import Literal
+
 from pydantic import BaseModel, Field, HttpUrl
 
 
@@ -50,12 +52,26 @@ class ParseSourceDocumentItem(BaseModel):
     created_at: datetime
 
 
-class ParseSourceResponse(BaseModel):
+class ParseSourceEnqueueResponse(BaseModel):
+    parse_run_id: uuid.UUID
     source_id: uuid.UUID
-    found_total: int
-    created_total: int
-    existing_unprocessed_by_source: list[ParseSourceDocumentItem]
-    new_unprocessed_by_source: list[ParseSourceDocumentItem]
+    processing_job_id: uuid.UUID | None = None
+    status: Literal["pending"] = "pending"
+
+
+class ParseSourceRunResponse(BaseModel):
+    parse_run_id: uuid.UUID
+    source_id: uuid.UUID
+    processing_job_id: uuid.UUID | None = None
+    phase: str | None = None
+    status: Literal["pending", "running", "completed", "failed"]
+    found_total: int | None = None
+    created_total: int | None = None
+    error_message: str | None = None
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+    existing_unprocessed_by_source: list[ParseSourceDocumentItem] = Field(default_factory=list)
+    new_unprocessed_by_source: list[ParseSourceDocumentItem] = Field(default_factory=list)
 
 
 class SourceListItem(BaseModel):
@@ -81,6 +97,17 @@ class SourceListResponse(BaseModel):
     total: int
     items: list[SourceListItem]
     can_filter_by_all_users: bool = False
+
+
+class ActiveParseRunItem(BaseModel):
+    """Источник с незавершённым запуском разбора (для восстановления UI без локального хранилища)."""
+
+    source_id: uuid.UUID
+    parse_run: ParseSourceRunResponse
+
+
+class ActiveParseRunsResponse(BaseModel):
+    items: list[ActiveParseRunItem]
 
 
 class LanguageCatalogItem(BaseModel):

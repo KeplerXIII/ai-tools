@@ -4,7 +4,8 @@ import { AuthService } from '../../core/auth/auth.service';
 
 export interface ProcessingJobRow {
   id: string;
-  document_id: string;
+  document_id: string | null;
+  source_id: string | null;
   job_type: string;
   status: string;
   model_name: string | null;

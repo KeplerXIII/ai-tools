@@ -6,8 +6,8 @@ from time import perf_counter
 
 from sqlalchemy.exc import IntegrityError
 
-from app.domain.errors import NotFoundError
-from app.infrastructure.db.models import ProcessingJob
+from app.domain.errors import NotFoundError, ValidationError
+from app.infrastructure.db.models import ProcessingJob, SourceParseRun
 from app.infrastructure.db.session import AsyncSessionLocal
 from app.schemas.documents import SummarySource
 from app.services.documents.document_pipeline import run_translate_document
@@ -21,6 +21,7 @@ from app.services.processing.extractor_batch_store import inc_extractor_batch_co
 from app.services.processing.enqueue_locks import release_enqueue_lock
 from app.services.processing.jobs import JobStatus
 from app.services.processing.tagger_batch_store import inc_tagger_batch_counter
+from app.services.parsing.parse_source_runner import execute_parse_source
 from app.services.processing.translate_batch_store import inc_translate_batch_counter
 
 
@@ -474,3 +475,81 @@ async def tagger_document_job(
         }
     finally:
         await release_enqueue_lock(lock_kind, document_id)
+
+
+async def parse_source_job(ctx: dict, *, parse_run_id: str) -> dict[str, str]:
+    parsed_id = uuid.UUID(parse_run_id)
+    t0 = perf_counter()
+    async with AsyncSessionLocal() as session:
+        run = await session.get(SourceParseRun, parsed_id)
+        if run is None:
+            return {"parse_run_id": parse_run_id, "status": "missing"}
+        if run.status != "pending":
+            return {"parse_run_id": parse_run_id, "status": "skipped"}
+
+        run.status = "running"
+        run.started_at = datetime.now(UTC)
+        run.phase = "discovery"
+        pj = await session.get(ProcessingJob, run.processing_job_id) if run.processing_job_id else None
+        if pj is not None and pj.status == JobStatus.PENDING:
+            pj.status = JobStatus.RUNNING
+            pj.started_at = datetime.now(UTC)
+        await session.commit()
+
+        try:
+            outcome = await execute_parse_source(
+                session,
+                source_id=run.source_id,
+                days=run.days,
+                skip_undated=run.skip_undated,
+                created_by_id=run.created_by_id,
+                parse_run_id=parsed_id,
+            )
+            run = await session.get(SourceParseRun, parsed_id)
+            if run is None:
+                return {"parse_run_id": parse_run_id, "status": "missing"}
+            run.status = "completed"
+            run.finished_at = datetime.now(UTC)
+            run.found_total = outcome.found_total
+            run.created_total = outcome.created_total
+            run.new_document_ids = [str(x) for x in outcome.new_document_ids]
+            run.phase = "complete"
+            pj = await session.get(ProcessingJob, run.processing_job_id) if run.processing_job_id else None
+            if pj is not None:
+                pj.status = JobStatus.COMPLETED
+                pj.finished_at = datetime.now(UTC)
+                pj.duration_ms = int((perf_counter() - t0) * 1000)
+            await session.commit()
+            return {"parse_run_id": parse_run_id, "status": "completed"}
+        except ValidationError as exc:
+            await session.rollback()
+            run = await session.get(SourceParseRun, parsed_id)
+            if run is not None:
+                run.status = "failed"
+                run.finished_at = datetime.now(UTC)
+                run.error_message = str(exc)[:8000]
+                run.phase = "failed"
+                pj = await session.get(ProcessingJob, run.processing_job_id) if run.processing_job_id else None
+                if pj is not None:
+                    pj.status = JobStatus.FAILED
+                    pj.finished_at = datetime.now(UTC)
+                    pj.duration_ms = int((perf_counter() - t0) * 1000)
+                    pj.error_message = str(exc)[:8000]
+                await session.commit()
+            return {"parse_run_id": parse_run_id, "status": "failed"}
+        except Exception as exc:
+            await session.rollback()
+            run = await session.get(SourceParseRun, parsed_id)
+            if run is not None:
+                run.status = "failed"
+                run.finished_at = datetime.now(UTC)
+                run.error_message = str(exc)[:8000]
+                run.phase = "failed"
+                pj = await session.get(ProcessingJob, run.processing_job_id) if run.processing_job_id else None
+                if pj is not None:
+                    pj.status = JobStatus.FAILED
+                    pj.finished_at = datetime.now(UTC)
+                    pj.duration_ms = int((perf_counter() - t0) * 1000)
+                    pj.error_message = str(exc)[:8000]
+                await session.commit()
+            return {"parse_run_id": parse_run_id, "status": "failed"}

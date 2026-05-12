@@ -35,6 +35,7 @@ type JobSortField =
   | 'provider'
   | 'queue_name'
   | 'document_id'
+  | 'source_id'
   | 'id'
   | 'batch_id';
 
@@ -114,6 +115,7 @@ export class ProcessingDashboard implements OnInit, OnDestroy {
     { value: 'provider', label: 'Провайдер' },
     { value: 'queue_name', label: 'Очередь' },
     { value: 'document_id', label: 'document_id' },
+    { value: 'source_id', label: 'source_id' },
     { value: 'id', label: 'id' },
     { value: 'batch_id', label: 'batch_id' },
   ];
@@ -191,7 +193,9 @@ export class ProcessingDashboard implements OnInit, OnDestroy {
         }
       }
       if (q) {
-        const hay = [j.id, j.document_id, j.batch_id ?? '', j.queue_job_key ?? ''].join(' ').toLowerCase();
+        const hay = [j.id, j.document_id ?? '', j.source_id ?? '', j.batch_id ?? '', j.queue_job_key ?? '']
+          .join(' ')
+          .toLowerCase();
         if (!hay.includes(q)) {
           return false;
         }
@@ -369,6 +373,7 @@ export class ProcessingDashboard implements OnInit, OnDestroy {
     const fieldsToWatch: JobFieldKey[] = [
       'id',
       'document_id',
+      'source_id',
       'job_type',
       'status',
       'model_name',

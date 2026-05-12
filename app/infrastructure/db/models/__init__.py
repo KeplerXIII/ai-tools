@@ -11,6 +11,7 @@ from app.infrastructure.db.models.catalog import (
     Language,
     PredictionSource,
     Source,
+    SourceParseRun,
     Tag,
 )
 from app.infrastructure.db.models.document import (
@@ -48,6 +49,7 @@ __all__ = [
     "ProcessingJob",
     "Role",
     "Source",
+    "SourceParseRun",
     "Tag",
     "User",
     "UserRole",

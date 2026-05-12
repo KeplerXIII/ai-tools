@@ -7,6 +7,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Integer,
+    JSON,
     String,
     Text,
     UniqueConstraint,
@@ -169,6 +170,41 @@ class Source(Base):
     updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (UniqueConstraint("user_id", "url", name="uq_sources_user_url"),)
+
+
+class SourceParseRun(Base):
+    """Один запуск разбора источника (фоновый воркер SAQ)."""
+
+    __tablename__ = "source_parse_runs"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    source_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("sources.id", ondelete="CASCADE"), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False)
+    days: Mapped[int] = mapped_column(Integer, nullable=False)
+    skip_undated: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    created_by_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+
+    found_total: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_total: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    new_document_ids: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    phase: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    processing_job_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("processing_jobs.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
 
 
 class Tag(Base):

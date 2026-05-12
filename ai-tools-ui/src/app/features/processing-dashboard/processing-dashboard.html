@@ -213,6 +213,7 @@
           <tr>
             <th>id</th>
             <th>document_id</th>
+            <th>source_id</th>
             <th>job_type</th>
             <th>status</th>
             <th>model_name</th>
@@ -231,7 +232,8 @@
         <tbody>
           <tr *ngFor="let job of displayedJobs; trackBy: trackJob" [ngClass]="'row-flash-' + (jobFlash[job.id] || 'none')">
             <td [class.cell-flash]="isCellFlashing(job.id, 'id')">{{ job.id }}</td>
-            <td [class.cell-flash]="isCellFlashing(job.id, 'document_id')">{{ job.document_id }}</td>
+            <td [class.cell-flash]="isCellFlashing(job.id, 'document_id')">{{ job.document_id || '-' }}</td>
+            <td [class.cell-flash]="isCellFlashing(job.id, 'source_id')">{{ job.source_id || '-' }}</td>
             <td [class.cell-flash]="isCellFlashing(job.id, 'job_type')">{{ job.job_type }}</td>
             <td [class.cell-flash]="isCellFlashing(job.id, 'status')">{{ job.status }}</td>
             <td [class.cell-flash]="isCellFlashing(job.id, 'model_name')">{{ job.model_name || '-' }}</td>

@@ -2,6 +2,8 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 
+import { AuthService } from '../../core/auth/auth.service';
+
 export interface SourceListItem {
   source_id: string;
   name: string | null;
@@ -64,12 +66,40 @@ export interface ParseSourceDocumentItem {
   created_at: string;
 }
 
-export interface ParseSourceResponse {
+export interface ParseSourceEnqueueResponse {
+  parse_run_id: string;
   source_id: string;
-  found_total: number;
-  created_total: number;
+  processing_job_id?: string | null;
+  status: 'pending';
+}
+
+export interface ParseSourceRunResponse {
+  parse_run_id: string;
+  source_id: string;
+  processing_job_id?: string | null;
+  phase?: string | null;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  found_total: number | null;
+  created_total: number | null;
+  error_message: string | null;
+  started_at: string | null;
+  finished_at: string | null;
   existing_unprocessed_by_source: ParseSourceDocumentItem[];
   new_unprocessed_by_source: ParseSourceDocumentItem[];
+}
+
+/** Снимок из SSE ``/parse-runs/{id}/stream`` (поля ответа + ``snapshot_at``). */
+export interface ParseSourceRunSnapshotPayload extends ParseSourceRunResponse {
+  snapshot_at: string;
+}
+
+export interface ActiveParseRunItem {
+  source_id: string;
+  parse_run: ParseSourceRunResponse;
+}
+
+export interface ActiveParseRunsResponse {
+  items: ActiveParseRunItem[];
 }
 
 export interface LanguageCatalogItem {
@@ -86,7 +116,10 @@ export interface CountryCatalogItem {
   providedIn: 'root',
 })
 export class SourcesApi {
-  constructor(private readonly http: HttpClient) {}
+  constructor(
+    private readonly http: HttpClient,
+    private readonly auth: AuthService,
+  ) {}
 
   getLanguagesCatalog(): Observable<LanguageCatalogItem[]> {
     return this.http.get<LanguageCatalogItem[]>('/api/v1/parsing/languages/catalog');
@@ -100,8 +133,118 @@ export class SourcesApi {
     return this.http.post<SourceCreateResponse>('/api/v1/parsing/sources', body);
   }
 
-  parseSource(body: ParseSourceRequestBody): Observable<ParseSourceResponse> {
-    return this.http.post<ParseSourceResponse>('/api/v1/parsing/sources/parse', body);
+  /** POST возвращает 202 Accepted; разбор выполняется воркером ``ai-tools-parse-worker``. */
+  parseSource(body: ParseSourceRequestBody): Observable<ParseSourceEnqueueResponse> {
+    return this.http.post<ParseSourceEnqueueResponse>('/api/v1/parsing/sources/parse', body);
+  }
+
+  getParseRun(parseRunId: string): Observable<ParseSourceRunResponse> {
+    return this.http.get<ParseSourceRunResponse>(`/api/v1/parsing/sources/parse-runs/${parseRunId}`);
+  }
+
+  /** Незавершённые разборы по БД (pending/running), чтобы восстановить SSE после навигации. */
+  listActiveSourceParseRuns(): Observable<ActiveParseRunsResponse> {
+    return this.http.get<ActiveParseRunsResponse>('/api/v1/parsing/sources/active-parse-runs');
+  }
+
+  /** SSE: статус и фаза разбора до ``completed`` / ``failed``. */
+  streamParseRun(parseRunId: string): Observable<ParseSourceRunSnapshotPayload> {
+    return new Observable<ParseSourceRunSnapshotPayload>((observer) => {
+      const token = this.auth.getToken();
+      const controller = new AbortController();
+      const url = `/api/v1/parsing/sources/parse-runs/${encodeURIComponent(parseRunId)}/stream`;
+
+      fetch(url, {
+        method: 'GET',
+        headers: {
+          Accept: 'text/event-stream',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        signal: controller.signal,
+      })
+        .then(async (response) => {
+          if (!response.ok || !response.body) {
+            throw new Error(`Ошибка SSE: ${response.status}`);
+          }
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder('utf-8');
+          let buffer = '';
+          let eventName = 'message';
+          let dataLines: string[] = [];
+
+          const dispatchEvent = () => {
+            if (eventName === 'heartbeat') {
+              eventName = 'message';
+              dataLines = [];
+              return;
+            }
+            if (eventName === 'error') {
+              observer.error(new Error(dataLines.join('\n') || 'Ошибка SSE stream'));
+              return;
+            }
+            const payloadText = dataLines.join('\n').trim();
+            if (!payloadText) {
+              eventName = 'message';
+              dataLines = [];
+              return;
+            }
+            const looksLikeSnapshot =
+              payloadText.includes('"snapshot_at"') && payloadText.includes('"parse_run_id"');
+            const isSnapshot = eventName === 'snapshot' || (eventName === 'message' && looksLikeSnapshot);
+            if (!isSnapshot) {
+              eventName = 'message';
+              dataLines = [];
+              return;
+            }
+            try {
+              const payload = JSON.parse(payloadText) as ParseSourceRunSnapshotPayload;
+              observer.next(payload);
+            } catch {
+              observer.error(new Error('Некорректный JSON в SSE snapshot'));
+            } finally {
+              eventName = 'message';
+              dataLines = [];
+            }
+          };
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) {
+              if (dataLines.length > 0) {
+                dispatchEvent();
+              }
+              observer.complete();
+              break;
+            }
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split(/\r?\n/);
+            buffer = lines.pop() ?? '';
+            for (const line of lines) {
+              const normalized = line.replace(/^\uFEFF/, '');
+              if (normalized.trim() === '') {
+                dispatchEvent();
+                continue;
+              }
+              const trimmedStart = normalized.trimStart();
+              if (/^event:/i.test(trimmedStart)) {
+                eventName = trimmedStart.replace(/^event:/i, '').trim();
+                continue;
+              }
+              if (/^data:/i.test(trimmedStart)) {
+                dataLines.push(trimmedStart.replace(/^data:/i, '').trimStart());
+              }
+            }
+          }
+        })
+        .catch((error: unknown) => {
+          const fetchError = error as { name?: string };
+          if (fetchError?.name !== 'AbortError') {
+            observer.error(error);
+          }
+        });
+
+      return () => controller.abort();
+    });
   }
 
   listSources(addedByUserId?: string): Observable<SourceListResponse> {

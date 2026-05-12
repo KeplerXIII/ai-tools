@@ -4,7 +4,8 @@ from __future__ import annotations
 
 Что проверяется
     Поведение функций FastAPI-эндпоинтов ``create_source``, ``deactivate_source``,
-    ``parse_source``: коды ошибок (404/403), форма успешного ответа, подсчёты
+    ``parse_source`` (постановка в очередь, 404), ``list_sources`` и логика
+    ``execute_parse_source`` в ``parse_source_runner``: коды ошибок, подсчёты
     ``found_total`` / ``created_total``, лимит параллельного извлечения статей.
 
 Как устроено тестирование (без HTTP и без реальной БД)
@@ -43,12 +44,14 @@ from fastapi import HTTPException
 from app.api.v1.endpoints.parsing import (
     create_source,
     deactivate_source,
+    list_active_source_parse_runs,
     list_countries_catalog,
     list_languages_catalog,
     list_sources,
     parse_source,
 )
 from app.schemas.parsing import ParseSourceRequest, SourceCreateRequest
+from app.services.parsing.parse_source_runner import execute_parse_source
 from app.services.parsing.source_discovery import DiscoveredUrl
 
 
@@ -170,6 +173,33 @@ class _FakeDbLangCatalog:
         return _FakeExecLang(self._items)
 
 
+class _FakeScalarsParseRuns:
+    def __init__(self, runs):
+        self._runs = runs
+
+    def all(self):
+        return self._runs
+
+
+class _FakeExecParseRuns:
+    def __init__(self, runs):
+        self._runs = runs
+
+    def scalars(self):
+        return _FakeScalarsParseRuns(self._runs)
+
+
+class _FakeDbActiveParseRuns:
+    """Для ``list_active_source_parse_runs``: ``execute().scalars().all()``."""
+
+    def __init__(self, runs):
+        self._runs = runs
+
+    async def execute(self, statement):
+        _ = statement
+        return _FakeExecParseRuns(self._runs)
+
+
 class ParseSourceEndpointTests(IsolatedAsyncioTestCase):
     """Сценарии вокруг ``deactivate_source``, ``parse_source``, ``create_source``."""
 
@@ -229,7 +259,7 @@ class ParseSourceEndpointTests(IsolatedAsyncioTestCase):
         self.assertEqual(exc.exception.status_code, 404)
 
     async def test_parse_source_happy_path_response_shape(self):
-        """Успешный прогон с моками: счётчики и списки unprocessed соответствуют двум найденным URL."""
+        """Успешный прогон с моками: счётчики по двум найденным URL (логика в ``parse_source_runner``)."""
         source_id = uuid.uuid4()
         source = SimpleNamespace(
             id=source_id,
@@ -263,35 +293,17 @@ class ParseSourceEndpointTests(IsolatedAsyncioTestCase):
             docs_created.append(doc)
             return doc
 
-        async def _list_unprocessed(_db, *, source_id, document_ids=None):
-            _ = _db
-            _ = source_id
-            if document_ids is None:
-                ids = [doc.id for doc in docs_created]
-            else:
-                ids = list(document_ids)
-            return [
-                {
-                    "document_id": doc_id,
-                    "title": "T",
-                    "source_url": "https://example.com/news",
-                    "published_at": None,
-                    "created_at": datetime(2026, 5, 5, tzinfo=UTC),
-                }
-                for doc_id in ids
-            ]
-
         with (
             patch(
-                "app.api.v1.endpoints.parsing.discover_source_news_urls",
+                "app.services.parsing.parse_source_runner.discover_source_news_urls",
                 AsyncMock(return_value=discovered),
             ),
             patch(
-                "app.api.v1.endpoints.parsing.get_document_by_source_url",
+                "app.services.parsing.parse_source_runner.get_document_by_source_url",
                 AsyncMock(return_value=None),
             ),
             patch(
-                "app.api.v1.endpoints.parsing._extract_single_article_for_parse_source",
+                "app.services.parsing.parse_source_runner.extract_single_article_for_parse_source",
                 AsyncMock(
                     return_value={
                         "title": "n",
@@ -304,25 +316,20 @@ class ParseSourceEndpointTests(IsolatedAsyncioTestCase):
                 ),
             ),
             patch(
-                "app.api.v1.endpoints.parsing.create_document_after_extract",
+                "app.services.parsing.parse_source_runner.create_document_after_extract",
                 AsyncMock(side_effect=_create_doc),
             ),
-            patch(
-                "app.api.v1.endpoints.parsing._list_unprocessed_by_source",
-                AsyncMock(side_effect=_list_unprocessed),
-            ),
         ):
-            result = await parse_source(
-                payload=ParseSourceRequest(source_id=source_id, days=7),
-                db=db,
-                user=user,
+            outcome = await execute_parse_source(
+                db,
+                source_id=source_id,
+                days=7,
+                skip_undated=False,
+                created_by_id=user.id,
             )
 
-        self.assertEqual(result.source_id, source_id)
-        self.assertEqual(result.found_total, 2)
-        self.assertEqual(result.created_total, 2)
-        self.assertEqual(len(result.existing_unprocessed_by_source), 2)
-        self.assertEqual(len(result.new_unprocessed_by_source), 2)
+        self.assertEqual(outcome.found_total, 2)
+        self.assertEqual(outcome.created_total, 2)
         self.assertEqual(len(create_doc_kwargs), 2)
         for kw in create_doc_kwargs:
             self.assertEqual(kw.get("document_type_code"), "news")
@@ -376,30 +383,28 @@ class ParseSourceEndpointTests(IsolatedAsyncioTestCase):
 
         with (
             patch(
-                "app.api.v1.endpoints.parsing.discover_source_news_urls",
+                "app.services.parsing.parse_source_runner.discover_source_news_urls",
                 AsyncMock(return_value=discovered),
             ),
             patch(
-                "app.api.v1.endpoints.parsing.get_document_by_source_url",
+                "app.services.parsing.parse_source_runner.get_document_by_source_url",
                 AsyncMock(return_value=None),
             ),
             patch(
-                "app.api.v1.endpoints.parsing._extract_single_article_for_parse_source",
+                "app.services.parsing.parse_source_runner.extract_single_article_for_parse_source",
                 AsyncMock(side_effect=_extract_stub),
             ),
             patch(
-                "app.api.v1.endpoints.parsing.create_document_after_extract",
+                "app.services.parsing.parse_source_runner.create_document_after_extract",
                 AsyncMock(side_effect=_create_doc),
             ),
-            patch(
-                "app.api.v1.endpoints.parsing._list_unprocessed_by_source",
-                AsyncMock(return_value=[]),
-            ),
         ):
-            await parse_source(
-                payload=ParseSourceRequest(source_id=source_id, days=7, skip_undated=False),
-                db=db,
-                user=None,
+            await execute_parse_source(
+                db,
+                source_id=source_id,
+                days=7,
+                skip_undated=False,
+                created_by_id=None,
             )
 
         self.assertLessEqual(max_in_flight, 3)
@@ -429,18 +434,18 @@ class ParseSourceEndpointTests(IsolatedAsyncioTestCase):
 
         with (
             patch(
-                "app.api.v1.endpoints.parsing.discover_source_news_urls",
+                "app.services.parsing.parse_source_runner.discover_source_news_urls",
                 AsyncMock(return_value=discovered),
             ),
             patch(
-                "app.api.v1.endpoints.parsing.get_document_by_source_url",
+                "app.services.parsing.parse_source_runner.get_document_by_source_url",
                 AsyncMock(return_value=None),
             ),
             patch(
-                "app.api.v1.endpoints.parsing.datetime",
+                "app.services.parsing.parse_source_runner.datetime",
             ) as mock_dt,
             patch(
-                "app.api.v1.endpoints.parsing._extract_single_article_for_parse_source",
+                "app.services.parsing.parse_source_runner.extract_single_article_for_parse_source",
                 AsyncMock(
                     return_value={
                         "title": "n",
@@ -454,29 +459,23 @@ class ParseSourceEndpointTests(IsolatedAsyncioTestCase):
                 ),
             ),
             patch(
-                "app.api.v1.endpoints.parsing.create_document_after_extract",
+                "app.services.parsing.parse_source_runner.create_document_after_extract",
                 AsyncMock(side_effect=_create_doc),
-            ),
-            patch(
-                "app.api.v1.endpoints.parsing._list_unprocessed_by_source",
-                AsyncMock(return_value=[]),
             ),
         ):
             mock_dt.now = MagicMock(return_value=fixed_now)
             mock_dt.UTC = UTC
-            result = await parse_source(
-                payload=ParseSourceRequest(
-                    source_id=source_id,
-                    days=7,
-                    skip_undated=False,
-                ),
-                db=db,
-                user=None,
+            outcome = await execute_parse_source(
+                db,
+                source_id=source_id,
+                days=7,
+                skip_undated=False,
+                created_by_id=None,
             )
 
         self.assertEqual(create_calls, 0)
-        self.assertEqual(result.created_total, 0)
-        self.assertEqual(result.found_total, 1)
+        self.assertEqual(outcome.created_total, 0)
+        self.assertEqual(outcome.found_total, 1)
 
     async def test_parse_source_skips_when_skip_undated_and_no_final_date(self):
         """При skip_undated не сохраняем документ без итоговой даты публикации."""
@@ -501,15 +500,15 @@ class ParseSourceEndpointTests(IsolatedAsyncioTestCase):
 
         with (
             patch(
-                "app.api.v1.endpoints.parsing.discover_source_news_urls",
+                "app.services.parsing.parse_source_runner.discover_source_news_urls",
                 AsyncMock(return_value=discovered),
             ),
             patch(
-                "app.api.v1.endpoints.parsing.get_document_by_source_url",
+                "app.services.parsing.parse_source_runner.get_document_by_source_url",
                 AsyncMock(return_value=None),
             ),
             patch(
-                "app.api.v1.endpoints.parsing._extract_single_article_for_parse_source",
+                "app.services.parsing.parse_source_runner.extract_single_article_for_parse_source",
                 AsyncMock(
                     return_value={
                         "title": "n",
@@ -522,22 +521,20 @@ class ParseSourceEndpointTests(IsolatedAsyncioTestCase):
                 ),
             ),
             patch(
-                "app.api.v1.endpoints.parsing.create_document_after_extract",
+                "app.services.parsing.parse_source_runner.create_document_after_extract",
                 AsyncMock(side_effect=_create_doc),
             ),
-            patch(
-                "app.api.v1.endpoints.parsing._list_unprocessed_by_source",
-                AsyncMock(return_value=[]),
-            ),
         ):
-            result = await parse_source(
-                payload=ParseSourceRequest(source_id=source_id, days=7, skip_undated=True),
-                db=db,
-                user=None,
+            outcome = await execute_parse_source(
+                db,
+                source_id=source_id,
+                days=7,
+                skip_undated=True,
+                created_by_id=None,
             )
 
         self.assertEqual(create_calls, 0)
-        self.assertEqual(result.created_total, 0)
+        self.assertEqual(outcome.created_total, 0)
 
     async def test_parse_source_does_not_filter_undated_during_discovery(self):
         """При skip_undated discovery не фильтрует бездатные ссылки до extraction."""
@@ -554,13 +551,13 @@ class ParseSourceEndpointTests(IsolatedAsyncioTestCase):
         discover_mock = AsyncMock(return_value=discovered)
 
         with (
-            patch("app.api.v1.endpoints.parsing.discover_source_news_urls", discover_mock),
+            patch("app.services.parsing.parse_source_runner.discover_source_news_urls", discover_mock),
             patch(
-                "app.api.v1.endpoints.parsing.get_document_by_source_url",
+                "app.services.parsing.parse_source_runner.get_document_by_source_url",
                 AsyncMock(return_value=None),
             ),
             patch(
-                "app.api.v1.endpoints.parsing._extract_single_article_for_parse_source",
+                "app.services.parsing.parse_source_runner.extract_single_article_for_parse_source",
                 AsyncMock(
                     return_value={
                         "title": "n",
@@ -573,18 +570,16 @@ class ParseSourceEndpointTests(IsolatedAsyncioTestCase):
                 ),
             ),
             patch(
-                "app.api.v1.endpoints.parsing.create_document_after_extract",
+                "app.services.parsing.parse_source_runner.create_document_after_extract",
                 AsyncMock(return_value=SimpleNamespace(id=uuid.uuid4(), version=1, source_id=None, published_at=None)),
             ),
-            patch(
-                "app.api.v1.endpoints.parsing._list_unprocessed_by_source",
-                AsyncMock(return_value=[]),
-            ),
         ):
-            await parse_source(
-                payload=ParseSourceRequest(source_id=source_id, days=7, skip_undated=True),
-                db=db,
-                user=None,
+            await execute_parse_source(
+                db,
+                source_id=source_id,
+                days=7,
+                skip_undated=True,
+                created_by_id=None,
             )
 
         discover_mock.assert_awaited_once()
@@ -694,3 +689,75 @@ class ParseSourceEndpointTests(IsolatedAsyncioTestCase):
         self.assertEqual(result[0].code, "DE")
         self.assertEqual(result[0].name, "Germany")
         self.assertEqual(result[1].code, "US")
+
+    async def test_list_active_parse_runs_empty(self):
+        """Нет активных запусков — пустой список."""
+        db = _FakeDbActiveParseRuns([])
+        user = SimpleNamespace(id=uuid.uuid4(), is_admin=False)
+        result = await list_active_source_parse_runs(db=db, user=user)
+        self.assertEqual(result.items, [])
+
+    async def test_list_active_parse_runs_one_pending(self):
+        """Один pending-запуск: в ответе source_id и статус разбора."""
+        rid = uuid.uuid4()
+        sid = uuid.uuid4()
+        run = SimpleNamespace(
+            id=rid,
+            source_id=sid,
+            status="pending",
+            processing_job_id=None,
+            phase="queued",
+            found_total=None,
+            created_total=None,
+            new_document_ids=None,
+            error_message=None,
+            started_at=None,
+            finished_at=None,
+        )
+        db = _FakeDbActiveParseRuns([run])
+        user = SimpleNamespace(id=uuid.uuid4(), is_admin=False)
+        result = await list_active_source_parse_runs(db=db, user=user)
+        self.assertEqual(len(result.items), 1)
+        self.assertEqual(result.items[0].source_id, sid)
+        self.assertEqual(result.items[0].parse_run.parse_run_id, rid)
+        self.assertEqual(result.items[0].parse_run.status, "pending")
+
+    async def test_list_active_parse_runs_dedupes_by_source(self):
+        """Два запуска по одному источнику — в ответе только первый по ``created_at`` (новее)."""
+        sid = uuid.uuid4()
+        older = datetime(2020, 1, 1, tzinfo=UTC)
+        newer = datetime(2025, 1, 1, tzinfo=UTC)
+        run_old = SimpleNamespace(
+            id=uuid.uuid4(),
+            source_id=sid,
+            status="pending",
+            processing_job_id=None,
+            phase="queued",
+            found_total=None,
+            created_total=None,
+            new_document_ids=None,
+            error_message=None,
+            started_at=None,
+            finished_at=None,
+            created_at=older,
+        )
+        run_new = SimpleNamespace(
+            id=uuid.uuid4(),
+            source_id=sid,
+            status="running",
+            processing_job_id=None,
+            phase="extract",
+            found_total=5,
+            created_total=None,
+            new_document_ids=None,
+            error_message=None,
+            started_at=None,
+            finished_at=None,
+            created_at=newer,
+        )
+        db = _FakeDbActiveParseRuns([run_new, run_old])
+        user = SimpleNamespace(id=uuid.uuid4(), is_admin=False)
+        result = await list_active_source_parse_runs(db=db, user=user)
+        self.assertEqual(len(result.items), 1)
+        self.assertEqual(result.items[0].parse_run.parse_run_id, run_new.id)
+        self.assertEqual(result.items[0].parse_run.status, "running")

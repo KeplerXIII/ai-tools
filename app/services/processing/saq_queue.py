@@ -38,3 +38,10 @@ def get_saq_tagger_queue() -> Queue:
         settings.saq_queue_url,
         name=settings.saq_tagger_queue_name,
     )
+
+
+def get_saq_parse_queue() -> Queue:
+    return Queue.from_url(
+        settings.saq_queue_url,
+        name=settings.saq_parse_queue_name,
+    )

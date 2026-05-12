@@ -13,6 +13,7 @@ from app.infrastructure.db.models import ProcessingJob
 
 
 class JobType:
+    PARSE_SOURCE = "parse_source"
     EXTRACT = "extract"
     TRANSLATE = "translate"
     SUMMARY = "summary"

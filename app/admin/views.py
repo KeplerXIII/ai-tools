@@ -312,6 +312,7 @@ class ProcessingJobAdmin(ModelView, model=ProcessingJob):
     column_list = [
         ProcessingJob.id,
         ProcessingJob.document_id,
+        ProcessingJob.source_id,
         ProcessingJob.job_type,
         ProcessingJob.status,
         ProcessingJob.duration_ms,
