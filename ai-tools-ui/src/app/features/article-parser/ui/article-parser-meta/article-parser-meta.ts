@@ -5,23 +5,14 @@ import { InputTextModule } from 'primeng/inputtext';
 import { ChipModule } from 'primeng/chip';
 import { ImageModule } from 'primeng/image';
 import { DialogModule } from 'primeng/dialog';
-import { CheckboxModule } from 'primeng/checkbox';
 import { RadioButtonModule } from 'primeng/radiobutton';
-import { ArticleParserApi, ExtractResponse, ImageInfo } from '../../api/article-parser-api';
+import { ArticleParserApi, ExtractResponse } from '../../api/article-parser-api';
 import { ArticleParserState } from '../../model/article-parser-state';
 import {
   ArticleMetaGalleriaItem,
   ArticleParserMetaGalleriaComponent,
 } from '../article-parser-meta-galleria/article-parser-meta-galleria';
-
-/** Строка в модальном окне удаления изображений галереи. */
-interface ArticleMetaImageManageRow {
-  url: string;
-  title: string;
-  alt: string;
-  isMain: boolean;
-  selected: boolean;
-}
+import { ArticleParserMetaImagesDeleteDialogComponent } from './article-parser-meta-images-delete-dialog/article-parser-meta-images-delete-dialog';
 
 /** Строка в модальном окне выбора главного изображения (без множественного выбора). */
 interface ArticleMetaMainPickRow {
@@ -42,9 +33,9 @@ interface ArticleMetaMainPickRow {
     ChipModule,
     ImageModule,
     DialogModule,
-    CheckboxModule,
     RadioButtonModule,
     ArticleParserMetaGalleriaComponent,
+    ArticleParserMetaImagesDeleteDialogComponent,
   ],
   templateUrl: './article-parser-meta.html',
   styleUrl: './article-parser-meta.scss',
@@ -55,12 +46,6 @@ export class ArticleParserMetaComponent implements OnChanges {
   isEditingMetaBlock = false;
 
   galleriaItems: ArticleMetaGalleriaItem[] = [];
-
-  imagesManageDialogVisible = false;
-
-  imageManageRows: ArticleMetaImageManageRow[] = [];
-
-  imagesDeleteLoading = false;
 
   mainImagePickDialogVisible = false;
 
@@ -145,33 +130,17 @@ export class ArticleParserMetaComponent implements OnChanges {
     console.log('Ошибка загрузки картинки:', this.mainImageUrl, event);
   }
 
-  get hasSelectedImagesForDelete(): boolean {
-    return this.imageManageRows.some((r) => r.selected);
-  }
-
-  get canPersistImageChanges(): boolean {
+  get canPersistMainImageChanges(): boolean {
     return !!this.article?.document_id?.trim();
   }
 
   get mainPickApplyDisabled(): boolean {
     const url = (this.mainPickerSelectedUrl || '').trim();
-    if (!url || !this.canPersistImageChanges || this.mainImagePickLoading) {
+    if (!url || !this.canPersistMainImageChanges || this.mainImagePickLoading) {
       return true;
     }
     const cur = (this.article?.main_image || '').trim();
     return url === cur;
-  }
-
-  openImagesManageDialog(): void {
-    const mainUrl = (this.article.main_image || '').trim();
-    this.imageManageRows = this.galleriaItems.map((it, idx) => ({
-      url: it.itemImageSrc,
-      title: (it.title || '').trim(),
-      alt: (it.alt || '').trim(),
-      isMain: idx === 0 && !!mainUrl && it.itemImageSrc === mainUrl,
-      selected: false,
-    }));
-    this.imagesManageDialogVisible = true;
   }
 
   openMainImagePickDialog(): void {
@@ -231,77 +200,6 @@ export class ArticleParserMetaComponent implements OnChanges {
       error: () => {
         this.mainImagePickLoading = false;
         this.state.error = 'Не удалось назначить главное изображение';
-        this.cdr.detectChanges();
-      },
-    });
-  }
-
-  closeImagesManageDialog(): void {
-    this.imagesManageDialogVisible = false;
-    this.onImagesManageDialogHide();
-  }
-
-  onImagesManageDialogHide(): void {
-    this.imageManageRows = [];
-    this.imagesDeleteLoading = false;
-  }
-
-  deleteSelectedImages(): void {
-    const docId = this.article?.document_id?.trim();
-    if (!docId) {
-      this.state.error = 'Нельзя удалить изображения: документ ещё не сохранён на сервере';
-      this.cdr.detectChanges();
-      return;
-    }
-
-    const selectedUrls = new Set(
-      this.imageManageRows.filter((r) => r.selected).map((r) => r.url),
-    );
-    if (selectedUrls.size === 0) {
-      return;
-    }
-
-    const mainUrl = (this.article.main_image || '').trim();
-    const mainAffected = !!mainUrl && selectedUrls.has(mainUrl);
-
-    const newImages: ImageInfo[] = (this.article.images ?? [])
-      .filter((img) => {
-        const u = (img.url || '').trim();
-        return u && !selectedUrls.has(u);
-      })
-      .map((img) => ({
-        url: img.url!.trim(),
-        alt: img.alt ?? null,
-        title: img.title ?? null,
-      }));
-
-    const payload: { images: ImageInfo[]; main_image?: string | null } = { images: newImages };
-    if (mainAffected) {
-      payload.main_image = null;
-    }
-
-    this.state.error = '';
-    this.imagesDeleteLoading = true;
-    this.cdr.detectChanges();
-
-    this.api.updateDocumentMetadata(docId, payload).subscribe({
-      next: () => {
-        const art = this.state.article;
-        if (art) {
-          this.state.article = {
-            ...art,
-            images: newImages,
-            main_image: mainAffected ? null : art.main_image,
-          };
-        }
-        this.imagesDeleteLoading = false;
-        this.imagesManageDialogVisible = false;
-        this.imageManageRows = [];
-        this.appRef.tick();
-      },
-      error: () => {
-        this.imagesDeleteLoading = false;
-        this.state.error = 'Не удалось удалить выбранные изображения';
         this.cdr.detectChanges();
       },
     });

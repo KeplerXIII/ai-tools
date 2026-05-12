@@ -540,14 +540,29 @@
   background: var(--light-text-color) !important;
 }
 
-/* Граница и фон видимой области чекбокса во включённом состоянии; галочка белая */
 .p-checkbox.p-checkbox-checked .p-checkbox-box,
 .p-checkbox.p-highlight .p-checkbox-box {
-  border: 1px solid var(--light-grey-text-color) !important;
-  background: var(--primary-text-color) !important;
+  background: var(--primary-text-color-light) !important;
+  border-color: var(--light-grey-text-color) !important;
 }
 
 .p-checkbox.p-checkbox-checked .p-checkbox-icon,
 .p-checkbox.p-highlight .p-checkbox-icon {
   color: var(--light-text-color) !important;
+}
+
+.p-radiobutton.p-radiobutton-checked .p-radiobutton-box,
+.p-radiobutton.p-highlight .p-radiobutton-box {
+  border: 1px solid var(--primary-text-color-light) !important;
+  background: var(--primary-text-color-light) !important;
+}
+
+.p-radiobutton.p-radiobutton-checked .p-radiobutton-icon,
+.p-radiobutton.p-highlight .p-radiobutton-icon,
+.p-radiobutton.p-radiobutton-checked .p-radiobutton-box .p-radiobutton-icon,
+.p-radiobutton.p-highlight .p-radiobutton-box .p-radiobutton-icon,
+.p-radiobutton:not(.p-disabled):has(.p-radiobutton-input:hover).p-radiobutton-checked
+  .p-radiobutton-box
+  .p-radiobutton-icon {
+  background: var(--light-text-color) !important;
 }

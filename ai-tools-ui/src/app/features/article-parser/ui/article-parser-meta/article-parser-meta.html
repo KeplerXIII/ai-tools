@@ -128,7 +128,7 @@
               type="button"
               class="block-edit-toggle no-print-field image-prew-manage-btn"
               aria-label="Удаление изображений статьи"
-              (click)="openImagesManageDialog()"
+              (click)="imagesDeleteDialog.open()"
             >
               <i class="pi pi-trash"></i>
             </button>
@@ -137,78 +137,11 @@
 
         <app-article-parser-meta-galleria [items]="galleriaItems" />
 
-        <p-dialog
-          [(visible)]="imagesManageDialogVisible"
-          [modal]="true"
-          [dismissableMask]="true"
-          [closable]="true"
-          [draggable]="false"
-          [appendTo]="'self'"
-          [style]="{ width: 'min(36rem, 94vw)' }"
-          styleClass="article-meta-images-dialog"
-          header="Удаление изображений"
-          (onHide)="onImagesManageDialogHide()"
-        >
-          <div class="images-manage-list">
-            @for (row of imageManageRows; track row.url; let i = $index) {
-              <div class="images-manage-row">
-                <p-checkbox
-                  [(ngModel)]="row.selected"
-                  [binary]="true"
-                  [inputId]="'article-meta-img-cb-' + i"
-                />
-                <div class="images-manage-body">
-                  <div class="images-manage-thumb-wrap">
-                    <img
-                      [src]="row.url"
-                      [attr.alt]="row.alt || row.title || 'Превью'"
-                      class="images-manage-thumb"
-                    />
-                  </div>
-                  <div class="images-manage-caption">
-                    @if (row.title) {
-                      <div class="images-manage-title">{{ row.title }}</div>
-                    }
-                    @if (row.alt) {
-                      <div class="images-manage-alt">{{ row.alt }}</div>
-                    }
-                    @if (!row.title && !row.alt) {
-                      <span class="images-manage-muted">Нет подписи</span>
-                    }
-                  </div>
-                </div>
-              </div>
-            }
-          </div>
-          <ng-template pTemplate="footer">
-            <div class="images-manage-footer">
-              @if (!canPersistImageChanges) {
-                <p class="images-manage-footer-hint">
-                  Сохранение недоступно: у документа нет идентификатора на сервере.
-                </p>
-              }
-              <div class="images-manage-footer-actions">
-                <button type="button" class="images-manage-btn images-manage-btn--ghost" (click)="closeImagesManageDialog()">
-                  Отмена
-                </button>
-                <button
-                  type="button"
-                  class="images-manage-btn images-manage-btn--danger"
-                  [disabled]="
-                    !hasSelectedImagesForDelete || !canPersistImageChanges || imagesDeleteLoading
-                  "
-                  (click)="deleteSelectedImages()"
-                >
-                  @if (imagesDeleteLoading) {
-                    Удаление…
-                  } @else {
-                    Удалить выбранные фотографии
-                  }
-                </button>
-              </div>
-            </div>
-          </ng-template>
-        </p-dialog>
+        <app-article-parser-meta-images-delete-dialog
+          #imagesDeleteDialog
+          [article]="article"
+          [galleriaItems]="galleriaItems"
+        />
 
         <p-dialog
           [(visible)]="mainImagePickDialogVisible"
@@ -262,7 +195,7 @@
           </div>
           <ng-template pTemplate="footer">
             <div class="images-manage-footer">
-              @if (!canPersistImageChanges) {
+              @if (!canPersistMainImageChanges) {
                 <p class="images-manage-footer-hint">
                   Сохранение недоступно: у документа нет идентификатора на сервере.
                 </p>

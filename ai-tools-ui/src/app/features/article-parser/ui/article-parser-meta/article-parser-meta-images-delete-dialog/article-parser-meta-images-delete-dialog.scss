@@ -1,0 +1,9 @@
+@use '../article-parser-meta-images-dialog.shared.scss';
+
+:host {
+  display: contents;
+}
+
+:host ::ng-deep .images-manage-row .p-checkbox:not(.p-checkbox-checked):not(.p-highlight) .p-checkbox-box {
+  background: var(--light-text-color);
+}
