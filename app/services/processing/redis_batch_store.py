@@ -1,20 +1,31 @@
 from __future__ import annotations
 
+from typing import Literal
+
 from redis import asyncio as aioredis
 
 from app.core.config import settings
 
-_KEY_PREFIX = "processing:extractor_batch:"
+ProcessingBatchKind = Literal["translate", "annotate", "categorize", "extractor", "tagger"]
+
+_KEY_PREFIXES: dict[ProcessingBatchKind, str] = {
+    "translate": "processing:translate_batch:",
+    "annotate": "processing:annotate_batch:",
+    "categorize": "processing:categorize_batch:",
+    "extractor": "processing:extractor_batch:",
+    "tagger": "processing:tagger_batch:",
+}
+
 _TTL_SEC = 7 * 24 * 60 * 60
 
 
-def _batch_key(batch_id: str) -> str:
-    return f"{_KEY_PREFIX}{batch_id}"
+def _batch_key(kind: ProcessingBatchKind, batch_id: str) -> str:
+    return f"{_KEY_PREFIXES[kind]}{batch_id}"
 
 
-async def init_extractor_batch(batch_id: str, *, scanned: int) -> None:
+async def init_processing_batch(kind: ProcessingBatchKind, batch_id: str, *, scanned: int) -> None:
     redis = aioredis.from_url(settings.saq_queue_url, encoding="utf-8", decode_responses=True)
-    key = _batch_key(batch_id)
+    key = _batch_key(kind, batch_id)
     try:
         await redis.hset(
             key,
@@ -31,9 +42,9 @@ async def init_extractor_batch(batch_id: str, *, scanned: int) -> None:
         await redis.aclose()
 
 
-async def inc_extractor_batch_counter(batch_id: str, field: str) -> None:
+async def inc_processing_batch(kind: ProcessingBatchKind, batch_id: str, field: str) -> None:
     redis = aioredis.from_url(settings.saq_queue_url, encoding="utf-8", decode_responses=True)
-    key = _batch_key(batch_id)
+    key = _batch_key(kind, batch_id)
     try:
         await redis.hincrby(key, field, 1)
         await redis.expire(key, _TTL_SEC)
@@ -41,9 +52,9 @@ async def inc_extractor_batch_counter(batch_id: str, field: str) -> None:
         await redis.aclose()
 
 
-async def get_extractor_batch(batch_id: str) -> dict[str, int] | None:
+async def get_processing_batch(kind: ProcessingBatchKind, batch_id: str) -> dict[str, int] | None:
     redis = aioredis.from_url(settings.saq_queue_url, encoding="utf-8", decode_responses=True)
-    key = _batch_key(batch_id)
+    key = _batch_key(kind, batch_id)
     try:
         payload = await redis.hgetall(key)
     finally:

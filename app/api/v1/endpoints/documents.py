@@ -21,6 +21,7 @@ from app.api.deps import (
     get_optional_started_by_id,
 )
 from app.api.error_mapping import map_app_error
+from app.api.streaming_utils import coop_text_chunks, sse_data_event_bytes
 from app.domain.errors import AppError, ValidationError
 from app.infrastructure.db.models import Category, Document, DocumentCategory, DocumentStatus, DocumentStatusAssignment
 from app.infrastructure.db.models import DocumentEntity, DocumentTag, Entity, EntityType, PredictionSource, Source, Tag, User
@@ -95,10 +96,7 @@ async def _prepare_write_session(db: AsyncSession) -> None:
 
 
 def _sse_data(payload: str) -> bytes:
-    # SSE requires each logical line to be prefixed with `data:`.
-    lines = payload.splitlines() or [""]
-    body = "".join(f"data: {line}\n" for line in lines)
-    return f"{body}\n".encode("utf-8")
+    return sse_data_event_bytes(payload)
 
 
 def _sse_error(message: str) -> bytes:
@@ -804,11 +802,9 @@ async def document_translate_stream(
             return
         parts: list[str] = []
         try:
-            async for chunk in stream:
-                s = chunk if isinstance(chunk, str) else str(chunk)
+            async for s in coop_text_chunks(stream):
                 parts.append(s)
                 yield _sse_data(s)
-                await asyncio.sleep(0)
         except Exception as exc:
             yield _sse_error(f"[stream_error] {exc}")
             return
@@ -1378,11 +1374,9 @@ async def document_summary_refine_stream(
             return
         parts: list[str] = []
         try:
-            async for chunk in stream:
-                s = chunk if isinstance(chunk, str) else str(chunk)
+            async for s in coop_text_chunks(stream):
                 parts.append(s)
                 yield _sse_data(s)
-                await asyncio.sleep(0)
         except Exception as exc:
             yield _sse_error(f"[stream_error] {exc}")
             return
@@ -1463,11 +1457,9 @@ async def document_summary_stream(
             return
         parts: list[str] = []
         try:
-            async for chunk in stream:
-                s = chunk if isinstance(chunk, str) else str(chunk)
+            async for s in coop_text_chunks(stream):
                 parts.append(s)
                 yield _sse_data(s)
-                await asyncio.sleep(0)
         except Exception as exc:
             yield _sse_error(f"[stream_error] {exc}")
             return

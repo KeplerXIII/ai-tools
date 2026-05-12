@@ -4,7 +4,7 @@ import asyncio
 import json
 import uuid
 from datetime import UTC, datetime
-from typing import Any, Literal
+from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -13,6 +13,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_optional_started_by_id
+from app.api.sse import sse_json_event
 from app.core.config import settings
 from app.core.llm_task import LLMTask
 from app.infrastructure.db.models import Document, DocumentCategory, DocumentEntity, DocumentTag, ProcessingJob, Tag
@@ -34,21 +35,13 @@ from app.schemas.processing import (
     TaggerBatchStatusResponse,
     TranslateBatchStatusResponse,
 )
-from app.services.processing.annotate_batch_store import (
-    get_annotate_batch,
-    inc_annotate_batch_counter,
-    init_annotate_batch,
-)
-from app.services.processing.categorize_batch_store import (
-    get_categorize_batch,
-    inc_categorize_batch_counter,
-    init_categorize_batch,
-)
 from app.services.processing.enqueue_locks import try_acquire_enqueue_lock
-from app.services.processing.extractor_batch_store import (
-    get_extractor_batch,
-    inc_extractor_batch_counter,
-    init_extractor_batch,
+from app.services.processing.jobs import JobStatus, JobType, provider_label_for_task
+from app.services.processing.redis_batch_store import (
+    ProcessingBatchKind,
+    get_processing_batch,
+    inc_processing_batch,
+    init_processing_batch,
 )
 from app.services.processing.saq_queue import (
     get_saq_annotate_queue,
@@ -56,17 +49,6 @@ from app.services.processing.saq_queue import (
     get_saq_extractor_queue,
     get_saq_tagger_queue,
     get_saq_translate_queue,
-)
-from app.services.processing.jobs import JobStatus, JobType, provider_label_for_task
-from app.services.processing.tagger_batch_store import (
-    get_tagger_batch,
-    inc_tagger_batch_counter,
-    init_tagger_batch,
-)
-from app.services.processing.translate_batch_store import (
-    get_translate_batch,
-    inc_translate_batch_counter,
-    init_translate_batch,
 )
 
 router = APIRouter(prefix="/processing", tags=["processing"])
@@ -114,12 +96,7 @@ async def _filter_out_active_jobs(
     return [d for d in document_ids if UUID(d) not in busy]
 
 
-def _sse_event(event: str, payload: dict) -> bytes:
-    data = json.dumps(payload, ensure_ascii=False, default=str)
-    return f"event: {event}\ndata: {data}\n\n".encode("utf-8")
-
-
-BatchKind = Literal["translate", "annotate", "categorize", "extractor", "tagger"]
+BatchKind = ProcessingBatchKind
 
 
 def _batch_status_dict(batch_id: str, payload: dict[str, int]) -> dict[str, Any]:
@@ -145,17 +122,7 @@ def _batch_status_dict(batch_id: str, payload: dict[str, int]) -> dict[str, Any]
 
 
 async def _fetch_batch_store_payload(kind: BatchKind, batch_id: str) -> dict[str, int] | None:
-    if kind == "translate":
-        return await get_translate_batch(batch_id)
-    if kind == "annotate":
-        return await get_annotate_batch(batch_id)
-    if kind == "categorize":
-        return await get_categorize_batch(batch_id)
-    if kind == "extractor":
-        return await get_extractor_batch(batch_id)
-    if kind == "tagger":
-        return await get_tagger_batch(batch_id)
-    raise ValueError(f"unknown_batch_kind:{kind}")
+    return await get_processing_batch(kind, batch_id)
 
 
 def _job_to_dict(job: ProcessingJob) -> dict:
@@ -252,7 +219,7 @@ async def enqueue_translate_documents(
     document_ids = await _require_documents_exist(db, payload.document_ids)
     document_ids = await _filter_out_active_jobs(db, document_ids, JobType.TRANSLATE)
     batch_id = str(uuid.uuid4())
-    await init_translate_batch(batch_id, scanned=len(document_ids))
+    await init_processing_batch("translate", batch_id, scanned=len(document_ids))
 
     queue = get_saq_translate_queue()
     await queue.connect()
@@ -295,7 +262,7 @@ async def enqueue_translate_documents(
             )
             if job is not None:
                 enqueued += 1
-                await inc_translate_batch_counter(batch_id, "enqueued")
+                await inc_processing_batch("translate", batch_id, "enqueued")
             else:
                 pending_job.status = JobStatus.CANCELLED
                 pending_job.finished_at = datetime.now(UTC)
@@ -313,7 +280,7 @@ async def enqueue_translate_documents(
 
 @router.get("/documents/translate/{batch_id}", response_model=TranslateBatchStatusResponse)
 async def get_translate_batch_status(batch_id: str) -> TranslateBatchStatusResponse:
-    payload = await get_translate_batch(batch_id)
+    payload = await get_processing_batch("translate", batch_id)
     if payload is None:
         raise HTTPException(status_code=404, detail="Батч не найден")
 
@@ -329,7 +296,7 @@ async def enqueue_annotate_documents(
     document_ids = await _require_documents_exist(db, payload.document_ids)
     document_ids = await _filter_out_active_jobs(db, document_ids, JobType.SUMMARY)
     batch_id = str(uuid.uuid4())
-    await init_annotate_batch(batch_id, scanned=len(document_ids))
+    await init_processing_batch("annotate", batch_id, scanned=len(document_ids))
 
     queue = get_saq_annotate_queue()
     await queue.connect()
@@ -370,7 +337,7 @@ async def enqueue_annotate_documents(
             )
             if job is not None:
                 enqueued += 1
-                await inc_annotate_batch_counter(batch_id, "enqueued")
+                await inc_processing_batch("annotate", batch_id, "enqueued")
             else:
                 pending_job.status = JobStatus.CANCELLED
                 pending_job.finished_at = datetime.now(UTC)
@@ -388,7 +355,7 @@ async def enqueue_annotate_documents(
 
 @router.get("/documents/annotate/{batch_id}", response_model=AnnotateBatchStatusResponse)
 async def get_annotate_batch_status(batch_id: str) -> AnnotateBatchStatusResponse:
-    payload = await get_annotate_batch(batch_id)
+    payload = await get_processing_batch("annotate", batch_id)
     if payload is None:
         raise HTTPException(status_code=404, detail="Батч не найден")
 
@@ -404,7 +371,7 @@ async def enqueue_categorize_documents(
     document_ids = await _require_documents_exist(db, payload.document_ids)
     document_ids = await _filter_out_active_jobs(db, document_ids, JobType.CATEGORIZE)
     batch_id = str(uuid.uuid4())
-    await init_categorize_batch(batch_id, scanned=len(document_ids))
+    await init_processing_batch("categorize", batch_id, scanned=len(document_ids))
 
     queue = get_saq_categorize_queue()
     await queue.connect()
@@ -445,7 +412,7 @@ async def enqueue_categorize_documents(
             )
             if job is not None:
                 enqueued += 1
-                await inc_categorize_batch_counter(batch_id, "enqueued")
+                await inc_processing_batch("categorize", batch_id, "enqueued")
             else:
                 pending_job.status = JobStatus.CANCELLED
                 pending_job.finished_at = datetime.now(UTC)
@@ -463,7 +430,7 @@ async def enqueue_categorize_documents(
 
 @router.get("/documents/categorize/{batch_id}", response_model=CategorizeBatchStatusResponse)
 async def get_categorize_batch_status(batch_id: str) -> CategorizeBatchStatusResponse:
-    payload = await get_categorize_batch(batch_id)
+    payload = await get_processing_batch("categorize", batch_id)
     if payload is None:
         raise HTTPException(status_code=404, detail="Батч не найден")
 
@@ -479,7 +446,7 @@ async def enqueue_extractor_documents(
     document_ids = await _require_documents_exist(db, payload.document_ids)
     document_ids = await _filter_out_active_jobs(db, document_ids, JobType.ENTITY_EXTRACT)
     batch_id = str(uuid.uuid4())
-    await init_extractor_batch(batch_id, scanned=len(document_ids))
+    await init_processing_batch("extractor", batch_id, scanned=len(document_ids))
 
     queue = get_saq_extractor_queue()
     await queue.connect()
@@ -520,7 +487,7 @@ async def enqueue_extractor_documents(
             )
             if job is not None:
                 enqueued += 1
-                await inc_extractor_batch_counter(batch_id, "enqueued")
+                await inc_processing_batch("extractor", batch_id, "enqueued")
             else:
                 pending_job.status = JobStatus.CANCELLED
                 pending_job.finished_at = datetime.now(UTC)
@@ -538,7 +505,7 @@ async def enqueue_extractor_documents(
 
 @router.get("/documents/extractor/{batch_id}", response_model=ExtractorBatchStatusResponse)
 async def get_extractor_batch_status(batch_id: str) -> ExtractorBatchStatusResponse:
-    payload = await get_extractor_batch(batch_id)
+    payload = await get_processing_batch("extractor", batch_id)
     if payload is None:
         raise HTTPException(status_code=404, detail="Батч не найден")
 
@@ -563,7 +530,7 @@ async def _enqueue_tagger_documents(
         queue_job_key_like=f"{same_source_active_key_prefix}%",
     )
     batch_id = str(uuid.uuid4())
-    await init_tagger_batch(batch_id, scanned=len(document_ids))
+    await init_processing_batch("tagger", batch_id, scanned=len(document_ids))
 
     queue = get_saq_tagger_queue()
     await queue.connect()
@@ -608,7 +575,7 @@ async def _enqueue_tagger_documents(
             )
             if job is not None:
                 enqueued += 1
-                await inc_tagger_batch_counter(batch_id, "enqueued")
+                await inc_processing_batch("tagger", batch_id, "enqueued")
             else:
                 pending_job.status = JobStatus.CANCELLED
                 pending_job.finished_at = datetime.now(UTC)
@@ -655,7 +622,7 @@ async def enqueue_tagger_translated_documents(
 
 @router.get("/documents/tagger/{batch_id}", response_model=TaggerBatchStatusResponse)
 async def get_tagger_batch_status(batch_id: str) -> TaggerBatchStatusResponse:
-    payload = await get_tagger_batch(batch_id)
+    payload = await get_processing_batch("tagger", batch_id)
     if payload is None:
         raise HTTPException(status_code=404, detail="Батч не найден")
 
@@ -675,7 +642,7 @@ async def stream_batch_status(
             try:
                 raw = await _fetch_batch_store_payload(kind, batch_id)
                 if raw is None:
-                    yield _sse_event("error", {"message": "Батч не найден"})
+                    yield sse_json_event("error", {"message": "Батч не найден"})
                     return
                 body = {
                     **_batch_status_dict(batch_id, raw),
@@ -684,7 +651,7 @@ async def stream_batch_status(
                 }
                 stable = json.dumps(body, ensure_ascii=False, sort_keys=True, default=str)
                 if stable != previous_json:
-                    yield _sse_event("snapshot", body)
+                    yield sse_json_event("snapshot", body)
                     previous_json = stable
                 if body["done"]:
                     return
@@ -693,7 +660,7 @@ async def stream_batch_status(
             except asyncio.CancelledError:
                 return
             except Exception as exc:
-                yield _sse_event("error", {"message": str(exc)})
+                yield sse_json_event("error", {"message": str(exc)})
                 await asyncio.sleep(2)
 
     return StreamingResponse(
@@ -721,7 +688,7 @@ async def stream_processing_dashboard() -> StreamingResponse:
                         "snapshot_at": datetime.now(UTC).isoformat(),
                         **stable_payload,
                     }
-                    yield _sse_event("snapshot", snapshot_payload)
+                    yield sse_json_event("snapshot", snapshot_payload)
                     previous_stable_payload_json = stable_payload_json
                 else:
                     yield b"event: heartbeat\ndata: ping\n\n"
@@ -729,7 +696,7 @@ async def stream_processing_dashboard() -> StreamingResponse:
             except asyncio.CancelledError:
                 break
             except Exception as exc:
-                yield _sse_event("error", {"message": str(exc)})
+                yield sse_json_event("error", {"message": str(exc)})
                 await asyncio.sleep(2)
 
     return StreamingResponse(

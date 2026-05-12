@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-from datetime import UTC, datetime
 from typing import Literal, cast
 from uuid import UUID
 
@@ -13,6 +12,7 @@ from sqlalchemy.exc import IntegrityError, NoResultFound
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_current_user_optional
+from app.api.sse import sse_json_event
 from app.core.config import settings
 from app.infrastructure.db.models import (
     Country,
@@ -48,11 +48,6 @@ from app.services.processing.jobs import JobStatus, JobType
 from app.services.processing.saq_queue import get_saq_parse_queue
 
 router = APIRouter(prefix="/parsing", tags=["parsing"])
-
-
-def _sse_event(event: str, payload: dict) -> bytes:
-    data = json.dumps(payload, ensure_ascii=False, default=str)
-    return f"event: {event}\ndata: {data}\n\n".encode("utf-8")
 
 
 async def _language_id_by_code(db: AsyncSession, code: str) -> UUID:
@@ -393,14 +388,14 @@ async def stream_parse_source_run(
         async with AsyncSessionLocal() as session:
             run0 = await session.get(SourceParseRun, parse_run_id)
             if run0 is None:
-                yield _sse_event("error", {"message": "Запуск разбора не найден"})
+                yield sse_json_event("error", {"message": "Запуск разбора не найден"})
                 return
             src0 = await session.get(Source, run0.source_id)
             if src0 is None:
-                yield _sse_event("error", {"message": "Источник не найден"})
+                yield sse_json_event("error", {"message": "Источник не найден"})
                 return
             if not user.is_admin and src0.user_id != user.id:
-                yield _sse_event("error", {"message": "Нет доступа"})
+                yield sse_json_event("error", {"message": "Нет доступа"})
                 return
 
         previous_json: str | None = None
@@ -409,7 +404,7 @@ async def stream_parse_source_run(
                 async with AsyncSessionLocal() as session:
                     run = await session.get(SourceParseRun, parse_run_id)
                     if run is None:
-                        yield _sse_event("error", {"message": "Запуск разбора удалён"})
+                        yield sse_json_event("error", {"message": "Запуск разбора удалён"})
                         return
                     body = await _parse_run_to_response(session, run)
                 payload = {
@@ -418,7 +413,7 @@ async def stream_parse_source_run(
                 }
                 stable = json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str)
                 if stable != previous_json:
-                    yield _sse_event("snapshot", payload)
+                    yield sse_json_event("snapshot", payload)
                     previous_json = stable
                 if run.status in ("completed", "failed"):
                     return
@@ -427,7 +422,7 @@ async def stream_parse_source_run(
             except asyncio.CancelledError:
                 return
             except Exception as exc:
-                yield _sse_event("error", {"message": str(exc)})
+                yield sse_json_event("error", {"message": str(exc)})
                 await asyncio.sleep(2)
 
     return StreamingResponse(
