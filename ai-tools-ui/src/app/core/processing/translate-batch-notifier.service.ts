@@ -1,101 +1,41 @@
 import { Injectable } from '@angular/core';
-import { HttpErrorResponse } from '@angular/common/http';
-import { BehaviorSubject, Subscription, timer } from 'rxjs';
+import { Observable } from 'rxjs';
 
 import { DocumentsApi, TranslateBatchStatusResponse } from '../../features/documents/documents-api';
 
-type ToastKind = 'success' | 'error';
+import {
+  AbstractBatchToastNotifierService,
+  GlobalToast,
+} from './abstract-batch-toast-notifier.service';
+import { ProcessingBatchStreamApi } from './processing-batch-stream.service';
 
-export interface GlobalToast {
-  kind: ToastKind;
-  text: string;
-}
+export type { GlobalToast };
 
 @Injectable({
   providedIn: 'root',
 })
-export class TranslateBatchNotifierService {
-  private readonly storageKey = 'translate_batch_id';
-  private pollSub: Subscription | null = null;
-  private hideTimer: ReturnType<typeof setTimeout> | null = null;
-
-  private readonly _toast = new BehaviorSubject<GlobalToast | null>(null);
-  /** Async pipe в корневом компоненте запускает change detection при обновлении тоста. */
-  readonly toast$ = this._toast.asObservable();
-
-  constructor(private readonly documentsApi: DocumentsApi) {}
-
-  initFromStorage(): void {
-    const batchId = localStorage.getItem(this.storageKey);
-    if (batchId) {
-      this.startPolling(batchId);
-    }
+export class TranslateBatchNotifierService extends AbstractBatchToastNotifierService {
+  protected override get storageKey(): string {
+    return 'translate_batch_id';
   }
 
-  trackBatch(batchId: string): void {
-    localStorage.setItem(this.storageKey, batchId);
-    this.startPolling(batchId);
+  protected override get batchKind() {
+    return 'translate' as const;
   }
 
-  stopTrackingByBatchId(batchId: string): boolean {
-    const normalized = batchId.trim();
-    if (!normalized) {
-      return false;
-    }
-    const current = localStorage.getItem(this.storageKey);
-    if (current !== normalized) {
-      return false;
-    }
-    this.stopTracking();
-    return true;
+  constructor(batchStream: ProcessingBatchStreamApi, documentsApi: DocumentsApi) {
+    super(batchStream, documentsApi);
   }
 
-  dismissToast(): void {
-    this._toast.next(null);
-    if (this.hideTimer) {
-      clearTimeout(this.hideTimer);
-      this.hideTimer = null;
-    }
+  protected override fetchStatus(batchId: string): Observable<TranslateBatchStatusResponse> {
+    return this.documentsApi.getTranslateBatchStatus(batchId);
   }
 
-  private startPolling(batchId: string): void {
-    this.pollSub?.unsubscribe();
-    this.pollSub = timer(0, 5000).subscribe(() => {
-      this.documentsApi.getTranslateBatchStatus(batchId).subscribe({
-        next: (status) => this.handleStatus(status),
-        error: (err: HttpErrorResponse) => {
-          if (err.status === 404) {
-            this.stopTracking();
-          }
-        },
-      });
-    });
-  }
-
-  private handleStatus(status: TranslateBatchStatusResponse): void {
-    if (!status.done) {
-      return;
-    }
-
+  protected override buildToast(status: TranslateBatchStatusResponse): GlobalToast {
     const hasErrors = status.failed > 0;
-    this._toast.next({
+    return {
       kind: hasErrors ? 'error' : 'success',
       text: `Перевод завершен: переведено ${status.completed}, ошибок ${status.failed}, пропущено ${status.skipped}`,
-    });
-    this.stopTracking();
-
-    if (this.hideTimer) {
-      clearTimeout(this.hideTimer);
-    }
-    this.hideTimer = setTimeout(() => {
-      this._toast.next(null);
-      this.hideTimer = null;
-    }, 9000);
-  }
-
-  private stopTracking(): void {
-    this.pollSub?.unsubscribe();
-    this.pollSub = null;
-    localStorage.removeItem(this.storageKey);
+    };
   }
 }

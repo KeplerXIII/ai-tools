@@ -1,17 +1,18 @@
 import { Injectable } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
-import { BehaviorSubject, Subscription, timer } from 'rxjs';
+import { BehaviorSubject, Subscription } from 'rxjs';
 
-import { DocumentsApi } from '../../features/documents/documents-api';
+import { DocumentsApi, TaggerBatchStatusResponse } from '../../features/documents/documents-api';
 
-type ToastKind = 'success' | 'error';
+import { GlobalToast } from './abstract-batch-toast-notifier.service';
+import { ProcessingBatchStreamApi, ProcessingBatchStreamSnapshot } from './processing-batch-stream.service';
 
-export interface GlobalToast {
-  kind: ToastKind;
-  text: string;
-}
+export type { GlobalToast };
 
 type TaggerSource = 'original' | 'translated';
+
+const RECONNECT_MS = 3000;
+const TOAST_HIDE_MS = 9000;
 
 @Injectable({
   providedIn: 'root',
@@ -21,26 +22,31 @@ export class TaggerBatchNotifierService {
     original: 'tagger_batch_original',
     translated: 'tagger_batch_translated',
   };
-  private pollSubs: Partial<Record<TaggerSource, Subscription>> = {};
+  private streamSubs: Partial<Record<TaggerSource, Subscription>> = {};
+  private reconnectTimers: Partial<Record<TaggerSource, ReturnType<typeof setTimeout>>> = {};
+  private trackedIds: Partial<Record<TaggerSource, string>> = {};
   private hideTimer: ReturnType<typeof setTimeout> | null = null;
 
   private readonly _toast = new BehaviorSubject<GlobalToast | null>(null);
   readonly toast$ = this._toast.asObservable();
 
-  constructor(private readonly documentsApi: DocumentsApi) {}
+  constructor(
+    private readonly batchStream: ProcessingBatchStreamApi,
+    private readonly documentsApi: DocumentsApi,
+  ) {}
 
   initFromStorage(): void {
     (['original', 'translated'] as const).forEach((source) => {
       const batchId = localStorage.getItem(this.storageKeys[source]);
       if (batchId) {
-        this.startPolling(source, batchId);
+        this.startStream(source, batchId);
       }
     });
   }
 
   trackBatch(batchId: string, source: TaggerSource): void {
     localStorage.setItem(this.storageKeys[source], batchId);
-    this.startPolling(source, batchId);
+    this.startStream(source, batchId);
   }
 
   stopTrackingByBatchId(batchId: string): boolean {
@@ -67,29 +73,39 @@ export class TaggerBatchNotifierService {
     }
   }
 
-  private startPolling(source: TaggerSource, batchId: string): void {
-    this.pollSubs[source]?.unsubscribe();
-    this.pollSubs[source] = timer(0, 5000).subscribe(() => {
-      this.documentsApi.getTaggerBatchStatus(batchId).subscribe({
-        next: (status) => this.handleStatus(source, status),
-        error: (err: HttpErrorResponse) => {
-          if (err.status === 404) {
-            this.stopTracking(source);
-          }
-        },
-      });
+  private startStream(source: TaggerSource, batchId: string): void {
+    this.clearReconnect(source);
+    this.streamSubs[source]?.unsubscribe();
+    delete this.streamSubs[source];
+    this.trackedIds[source] = batchId;
+    this.streamSubs[source] = this.batchStream.stream(batchId, 'tagger').subscribe({
+      next: (snap) => this.onSnapshot(source, snap),
+      error: () => this.onTransportError(source),
+      complete: () => this.onStreamComplete(source),
     });
   }
 
-  private handleStatus(
-    source: TaggerSource,
-    status: {
-      done: boolean;
-      completed: number;
-      failed: number;
-      skipped: number;
-    },
-  ): void {
+  private onSnapshot(source: TaggerSource, snap: ProcessingBatchStreamSnapshot): void {
+    const { snapshot_at: _sa, kind: _k, ...rest } = snap;
+    this.applyIfDone(source, rest as TaggerBatchStatusResponse);
+  }
+
+  private onStreamComplete(source: TaggerSource): void {
+    const id = localStorage.getItem(this.storageKeys[source]);
+    if (!id) {
+      return;
+    }
+    this.documentsApi.getTaggerBatchStatus(id).subscribe({
+      next: (s) => this.applyIfDone(source, s),
+      error: (e: HttpErrorResponse) => {
+        if (e.status === 404) {
+          this.stopTracking(source);
+        }
+      },
+    });
+  }
+
+  private applyIfDone(source: TaggerSource, status: TaggerBatchStatusResponse): void {
     if (!status.done) {
       return;
     }
@@ -100,19 +116,63 @@ export class TaggerBatchNotifierService {
       text: `Tagger (${sourceLabel}) завершен: готово ${status.completed}, ошибок ${status.failed}, пропущено ${status.skipped}`,
     });
     this.stopTracking(source);
-
     if (this.hideTimer) {
       clearTimeout(this.hideTimer);
     }
     this.hideTimer = setTimeout(() => {
       this._toast.next(null);
       this.hideTimer = null;
-    }, 9000);
+    }, TOAST_HIDE_MS);
+  }
+
+  private onTransportError(source: TaggerSource): void {
+    const id = this.trackedIds[source] ?? localStorage.getItem(this.storageKeys[source]);
+    if (!id) {
+      return;
+    }
+    this.streamSubs[source]?.unsubscribe();
+    delete this.streamSubs[source];
+    this.documentsApi.getTaggerBatchStatus(id).subscribe({
+      next: (s) => {
+        if (s.done) {
+          this.applyIfDone(source, s);
+        } else {
+          this.scheduleReconnect(source, id);
+        }
+      },
+      error: (e: HttpErrorResponse) => {
+        if (e.status === 404) {
+          this.stopTracking(source);
+        } else {
+          this.scheduleReconnect(source, id);
+        }
+      },
+    });
+  }
+
+  private scheduleReconnect(source: TaggerSource, batchId: string): void {
+    this.clearReconnect(source);
+    this.reconnectTimers[source] = setTimeout(() => {
+      delete this.reconnectTimers[source];
+      if (localStorage.getItem(this.storageKeys[source]) === batchId) {
+        this.startStream(source, batchId);
+      }
+    }, RECONNECT_MS);
+  }
+
+  private clearReconnect(source: TaggerSource): void {
+    const t = this.reconnectTimers[source];
+    if (t) {
+      clearTimeout(t);
+      delete this.reconnectTimers[source];
+    }
   }
 
   private stopTracking(source: TaggerSource): void {
-    this.pollSubs[source]?.unsubscribe();
-    delete this.pollSubs[source];
+    this.clearReconnect(source);
+    this.streamSubs[source]?.unsubscribe();
+    delete this.streamSubs[source];
+    delete this.trackedIds[source];
     localStorage.removeItem(this.storageKeys[source]);
   }
 }

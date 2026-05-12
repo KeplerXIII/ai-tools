@@ -4,9 +4,10 @@ import asyncio
 import json
 import uuid
 from datetime import UTC, datetime
+from typing import Any, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -116,6 +117,45 @@ async def _filter_out_active_jobs(
 def _sse_event(event: str, payload: dict) -> bytes:
     data = json.dumps(payload, ensure_ascii=False, default=str)
     return f"event: {event}\ndata: {data}\n\n".encode("utf-8")
+
+
+BatchKind = Literal["translate", "annotate", "categorize", "extractor", "tagger"]
+
+
+def _batch_status_dict(batch_id: str, payload: dict[str, int]) -> dict[str, Any]:
+    """Общее тело ответа для REST и SSE (счётчики из Redis)."""
+    enqueued = int(payload["enqueued"])
+    completed = int(payload["completed"])
+    failed = int(payload["failed"])
+    skipped = int(payload["skipped"])
+    finished = completed + failed + skipped
+    pending = max(0, enqueued - finished)
+    done = enqueued == 0 or pending == 0
+    return {
+        "ok": True,
+        "batch_id": batch_id,
+        "scanned": int(payload["scanned"]),
+        "enqueued": enqueued,
+        "completed": completed,
+        "failed": failed,
+        "skipped": skipped,
+        "pending": pending,
+        "done": done,
+    }
+
+
+async def _fetch_batch_store_payload(kind: BatchKind, batch_id: str) -> dict[str, int] | None:
+    if kind == "translate":
+        return await get_translate_batch(batch_id)
+    if kind == "annotate":
+        return await get_annotate_batch(batch_id)
+    if kind == "categorize":
+        return await get_categorize_batch(batch_id)
+    if kind == "extractor":
+        return await get_extractor_batch(batch_id)
+    if kind == "tagger":
+        return await get_tagger_batch(batch_id)
+    raise ValueError(f"unknown_batch_kind:{kind}")
 
 
 def _job_to_dict(job: ProcessingJob) -> dict:
@@ -277,24 +317,7 @@ async def get_translate_batch_status(batch_id: str) -> TranslateBatchStatusRespo
     if payload is None:
         raise HTTPException(status_code=404, detail="Батч не найден")
 
-    enqueued = payload["enqueued"]
-    completed = payload["completed"]
-    failed = payload["failed"]
-    skipped = payload["skipped"]
-    finished = completed + failed + skipped
-    pending = max(0, enqueued - finished)
-    done = enqueued == 0 or pending == 0
-
-    return TranslateBatchStatusResponse(
-        batch_id=batch_id,
-        scanned=payload["scanned"],
-        enqueued=enqueued,
-        completed=completed,
-        failed=failed,
-        skipped=skipped,
-        pending=pending,
-        done=done,
-    )
+    return TranslateBatchStatusResponse.model_validate(_batch_status_dict(batch_id, payload))
 
 
 @router.post("/documents/annotate", response_model=EnqueueAnnotateResponse)
@@ -369,24 +392,7 @@ async def get_annotate_batch_status(batch_id: str) -> AnnotateBatchStatusRespons
     if payload is None:
         raise HTTPException(status_code=404, detail="Батч не найден")
 
-    enqueued = payload["enqueued"]
-    completed = payload["completed"]
-    failed = payload["failed"]
-    skipped = payload["skipped"]
-    finished = completed + failed + skipped
-    pending = max(0, enqueued - finished)
-    done = enqueued == 0 or pending == 0
-
-    return AnnotateBatchStatusResponse(
-        batch_id=batch_id,
-        scanned=payload["scanned"],
-        enqueued=enqueued,
-        completed=completed,
-        failed=failed,
-        skipped=skipped,
-        pending=pending,
-        done=done,
-    )
+    return AnnotateBatchStatusResponse.model_validate(_batch_status_dict(batch_id, payload))
 
 
 @router.post("/documents/categorize", response_model=EnqueueCategorizeResponse)
@@ -461,24 +467,7 @@ async def get_categorize_batch_status(batch_id: str) -> CategorizeBatchStatusRes
     if payload is None:
         raise HTTPException(status_code=404, detail="Батч не найден")
 
-    enqueued = payload["enqueued"]
-    completed = payload["completed"]
-    failed = payload["failed"]
-    skipped = payload["skipped"]
-    finished = completed + failed + skipped
-    pending = max(0, enqueued - finished)
-    done = enqueued == 0 or pending == 0
-
-    return CategorizeBatchStatusResponse(
-        batch_id=batch_id,
-        scanned=payload["scanned"],
-        enqueued=enqueued,
-        completed=completed,
-        failed=failed,
-        skipped=skipped,
-        pending=pending,
-        done=done,
-    )
+    return CategorizeBatchStatusResponse.model_validate(_batch_status_dict(batch_id, payload))
 
 
 @router.post("/documents/extractor", response_model=EnqueueExtractorResponse)
@@ -553,24 +542,7 @@ async def get_extractor_batch_status(batch_id: str) -> ExtractorBatchStatusRespo
     if payload is None:
         raise HTTPException(status_code=404, detail="Батч не найден")
 
-    enqueued = payload["enqueued"]
-    completed = payload["completed"]
-    failed = payload["failed"]
-    skipped = payload["skipped"]
-    finished = completed + failed + skipped
-    pending = max(0, enqueued - finished)
-    done = enqueued == 0 or pending == 0
-
-    return ExtractorBatchStatusResponse(
-        batch_id=batch_id,
-        scanned=payload["scanned"],
-        enqueued=enqueued,
-        completed=completed,
-        failed=failed,
-        skipped=skipped,
-        pending=pending,
-        done=done,
-    )
+    return ExtractorBatchStatusResponse.model_validate(_batch_status_dict(batch_id, payload))
 
 
 async def _enqueue_tagger_documents(
@@ -687,23 +659,51 @@ async def get_tagger_batch_status(batch_id: str) -> TaggerBatchStatusResponse:
     if payload is None:
         raise HTTPException(status_code=404, detail="Батч не найден")
 
-    enqueued = payload["enqueued"]
-    completed = payload["completed"]
-    failed = payload["failed"]
-    skipped = payload["skipped"]
-    finished = completed + failed + skipped
-    pending = max(0, enqueued - finished)
-    done = enqueued == 0 or pending == 0
+    return TaggerBatchStatusResponse.model_validate(_batch_status_dict(batch_id, payload))
 
-    return TaggerBatchStatusResponse(
-        batch_id=batch_id,
-        scanned=payload["scanned"],
-        enqueued=enqueued,
-        completed=completed,
-        failed=failed,
-        skipped=skipped,
-        pending=pending,
-        done=done,
+
+@router.get("/batches/{batch_id}/stream")
+async def stream_batch_status(
+    batch_id: str,
+    kind: BatchKind = Query(..., description="Тип батча (очередь)"),
+) -> StreamingResponse:
+    """SSE: прогресс батча до ``done`` (для тостов без polling)."""
+
+    async def event_stream():
+        previous_json: str | None = None
+        while True:
+            try:
+                raw = await _fetch_batch_store_payload(kind, batch_id)
+                if raw is None:
+                    yield _sse_event("error", {"message": "Батч не найден"})
+                    return
+                body = {
+                    **_batch_status_dict(batch_id, raw),
+                    "snapshot_at": datetime.now(UTC).isoformat(),
+                    "kind": kind,
+                }
+                stable = json.dumps(body, ensure_ascii=False, sort_keys=True, default=str)
+                if stable != previous_json:
+                    yield _sse_event("snapshot", body)
+                    previous_json = stable
+                if body["done"]:
+                    return
+                yield b"event: heartbeat\ndata: ping\n\n"
+                await asyncio.sleep(1)
+            except asyncio.CancelledError:
+                return
+            except Exception as exc:
+                yield _sse_event("error", {"message": str(exc)})
+                await asyncio.sleep(2)
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
     )
 
 
