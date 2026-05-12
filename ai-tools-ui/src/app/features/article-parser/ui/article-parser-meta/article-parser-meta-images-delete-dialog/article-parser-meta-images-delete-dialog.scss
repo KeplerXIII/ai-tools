@@ -7,3 +7,16 @@
 :host ::ng-deep .images-manage-row .p-checkbox:not(.p-checkbox-checked):not(.p-highlight) .p-checkbox-box {
   background: var(--light-text-color);
 }
+
+:host ::ng-deep .article-meta-images-dialog {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+:host ::ng-deep .article-meta-images-dialog .images-manage-row {
+  border-radius: 6px;
+}
+
+:host ::ng-deep .article-meta-images-dialog .images-manage-thumb-wrap {
+  border-radius: 6px;
+}

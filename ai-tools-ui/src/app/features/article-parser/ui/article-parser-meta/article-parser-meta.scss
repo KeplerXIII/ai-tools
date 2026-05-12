@@ -281,37 +281,3 @@
   font-size: 2rem;
   color: var(--light-grey-text-color);
 }
-
-.images-manage-intro {
-  margin: 0 0 12px;
-  font-size: 14px;
-  line-height: 1.45;
-  color: var(--grey-text-color);
-}
-
-.article-meta-main-pick-dialog .images-manage-list {
-  max-height: min(52vh, 24rem);
-}
-
-.images-manage-current-badge {
-  display: inline-block;
-  font-size: 11px;
-  font-weight: var(--font-weight-semibold, 600);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: var(--primary-text-color-light, #4c6e8b);
-  background: var(--unread-notification-color, rgb(76 110 139 / 10%));
-  padding: 3px 8px;
-  border-radius: 6px;
-  margin-bottom: 6px;
-}
-
-:host ::ng-deep .images-manage-row--pick-main .p-radiobutton:not(.p-radiobutton-checked):not(.p-highlight) .p-radiobutton-box {
-  background: var(--light-text-color);
-}
-
-
-
-.images-manage-btn--primary:hover:not(:disabled) {
-  filter: brightness(1.08);
-}
