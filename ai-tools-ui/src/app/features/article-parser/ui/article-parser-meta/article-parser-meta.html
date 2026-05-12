@@ -115,14 +115,24 @@
       @if (hasGalleryImages()) {
         <div class="image-prew-title-wrapper">
           <p class="image-prew-title">Предпросмотр изображений:</p>
-          <button
-            type="button"
-            class="block-edit-toggle no-print-field image-prew-manage-btn"
-            aria-label="Управление изображениями статьи"
-            (click)="openImagesManageDialog()"
-          >
-            <i class="pi pi-trash"></i>
-          </button>
+          <div class="image-prew-title-actions">
+            <button
+              type="button"
+              class="block-edit-toggle no-print-field image-prew-manage-btn"
+              aria-label="Назначить главное изображение"
+              (click)="openMainImagePickDialog()"
+            >
+              <i class="pi pi-star"></i>
+            </button>
+            <button
+              type="button"
+              class="block-edit-toggle no-print-field image-prew-manage-btn"
+              aria-label="Удаление изображений статьи"
+              (click)="openImagesManageDialog()"
+            >
+              <i class="pi pi-trash"></i>
+            </button>
+          </div>
         </div>
 
         <app-article-parser-meta-galleria [items]="galleriaItems" />
@@ -193,6 +203,88 @@
                     Удаление…
                   } @else {
                     Удалить выбранные фотографии
+                  }
+                </button>
+              </div>
+            </div>
+          </ng-template>
+        </p-dialog>
+
+        <p-dialog
+          [(visible)]="mainImagePickDialogVisible"
+          [modal]="true"
+          [dismissableMask]="true"
+          [closable]="true"
+          [draggable]="false"
+          [appendTo]="'self'"
+          [style]="{ width: 'min(36rem, 94vw)' }"
+          styleClass="article-meta-images-dialog article-meta-main-pick-dialog"
+          header="Главное изображение"
+          (onHide)="onMainImagePickDialogHide()"
+        >
+          <p class="images-manage-intro">
+            Выберите фотографию, которая будет главной для статьи (поле «Главное изображение»).
+          </p>
+          <div class="images-manage-list">
+            @for (row of mainPickRows; track row.url; let i = $index) {
+              <div class="images-manage-row images-manage-row--pick-main">
+                <p-radiobutton
+                  name="articleMainImagePick"
+                  [inputId]="'article-meta-main-rb-' + i"
+                  [value]="row.url"
+                  [(ngModel)]="mainPickerSelectedUrl"
+                />
+                <div class="images-manage-body">
+                  <div class="images-manage-thumb-wrap">
+                    <img
+                      [src]="row.url"
+                      [attr.alt]="row.alt || row.title || 'Превью'"
+                      class="images-manage-thumb"
+                    />
+                  </div>
+                  <div class="images-manage-caption">
+                    @if (row.isMain) {
+                      <span class="images-manage-current-badge">Сейчас главное</span>
+                    }
+                    @if (row.title) {
+                      <div class="images-manage-title">{{ row.title }}</div>
+                    }
+                    @if (row.alt) {
+                      <div class="images-manage-alt">{{ row.alt }}</div>
+                    }
+                    @if (!row.title && !row.alt) {
+                      <span class="images-manage-muted">Нет подписи</span>
+                    }
+                  </div>
+                </div>
+              </div>
+            }
+          </div>
+          <ng-template pTemplate="footer">
+            <div class="images-manage-footer">
+              @if (!canPersistImageChanges) {
+                <p class="images-manage-footer-hint">
+                  Сохранение недоступно: у документа нет идентификатора на сервере.
+                </p>
+              }
+              <div class="images-manage-footer-actions">
+                <button
+                  type="button"
+                  class="images-manage-btn images-manage-btn--ghost"
+                  (click)="closeMainImagePickDialog()"
+                >
+                  Отмена
+                </button>
+                <button
+                  type="button"
+                  class="images-manage-btn images-manage-btn--primary"
+                  [disabled]="mainPickApplyDisabled"
+                  (click)="applyMainImagePick()"
+                >
+                  @if (mainImagePickLoading) {
+                    Сохранение…
+                  } @else {
+                    Назначить главным
                   }
                 </button>
               </div>
