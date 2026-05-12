@@ -1,4 +1,14 @@
-import { Component, EventEmitter, Input, Output, ViewChild } from '@angular/core';
+import {
+  afterNextRender,
+  Component,
+  EventEmitter,
+  HostListener,
+  inject,
+  Injector,
+  Input,
+  Output,
+  ViewChild,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ChipModule } from 'primeng/chip';
 import { SkeletonModule } from 'primeng/skeleton';
@@ -36,12 +46,18 @@ export class ArticleParserEntitiesComponent {
   @Output() entitiesLoadingChange = new EventEmitter<boolean>();
   @ViewChild('entityPickerSelect') entityPickerSelect?: Select;
 
+  private readonly injector = inject(Injector);
+  /** Увеличивается при закрытии/смене, чтобы отбрасывать устаревшие ответы каталога. */
+  private entityPickerLoadGeneration = 0;
+
   readonly ButtonVariant = ButtonVariant;
 
   loadingEntities = false;
   entitiesError = '';
 
   entityPickerOpen: EntitySection | null = null;
+  /** Пока грузится каталог — селект не в DOM, чтобы не мелькало «Выберите сущность». */
+  entityPickerLoadingSection: EntitySection | null = null;
   entityPickerSearch = '';
   entityPickerCatalogItems: DocumentEntityRef[] = [];
   selectedEntityPickerItem: DocumentEntityRef | null = null;
@@ -61,6 +77,39 @@ export class ArticleParserEntitiesComponent {
     private api: ArticleParserApi,
     public state: ArticleParserState,
   ) {}
+
+  @HostListener('document:pointerdown', ['$event'])
+  onDocumentPointerDown(event: PointerEvent): void {
+    if (!this.entityPickerOpen) {
+      return;
+    }
+    const path = event.composedPath();
+    const insideOverlay = path.some(
+      (n) =>
+        n instanceof HTMLElement &&
+        (n.classList.contains('p-select-overlay') ||
+          n.classList.contains('entity-picker-select-panel--light')),
+    );
+    if (insideOverlay) {
+      return;
+    }
+    const insideActiveEntityRow = path.some(
+      (n) =>
+        n instanceof HTMLElement && n.closest('[data-active-entity-picker]') !== null,
+    );
+    if (insideActiveEntityRow) {
+      return;
+    }
+    this.closeEntityPicker();
+  }
+
+  /** Синхронизация после закрытия панели (Esc, анимация и т.д.). */
+  onEntityPickerOverlayHide(): void {
+    if (!this.entityPickerOpen) {
+      return;
+    }
+    this.clearEntityPickerHostState();
+  }
 
   requestEntities(): void {
     if (!this.state.article?.text || !this.state.article.document_id) return;
@@ -126,21 +175,57 @@ export class ArticleParserEntitiesComponent {
       return;
     }
 
-    this.entityPickerOpen = section;
+    if (this.entityPickerLoadingSection === section) {
+      this.entityPickerLoadGeneration++;
+      this.entityPickerLoadingSection = null;
+      this.loadingEntityPickerCatalog = false;
+      return;
+    }
+
+    if (this.entityPickerOpen && this.entityPickerOpen !== section) {
+      this.closeEntityPicker();
+    }
+
+    if (this.entityPickerLoadingSection !== null && this.entityPickerLoadingSection !== section) {
+      this.entityPickerLoadGeneration++;
+      this.entityPickerLoadingSection = null;
+      this.loadingEntityPickerCatalog = false;
+    }
+
+    this.entityPickerLoadingSection = section;
     this.entityPickerSearch = '';
     this.entityPickerCatalogItems = [];
     this.selectedEntityPickerItem = null;
+    this.entityPickerOpen = null;
+
     const docId = this.state.article.document_id;
     const typeCode = this.entityTypeCodeForSection(section);
     this.loadingEntityPickerCatalog = true;
+    const generation = this.entityPickerLoadGeneration;
 
     this.api.getEntityCatalog(docId, typeCode).subscribe({
       next: (items: DocumentEntityRef[]) => {
+        if (generation !== this.entityPickerLoadGeneration) {
+          return;
+        }
         this.entityPickerCatalogItems = items;
         this.loadingEntityPickerCatalog = false;
-        setTimeout(() => this.entityPickerSelect?.show(true));
+        this.entityPickerLoadingSection = null;
+        this.entityPickerOpen = section;
+        afterNextRender(
+          () => {
+            if (generation !== this.entityPickerLoadGeneration || this.entityPickerOpen !== section) {
+              return;
+            }
+            this.entityPickerSelect?.show(true);
+          },
+          { injector: this.injector },
+        );
       },
       error: () => {
+        if (generation !== this.entityPickerLoadGeneration) {
+          return;
+        }
         this.entitiesError = 'Не удалось загрузить список сущностей';
         this.loadingEntityPickerCatalog = false;
         this.closeEntityPicker();
@@ -324,11 +409,18 @@ export class ArticleParserEntitiesComponent {
     this.loadingTagPickerCatalog = false;
   }
 
-  private closeEntityPicker(): void {
+  private clearEntityPickerHostState(): void {
     this.entityPickerOpen = null;
+    this.entityPickerLoadingSection = null;
     this.entityPickerSearch = '';
     this.entityPickerCatalogItems = [];
     this.selectedEntityPickerItem = null;
     this.loadingEntityPickerCatalog = false;
+  }
+
+  private closeEntityPicker(): void {
+    this.entityPickerLoadGeneration++;
+    this.entityPickerSelect?.hide();
+    this.clearEntityPickerHostState();
   }
 }

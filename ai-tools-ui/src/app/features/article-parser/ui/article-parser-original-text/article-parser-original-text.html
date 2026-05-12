@@ -1,0 +1,77 @@
+@if (state.article; as article) {
+  <section class="panel full print-original-last">
+    <div class="title-wrapper original-title-row">
+      <h3 class="panel-title">Исходный текст</h3>
+
+      <div class="original-title-trailing">
+        <div class="translate-teg-btn">
+          <div class="teg-btn-wrapper">
+            <app-outline-button
+              text="Тегировать оригинал"
+              size="large"
+              [variant]="ButtonVariant.Rounded"
+              [disabled]="isDisabled"
+              (clicked)="tagOriginal.emit()"
+            />
+
+            @if (originalTagsError) {
+              <div class="field-error">{{ originalTagsError }}</div>
+            }
+          </div>
+
+          <div class="translate-btn-wrapper">
+            <app-outline-button
+              text="Перевести на русский"
+              size="large"
+              [variant]="ButtonVariant.Rounded"
+              [disabled]="isDisabled"
+              (clicked)="translateArticle.emit()"
+            />
+
+            @if (translationError) {
+              <div class="field-error">{{ translationError }}</div>
+            }
+          </div>
+        </div>
+
+        <button
+          type="button"
+          class="block-edit-toggle no-print-field"
+          [class.block-edit-toggle--active]="isEditingOriginalBlock"
+          [attr.aria-pressed]="isEditingOriginalBlock"
+          [attr.aria-label]="
+            isEditingOriginalBlock ? 'Завершить редактирование блока' : 'Редактировать блок'
+          "
+          (click)="toggleOriginalEdit()"
+        >
+          <i
+            class="pi"
+            [class.pi-pencil]="!isEditingOriginalBlock"
+            [class.pi-check]="isEditingOriginalBlock"
+          ></i>
+        </button>
+      </div>
+    </div>
+
+    <div class="print-text-block" [innerHTML]="highlightedArticleText"></div>
+    @if (isEditingOriginalBlock) {
+      <div #originalTextEditor class="article-original-editor no-print-field">
+        <textarea
+          pTextarea
+          id="article_text"
+          class="full-width custom-textarea-scroll"
+          name="article_text"
+          [(ngModel)]="article.text"
+          rows="12"
+          style="resize: none"
+        ></textarea>
+      </div>
+    } @else {
+      <div
+        #originalTextPreview
+        class="highlighted-article-text custom-textarea-scroll no-print-field"
+        [innerHTML]="highlightedArticleText"
+      ></div>
+    }
+  </section>
+}

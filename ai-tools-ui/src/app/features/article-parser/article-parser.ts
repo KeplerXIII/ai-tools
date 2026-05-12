@@ -16,6 +16,7 @@ import { ArticleParserStatusComponent } from './ui/article-parser-status/article
 import { ArticleParserMetaComponent } from './ui/article-parser-meta/article-parser-meta';
 import { ArticleParserCategoriesComponent } from './ui/article-parser-categories/article-parser-categories';
 import { ArticleParserEntitiesComponent } from './ui/article-parser-entities/article-parser-entities';
+import { ArticleParserOriginalTextComponent } from './ui/article-parser-original-text/article-parser-original-text';
 import {
   ArticleParserApi,
   DocumentTagsResponse,
@@ -25,13 +26,9 @@ import {
   ButtonVariant,
   OutlineButtonComponent,
 } from '../../shared/ui/outline-button/outline-button.component';
-import { buildHighlightedArticleTextByGroups } from './lib/article-highlighter';
 import { scrollToElement } from './lib/scroll-to-element';
 
-export type ArticleParserBlock =
-  | 'original'
-  | 'translation'
-  | 'annotation';
+export type ArticleParserBlock = 'translation' | 'annotation';
 
 @Component({
   selector: 'app-article-parser',
@@ -50,6 +47,7 @@ export type ArticleParserBlock =
     ArticleParserMetaComponent,
     ArticleParserCategoriesComponent,
     ArticleParserEntitiesComponent,
+    ArticleParserOriginalTextComponent,
     SkeletonModule,
     TextareaModule,
   ],
@@ -59,8 +57,8 @@ export type ArticleParserBlock =
 export class ArticleParser implements OnInit {
   @ViewChild('translationSkeleton') translationSkeleton?: ElementRef;
   @ViewChild('annotationSkeleton') annotationSkeleton?: ElementRef;
-  @ViewChild('originalTextPreview') originalTextPreview?: ElementRef<HTMLElement>;
-  @ViewChild('originalTextEditor') originalTextEditor?: ElementRef<HTMLElement>;
+  @ViewChild(ArticleParserOriginalTextComponent)
+  originalTextComponent?: ArticleParserOriginalTextComponent;
   readonly ButtonVariant = ButtonVariant;
   loadingArticle = false;
   loadingEntitiesSection = false;
@@ -75,12 +73,10 @@ export class ArticleParser implements OnInit {
   translatedTagsError = '';
   summaryError = '';
 
-  isEditingOriginalBlock = false;
   isEditingTranslationBlock = false;
   isEditingAnnotationBlock = false;
 
   private buffer = '';
-  private originalTextViewportScroll = 0;
   private lastAutoloadKey = '';
 
   constructor(
@@ -220,7 +216,6 @@ export class ArticleParser implements OnInit {
     this.articleError = '';
     this.originalTagsError = '';
     this.translationError = '';
-    this.translationError = '';
     this.translatedTagsError = '';
     this.summaryError = '';
   }
@@ -273,44 +268,6 @@ export class ArticleParser implements OnInit {
 
   toggleBlockEdit(block: ArticleParserBlock): void {
     switch (block) {
-      case 'original':
-        if (!this.isEditingOriginalBlock) {
-          const docId = this.state.article?.document_id;
-          if (docId) {
-            this.state.error = '';
-            this.api.lockDocument(docId).subscribe({
-              error: () => {
-                this.state.error = 'Не удалось заблокировать документ для редактирования';
-                this.cdr.detectChanges();
-              },
-            });
-          }
-        }
-        if (!this.isEditingOriginalBlock) {
-          this.originalTextViewportScroll = this.originalTextPreview?.nativeElement?.scrollTop ?? 0;
-        } else {
-          const ta = this.getOriginalTextTextarea();
-          this.originalTextViewportScroll = ta?.scrollTop ?? 0;
-        }
-        this.isEditingOriginalBlock = !this.isEditingOriginalBlock;
-        this.scheduleRestoreOriginalTextScroll();
-        if (!this.isEditingOriginalBlock) {
-          const docId = this.state.article?.document_id;
-          if (docId && this.state.article) {
-            this.state.error = '';
-            this.api
-              .saveDocument(docId, {
-                original_content: this.state.article.text ?? '',
-              })
-              .subscribe({
-                error: () => {
-                  this.state.error = 'Не удалось сохранить исходный текст';
-                  this.cdr.detectChanges();
-                },
-              });
-          }
-        }
-        break;
       case 'translation':
         if (!this.isEditingTranslationBlock) {
           const docId = this.state.article?.document_id;
@@ -381,7 +338,7 @@ export class ArticleParser implements OnInit {
   }
 
   private resetBlockEditors(): void {
-    this.isEditingOriginalBlock = false;
+    this.originalTextComponent?.resetEdit();
     this.isEditingTranslationBlock = false;
     this.isEditingAnnotationBlock = false;
   }
@@ -439,60 +396,5 @@ export class ArticleParser implements OnInit {
 
   get isDisabled(): boolean {
     return this.isLoading;
-  }
-
-  get highlightedArticleText(): string {
-    const text = this.state.article?.text || '';
-    const ent = this.state.entities;
-
-    const sortDesc = (a: string, b: string) => b.length - a.length;
-    const military = [...(ent?.military_equipment || [])]
-      .map((e) => e.name)
-      .filter(Boolean)
-      .sort(sortDesc);
-    const manufacturers = [...(ent?.manufacturers || [])]
-      .map((e) => e.name)
-      .filter(Boolean)
-      .sort(sortDesc);
-    const contracts = [...(ent?.contracts || [])]
-      .map((e) => e.name)
-      .filter(Boolean)
-      .sort(sortDesc);
-
-    return buildHighlightedArticleTextByGroups(text, [
-      { className: 'highlighted-entity-military', entities: military },
-      { className: 'highlighted-entity-manufacturer', entities: manufacturers },
-      { className: 'highlighted-entity-contract', entities: contracts },
-    ]);
-  }
-
-  private getOriginalTextTextarea(): HTMLTextAreaElement | null {
-    const host = this.originalTextEditor?.nativeElement;
-    if (!host) {
-      return null;
-    }
-    return host.querySelector('textarea');
-  }
-
-  /** Keep viewport and in-block scroll when swapping preview ↔ textarea */
-  private scheduleRestoreOriginalTextScroll(): void {
-    const savedInnerScroll = this.originalTextViewportScroll;
-    const savedWinX = window.scrollX;
-    const savedWinY = window.scrollY;
-
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        window.scrollTo(savedWinX, savedWinY);
-
-        const textarea = this.getOriginalTextTextarea();
-        const preview = this.originalTextPreview?.nativeElement;
-        if (this.isEditingOriginalBlock && textarea) {
-          textarea.scrollTop = savedInnerScroll;
-          textarea.focus({ preventScroll: true });
-        } else if (!this.isEditingOriginalBlock && preview) {
-          preview.scrollTop = savedInnerScroll;
-        }
-      });
-    });
   }
 }
