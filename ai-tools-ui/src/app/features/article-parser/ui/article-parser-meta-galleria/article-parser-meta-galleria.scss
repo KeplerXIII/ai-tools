@@ -6,8 +6,22 @@
   width: 100%;
 }
 
-.meta-galleria-item-img {
+/* Фиксированная «рамка» просмотра: высота от ширины, без скачков при смене кадра. */
+.meta-galleria-item-viewport {
+  box-sizing: border-box;
   width: 100%;
+  aspect-ratio: 16 / 9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--select-color-light);
+}
+
+.meta-galleria-item-img {
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
   display: block;
   object-fit: contain;
 }
@@ -44,6 +58,11 @@
 :host ::ng-deep .meta-article-galleria .p-galleria {
   overflow: hidden;
   border: 1px solid var(--super-light-grey-text-color);
+  width: 100%;
+}
+
+:host ::ng-deep .meta-article-galleria .p-galleria-item {
+  box-sizing: border-box;
   width: 100%;
 }
 

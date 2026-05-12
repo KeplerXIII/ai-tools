@@ -14,12 +14,14 @@
   >
     <ng-template pTemplate="item">
       @if (activeSlide; as slide) {
-        <img
-          [src]="slide.itemImageSrc"
-          [attr.alt]="slide.alt || 'Изображение статьи'"
-          class="meta-galleria-item-img"
-          (error)="onItemImageError($event)"
-        />
+        <div class="meta-galleria-item-viewport">
+          <img
+            [src]="slide.itemImageSrc"
+            [attr.alt]="slide.alt || 'Изображение статьи'"
+            class="meta-galleria-item-img"
+            (error)="onItemImageError($event)"
+          />
+        </div>
       }
     </ng-template>
     <ng-template pTemplate="thumbnail" let-item>
