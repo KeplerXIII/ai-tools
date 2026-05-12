@@ -1,0 +1,54 @@
+.meta-galleria-card {
+  width: 100%;
+}
+
+.meta-article-galleria {
+  width: 100%;
+}
+
+.meta-galleria-item-img {
+  width: 100%;
+  display: block;
+  object-fit: contain;
+}
+
+.meta-galleria-thumb-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 4px;
+}
+
+.meta-galleria-thumb-img {
+  display: block;
+  max-height: 56px;
+  width: auto;
+  object-fit: cover;
+}
+
+.meta-galleria-caption-title {
+  font-size: var(--font-size-xl, 1.125rem);
+  font-weight: 700;
+  margin-bottom: 6px;
+  line-height: 1.3;
+  color: var(--light-text-color);
+}
+
+.meta-galleria-caption-alt {
+  margin: 0;
+  font-size: var(--font-size-detail, 14px);
+  font-weight: var(--font-weight-light, 400);
+  color: var(--light-text-color);
+  line-height: 1.45;
+}
+
+:host ::ng-deep .meta-article-galleria .p-galleria {
+  overflow: hidden;
+  border: 1px solid var(--super-light-grey-text-color);
+  width: 100%;
+}
+
+/* Пустая полоса caption, когда шаблон зарегистрирован, но у активного слайда нет title/alt */
+:host ::ng-deep .meta-article-galleria:not(.meta-galleria--caption-visible) .p-galleria-caption {
+  display: none !important;
+}
+

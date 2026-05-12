@@ -523,3 +523,31 @@
   padding-left: 40px !important;
   font-weight: var(--font-weight-light) !important;
 }
+
+.p-galleria-thumbnails-content {
+  background: var(--light-text-color) !important;
+}
+
+.p-dialog-header {
+  background: var(--light-text-color) !important;
+}
+
+.p-dialog-content {
+  background: var(--light-text-color) !important;
+}
+
+.p-dialog-footer {
+  background: var(--light-text-color) !important;
+}
+
+/* Граница и фон видимой области чекбокса во включённом состоянии; галочка белая */
+.p-checkbox.p-checkbox-checked .p-checkbox-box,
+.p-checkbox.p-highlight .p-checkbox-box {
+  border: 1px solid var(--light-grey-text-color) !important;
+  background: var(--primary-text-color) !important;
+}
+
+.p-checkbox.p-checkbox-checked .p-checkbox-icon,
+.p-checkbox.p-highlight .p-checkbox-icon {
+  color: var(--light-text-color) !important;
+}

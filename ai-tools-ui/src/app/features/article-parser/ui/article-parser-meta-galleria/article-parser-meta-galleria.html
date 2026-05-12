@@ -1,0 +1,51 @@
+<div class="meta-galleria-card">
+  <p-galleria
+    [value]="items"
+    [(activeIndex)]="galleriaActiveIndex"
+    [responsiveOptions]="responsiveOptions"
+    [containerStyle]="containerStyle"
+    [numVisible]="5"
+    [showThumbnails]="true"
+    [showItemNavigators]="true"
+    [showItemNavigatorsOnHover]="true"
+    [circular]="true"
+    class="meta-article-galleria"
+    [class.meta-galleria--caption-visible]="showCaptionForActiveSlide"
+  >
+    <ng-template pTemplate="item">
+      @if (activeSlide; as slide) {
+        <img
+          [src]="slide.itemImageSrc"
+          [attr.alt]="slide.alt || 'Изображение статьи'"
+          class="meta-galleria-item-img"
+          (error)="onItemImageError($event)"
+        />
+      }
+    </ng-template>
+    <ng-template pTemplate="thumbnail" let-item>
+      <div class="meta-galleria-thumb-wrap">
+        <img
+          [src]="item.thumbnailImageSrc"
+          [attr.alt]="item.alt || ''"
+          class="meta-galleria-thumb-img"
+        />
+      </div>
+    </ng-template>
+    @if (hasAnyCaptionContent) {
+      <ng-template pTemplate="caption">
+        @if (activeSlide; as cap) {
+          @if (slideHasCaption(cap)) {
+            <div class="meta-galleria-caption">
+              @if ((cap.title || '').trim()) {
+                <div class="meta-galleria-caption-title">{{ cap.title }}</div>
+              }
+              @if ((cap.alt || '').trim()) {
+                <p class="meta-galleria-caption-alt">{{ cap.alt }}</p>
+              }
+            </div>
+          }
+        }
+      </ng-template>
+    }
+  </p-galleria>
+</div>

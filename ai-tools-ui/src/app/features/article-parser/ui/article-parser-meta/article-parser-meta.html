@@ -32,7 +32,11 @@
             "
             (click)="toggleEdit()"
           >
-            <i class="pi" [class.pi-pen-to-square]="!isEditingMetaBlock" [class.pi-check-square]="isEditingMetaBlock"></i>
+            <i
+              class="pi"
+              [class.pi-pen-to-square]="!isEditingMetaBlock"
+              [class.pi-check-square]="isEditingMetaBlock"
+            ></i>
           </button>
         </div>
       </div>
@@ -93,7 +97,9 @@
             pInputText
             id="article_main_image"
             name="article_main_image"
-            [ngModel]="isEditingMetaBlock ? article.main_image : article.main_image || 'Нет информации'"
+            [ngModel]="
+              isEditingMetaBlock ? article.main_image : article.main_image || 'Нет информации'
+            "
             (ngModelChange)="isEditingMetaBlock && article && (article.main_image = $event)"
             [disabled]="!isEditingMetaBlock"
             placeholder="https://example.com/image.jpg"
@@ -104,20 +110,109 @@
     </div>
   </div>
 
-  @if (mainImageUrl) {
+  @if (showImagePreview()) {
     <div class="prew-image-block">
-      <p class="image-prew-title">Предпросмотр изображения:</p>
-      <p-image
-        [src]="mainImageUrl"
-        alt="Главное изображение статьи"
-        [preview]="true"
-        width="500"
-        (onImageError)="onImageError($event)"
-      >
-        <ng-template pTemplate="indicator">
-          <i class="pi pi-search-plus image-preview-icon"></i>
-        </ng-template>
-      </p-image>
+      @if (hasGalleryImages()) {
+        <div class="image-prew-title-wrapper">
+          <p class="image-prew-title">Предпросмотр изображений:</p>
+          <button
+            type="button"
+            class="block-edit-toggle no-print-field image-prew-manage-btn"
+            aria-label="Управление изображениями статьи"
+            (click)="openImagesManageDialog()"
+          >
+            <i class="pi pi-trash"></i>
+          </button>
+        </div>
+
+        <app-article-parser-meta-galleria [items]="galleriaItems" />
+
+        <p-dialog
+          [(visible)]="imagesManageDialogVisible"
+          [modal]="true"
+          [dismissableMask]="true"
+          [closable]="true"
+          [draggable]="false"
+          [appendTo]="'self'"
+          [style]="{ width: 'min(36rem, 94vw)' }"
+          styleClass="article-meta-images-dialog"
+          header="Удаление изображений"
+          (onHide)="onImagesManageDialogHide()"
+        >
+          <div class="images-manage-list">
+            @for (row of imageManageRows; track row.url; let i = $index) {
+              <div class="images-manage-row">
+                <p-checkbox
+                  [(ngModel)]="row.selected"
+                  [binary]="true"
+                  [inputId]="'article-meta-img-cb-' + i"
+                />
+                <div class="images-manage-body">
+                  <div class="images-manage-thumb-wrap">
+                    <img
+                      [src]="row.url"
+                      [attr.alt]="row.alt || row.title || 'Превью'"
+                      class="images-manage-thumb"
+                    />
+                  </div>
+                  <div class="images-manage-caption">
+                    @if (row.title) {
+                      <div class="images-manage-title">{{ row.title }}</div>
+                    }
+                    @if (row.alt) {
+                      <div class="images-manage-alt">{{ row.alt }}</div>
+                    }
+                    @if (!row.title && !row.alt) {
+                      <span class="images-manage-muted">Нет подписи</span>
+                    }
+                  </div>
+                </div>
+              </div>
+            }
+          </div>
+          <ng-template pTemplate="footer">
+            <div class="images-manage-footer">
+              @if (!canPersistImageChanges) {
+                <p class="images-manage-footer-hint">
+                  Сохранение недоступно: у документа нет идентификатора на сервере.
+                </p>
+              }
+              <div class="images-manage-footer-actions">
+                <button type="button" class="images-manage-btn images-manage-btn--ghost" (click)="closeImagesManageDialog()">
+                  Отмена
+                </button>
+                <button
+                  type="button"
+                  class="images-manage-btn images-manage-btn--danger"
+                  [disabled]="
+                    !hasSelectedImagesForDelete || !canPersistImageChanges || imagesDeleteLoading
+                  "
+                  (click)="deleteSelectedImages()"
+                >
+                  @if (imagesDeleteLoading) {
+                    Удаление…
+                  } @else {
+                    Удалить выбранные фотографии
+                  }
+                </button>
+              </div>
+            </div>
+          </ng-template>
+        </p-dialog>
+      } @else {
+        <p class="image-prew-title">Предпросмотр изображения:</p>
+        <p-image
+          [src]="mainImageUrl"
+          alt="Главное изображение статьи"
+          [preview]="true"
+          width="500"
+          (onImageError)="onImageError($event)"
+        >
+          <ng-template pTemplate="indicator">
+            <i class="pi pi-search-plus image-preview-icon"></i>
+          </ng-template>
+        </p-image>
+      }
     </div>
   }
 </section>
