@@ -1,4 +1,4 @@
-import { ApplicationRef, ChangeDetectorRef, Component, Input } from '@angular/core';
+import { ApplicationRef, ChangeDetectorRef, Component, HostListener, Input } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CheckboxModule } from 'primeng/checkbox';
 import { DialogModule } from 'primeng/dialog';
@@ -37,6 +37,14 @@ export class ArticleParserMetaImagesDeleteDialogComponent {
     private cdr: ChangeDetectorRef,
     private appRef: ApplicationRef,
   ) {}
+
+  @HostListener('document:keydown', ['$event'])
+  onDocumentKeydown(event: KeyboardEvent): void {
+    if (event.key !== 'Escape' || !this.dialogVisible) {
+      return;
+    }
+    this.close();
+  }
 
   open(): void {
     this.rows = this.galleriaItems.map((it) => ({

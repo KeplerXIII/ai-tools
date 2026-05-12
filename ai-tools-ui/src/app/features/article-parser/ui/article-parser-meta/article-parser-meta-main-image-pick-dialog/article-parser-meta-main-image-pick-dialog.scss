@@ -32,6 +32,19 @@
   background: var(--light-text-color);
 }
 
+:host ::ng-deep .article-meta-main-pick-dialog {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+:host ::ng-deep .article-meta-main-pick-dialog .images-manage-row {
+  border-radius: 6px;
+}
+
+:host ::ng-deep .article-meta-main-pick-dialog .images-manage-thumb-wrap {
+  border-radius: 6px;
+}
+
 .images-manage-btn--primary:hover:not(:disabled) {
   filter: brightness(1.08);
 }
