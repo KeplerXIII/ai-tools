@@ -45,10 +45,12 @@ export class ArticleParserEntitiesComponent {
   @Input() loadingTranslatedTags = false;
   @Output() entitiesLoadingChange = new EventEmitter<boolean>();
   @ViewChild('entityPickerSelect') entityPickerSelect?: Select;
+  @ViewChild('tagPickerSelect') tagPickerSelect?: Select;
 
   private readonly injector = inject(Injector);
   /** Увеличивается при закрытии/смене, чтобы отбрасывать устаревшие ответы каталога. */
   private entityPickerLoadGeneration = 0;
+  private tagPickerLoadGeneration = 0;
 
   readonly ButtonVariant = ButtonVariant;
 
@@ -65,6 +67,8 @@ export class ArticleParserEntitiesComponent {
   loadingDocumentEntitiesMutation = false;
 
   tagPickerOpen: TagScope | null = null;
+  /** Пока грузится каталог тегов — селект не в DOM. */
+  tagPickerLoadingScope: TagScope | null = null;
   tagPickerSearch = '';
   tagPickerCatalogItems: DocumentTagRef[] = [];
   selectedTagPickerItem: DocumentTagRef | null = null;
@@ -80,9 +84,6 @@ export class ArticleParserEntitiesComponent {
 
   @HostListener('document:pointerdown', ['$event'])
   onDocumentPointerDown(event: PointerEvent): void {
-    if (!this.entityPickerOpen) {
-      return;
-    }
     const path = event.composedPath();
     const insideOverlay = path.some(
       (n) =>
@@ -93,14 +94,35 @@ export class ArticleParserEntitiesComponent {
     if (insideOverlay) {
       return;
     }
-    const insideActiveEntityRow = path.some(
-      (n) =>
-        n instanceof HTMLElement && n.closest('[data-active-entity-picker]') !== null,
-    );
-    if (insideActiveEntityRow) {
+
+    if (this.entityPickerOpen) {
+      const insideActiveEntityRow = path.some(
+        (n) =>
+          n instanceof HTMLElement && n.closest('[data-active-entity-picker]') !== null,
+      );
+      if (!insideActiveEntityRow) {
+        this.closeEntityPicker();
+      }
       return;
     }
-    this.closeEntityPicker();
+
+    if (this.tagPickerOpen) {
+      const insideActiveTagRow = path.some(
+        (n) =>
+          n instanceof HTMLElement && n.closest('[data-active-tag-picker]') !== null,
+      );
+      if (!insideActiveTagRow) {
+        this.closeTagPicker();
+      }
+    }
+  }
+
+  /** Синхронизация после закрытия панели тегов (Esc и т.д.). */
+  onTagPickerOverlayHide(): void {
+    if (!this.tagPickerOpen) {
+      return;
+    }
+    this.clearTagPickerHostState();
   }
 
   /** Синхронизация после закрытия панели (Esc, анимация и т.д.). */
@@ -169,6 +191,8 @@ export class ArticleParserEntitiesComponent {
     if (!this.isEditingEntitiesBlock || !this.state.article?.document_id) {
       return;
     }
+
+    this.closeTagPicker();
 
     if (this.entityPickerOpen === section) {
       this.closeEntityPicker();
@@ -287,24 +311,63 @@ export class ArticleParserEntitiesComponent {
       return;
     }
 
+    this.closeEntityPicker();
+
     if (this.tagPickerOpen === scope) {
       this.closeTagPicker();
       return;
     }
 
-    this.tagPickerOpen = scope;
+    if (this.tagPickerLoadingScope === scope) {
+      this.tagPickerLoadGeneration++;
+      this.tagPickerLoadingScope = null;
+      this.loadingTagPickerCatalog = false;
+      return;
+    }
+
+    if (this.tagPickerOpen && this.tagPickerOpen !== scope) {
+      this.closeTagPicker();
+    }
+
+    if (this.tagPickerLoadingScope !== null && this.tagPickerLoadingScope !== scope) {
+      this.tagPickerLoadGeneration++;
+      this.tagPickerLoadingScope = null;
+      this.loadingTagPickerCatalog = false;
+    }
+
+    this.tagPickerLoadingScope = scope;
     this.tagPickerSearch = '';
     this.tagPickerCatalogItems = [];
     this.selectedTagPickerItem = null;
+    this.tagPickerOpen = null;
+
     const docId = this.state.article.document_id;
     this.loadingTagPickerCatalog = true;
+    const generation = this.tagPickerLoadGeneration;
 
     this.api.getTagCatalog(docId, scope).subscribe({
       next: (items: DocumentTagRef[]) => {
+        if (generation !== this.tagPickerLoadGeneration) {
+          return;
+        }
         this.tagPickerCatalogItems = items;
         this.loadingTagPickerCatalog = false;
+        this.tagPickerLoadingScope = null;
+        this.tagPickerOpen = scope;
+        afterNextRender(
+          () => {
+            if (generation !== this.tagPickerLoadGeneration || this.tagPickerOpen !== scope) {
+              return;
+            }
+            this.tagPickerSelect?.show(true);
+          },
+          { injector: this.injector },
+        );
       },
       error: () => {
+        if (generation !== this.tagPickerLoadGeneration) {
+          return;
+        }
         this.loadingTagPickerCatalog = false;
         this.closeTagPicker();
       },
@@ -401,12 +464,19 @@ export class ArticleParserEntitiesComponent {
     });
   }
 
-  private closeTagPicker(): void {
+  private clearTagPickerHostState(): void {
     this.tagPickerOpen = null;
+    this.tagPickerLoadingScope = null;
     this.tagPickerSearch = '';
     this.tagPickerCatalogItems = [];
     this.selectedTagPickerItem = null;
     this.loadingTagPickerCatalog = false;
+  }
+
+  private closeTagPicker(): void {
+    this.tagPickerLoadGeneration++;
+    this.tagPickerSelect?.hide();
+    this.clearTagPickerHostState();
   }
 
   private clearEntityPickerHostState(): void {

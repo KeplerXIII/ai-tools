@@ -17,18 +17,15 @@ import { ArticleParserMetaComponent } from './ui/article-parser-meta/article-par
 import { ArticleParserCategoriesComponent } from './ui/article-parser-categories/article-parser-categories';
 import { ArticleParserEntitiesComponent } from './ui/article-parser-entities/article-parser-entities';
 import { ArticleParserOriginalTextComponent } from './ui/article-parser-original-text/article-parser-original-text';
+import { ArticleParserTranslationComponent } from './ui/article-parser-translation/article-parser-translation';
 import {
   ArticleParserApi,
   DocumentTagsResponse,
 } from './api/article-parser-api';
 import { ArticleParserState } from './model/article-parser-state';
-import {
-  ButtonVariant,
-  OutlineButtonComponent,
-} from '../../shared/ui/outline-button/outline-button.component';
 import { scrollToElement } from './lib/scroll-to-element';
 
-export type ArticleParserBlock = 'translation' | 'annotation';
+export type ArticleParserBlock = 'annotation';
 
 @Component({
   selector: 'app-article-parser',
@@ -41,13 +38,13 @@ export type ArticleParserBlock = 'translation' | 'annotation';
     MatProgressSpinnerModule,
     FloatLabelModule,
     InputTextModule,
-    OutlineButtonComponent,
     ArticleParserUrlFormComponent,
     ArticleParserStatusComponent,
     ArticleParserMetaComponent,
     ArticleParserCategoriesComponent,
     ArticleParserEntitiesComponent,
     ArticleParserOriginalTextComponent,
+    ArticleParserTranslationComponent,
     SkeletonModule,
     TextareaModule,
   ],
@@ -55,11 +52,11 @@ export type ArticleParserBlock = 'translation' | 'annotation';
   styleUrl: './article-parser.scss',
 })
 export class ArticleParser implements OnInit {
-  @ViewChild('translationSkeleton') translationSkeleton?: ElementRef;
   @ViewChild('annotationSkeleton') annotationSkeleton?: ElementRef;
   @ViewChild(ArticleParserOriginalTextComponent)
   originalTextComponent?: ArticleParserOriginalTextComponent;
-  readonly ButtonVariant = ButtonVariant;
+  @ViewChild(ArticleParserTranslationComponent)
+  translationComponent?: ArticleParserTranslationComponent;
   loadingArticle = false;
   loadingEntitiesSection = false;
   loadingCategories = false;
@@ -73,7 +70,6 @@ export class ArticleParser implements OnInit {
   translatedTagsError = '';
   summaryError = '';
 
-  isEditingTranslationBlock = false;
   isEditingAnnotationBlock = false;
 
   private buffer = '';
@@ -119,6 +115,8 @@ export class ArticleParser implements OnInit {
     this.state.error = '';
     this.originalTagsError = '';
     this.translationError = '';
+    this.translatedTagsError = '';
+    this.summaryError = '';
     this.loadingCategories = false;
     this.state.article = null;
     this.state.entities = null;
@@ -167,7 +165,7 @@ export class ArticleParser implements OnInit {
     this.state.annotation = '';
     this.state.translatedTags = [];
 
-    scrollToElement(() => this.translationSkeleton, this.cdr);
+    scrollToElement(() => this.translationComponent?.translationSkeleton, this.cdr);
 
     this.api.translateToRussianStream(this.state.article.document_id).subscribe({
       next: (chunk) => {
@@ -267,79 +265,47 @@ export class ArticleParser implements OnInit {
   // =========================
 
   toggleBlockEdit(block: ArticleParserBlock): void {
-    switch (block) {
-      case 'translation':
-        if (!this.isEditingTranslationBlock) {
-          const docId = this.state.article?.document_id;
-          if (docId) {
-            this.state.error = '';
-            this.api.lockDocument(docId).subscribe({
-              error: () => {
-                this.state.error = 'Не удалось заблокировать документ для редактирования';
-                this.cdr.detectChanges();
-              },
-            });
-          }
-        }
-        this.isEditingTranslationBlock = !this.isEditingTranslationBlock;
-        if (!this.isEditingTranslationBlock) {
-          const docId = this.state.article?.document_id;
-          if (docId) {
-            this.state.error = '';
-            this.api
-              .saveDocument(docId, {
-                translated_content: this.state.translatedText ?? '',
-              })
-              .subscribe({
-                error: () => {
-                  this.state.error = 'Не удалось сохранить перевод';
-                  this.cdr.detectChanges();
-                },
-              });
-          }
-        }
-        break;
-      case 'annotation':
-        if (!this.isEditingAnnotationBlock) {
-          const docId = this.state.article?.document_id;
-          if (docId) {
-            this.state.error = '';
-            this.api.lockDocument(docId).subscribe({
-              error: () => {
-                this.state.error = 'Не удалось заблокировать документ для редактирования';
-                this.cdr.detectChanges();
-              },
-            });
-          }
-        }
-        this.isEditingAnnotationBlock = !this.isEditingAnnotationBlock;
-        if (!this.isEditingAnnotationBlock) {
-          const docId = this.state.article?.document_id;
-          if (docId) {
-            const hasTranslation = !!this.state.translatedText?.trim();
-            this.state.error = '';
-            this.api
-              .saveDocument(
-                docId,
-                hasTranslation
-                  ? { translated_summary: this.state.annotation ?? '' }
-                  : { original_summary: this.state.annotation ?? '' },
-              )
-              .subscribe({
-                error: () => {
-                  this.state.error = 'Не удалось сохранить аннотацию';
-                  this.cdr.detectChanges();
-                },
-              });
-          }
-        }
-        break;
+    if (block !== 'annotation') {
+      return;
+    }
+    if (!this.isEditingAnnotationBlock) {
+      const docId = this.state.article?.document_id;
+      if (docId) {
+        this.state.error = '';
+        this.api.lockDocument(docId).subscribe({
+          error: () => {
+            this.state.error = 'Не удалось заблокировать документ для редактирования';
+            this.cdr.detectChanges();
+          },
+        });
+      }
+    }
+    this.isEditingAnnotationBlock = !this.isEditingAnnotationBlock;
+    if (!this.isEditingAnnotationBlock) {
+      const docId = this.state.article?.document_id;
+      if (docId) {
+        const hasTranslation = !!this.state.translatedText?.trim();
+        this.state.error = '';
+        this.api
+          .saveDocument(
+            docId,
+            hasTranslation
+              ? { translated_summary: this.state.annotation ?? '' }
+              : { original_summary: this.state.annotation ?? '' },
+          )
+          .subscribe({
+            error: () => {
+              this.state.error = 'Не удалось сохранить аннотацию';
+              this.cdr.detectChanges();
+            },
+          });
+      }
     }
   }
 
   private resetBlockEditors(): void {
     this.originalTextComponent?.resetEdit();
-    this.isEditingTranslationBlock = false;
+    this.translationComponent?.resetTranslationEdit();
     this.isEditingAnnotationBlock = false;
   }
 
@@ -373,13 +339,6 @@ export class ArticleParser implements OnInit {
         }
       },
     });
-  }
-
-  autoResize(event: Event): void {
-    const textarea = event.target as HTMLTextAreaElement;
-
-    textarea.style.height = 'auto';
-    textarea.style.height = `${textarea.scrollHeight}px`;
   }
 
   get isLoading(): boolean {

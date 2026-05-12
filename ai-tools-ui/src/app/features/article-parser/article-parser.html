@@ -91,90 +91,14 @@
       (translateArticle)="translateArticle()"
     />
 
-    @if (state.translatedText.trim() || loadingTranslation) {
-      <section class="panel full print-translation-middle">
-        <div class="title-wrapper translation-title-row">
-          <h3 class="panel-title">Перевод</h3>
-
-          <div class="translation-title-trailing">
-            <div class="title-actions">
-              <div class="teg-btn-wrapper">
-                <app-outline-button
-                  text="Тегировать перевод"
-                  size="large"
-                  [variant]="ButtonVariant.Rounded"
-                  [disabled]="isDisabled"
-                  (clicked)="tagTranslated()"
-                />
-
-                @if (translatedTagsError) {
-                  <div class="field-error">{{ translatedTagsError }}</div>
-                }
-              </div>
-
-              <div class="summary-btn-wrapper">
-                <app-outline-button
-                  text="Сформировать аннотацию"
-                  size="large"
-                  [variant]="ButtonVariant.Rounded"
-                  [disabled]="isDisabled || !state.translatedText.trim()"
-                  (clicked)="summarizeArticle()"
-                />
-
-                @if (summaryError) {
-                  <div class="field-error">{{ summaryError }}</div>
-                }
-              </div>
-            </div>
-
-            <button
-              type="button"
-              class="block-edit-toggle no-print-field"
-              [class.block-edit-toggle--active]="isEditingTranslationBlock"
-              [attr.aria-pressed]="isEditingTranslationBlock"
-              [attr.aria-label]="
-                isEditingTranslationBlock ? 'Завершить редактирование блока' : 'Редактировать блок'
-              "
-              (click)="toggleBlockEdit('translation')"
-            >
-              <i
-                class="pi"
-                [class.pi-pencil]="!isEditingTranslationBlock"
-                [class.pi-check]="isEditingTranslationBlock"
-              ></i>
-            </button>
-          </div>
-        </div>
-
-        @if (loadingTranslation && !state.translatedText) {
-          <div #translationSkeleton class="sceleton-translate-text">
-            <p-skeleton height="1rem" borderRadius="12px" />
-            <p-skeleton height="1rem" borderRadius="12px" />
-            <p-skeleton height="1rem" borderRadius="12px" />
-            <p-skeleton height="1rem" borderRadius="12px" />
-            <p-skeleton height="1rem" borderRadius="12px" />
-            <p-skeleton height="1rem" borderRadius="12px" />
-            <p-skeleton height="1rem" borderRadius="12px" />
-          </div>
-        }
-        @if (state.translatedText) {
-          <div class="print-text-block">{{ state.translatedText }}</div>
-          <p-floatlabel variant="on" class="prime-field full-width textarea-field no-print-field">
-            <textarea
-              pTextarea
-              id="translated_text"
-              name="translated_text"
-              class="full-width custom-textarea-scroll no-print-textarea"
-              [(ngModel)]="state.translatedText"
-              [disabled]="!isEditingTranslationBlock"
-              rows="8"
-              placeholder="Здесь появится перевод"
-              style="resize: none"
-            ></textarea>
-          </p-floatlabel>
-        }
-      </section>
-    }
+    <app-article-parser-translation
+      [isDisabled]="isDisabled"
+      [loadingTranslation]="loadingTranslation"
+      [translatedTagsError]="translatedTagsError"
+      [summaryError]="summaryError"
+      (tagTranslated)="tagTranslated()"
+      (summarizeArticle)="summarizeArticle()"
+    />
 
     @if (state.annotation.trim() || loadingSummary) {
       <section class="panel full print-annotation-after-tags">

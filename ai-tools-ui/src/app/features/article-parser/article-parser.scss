@@ -112,49 +112,37 @@
   border: 1px solid transparent !important;
 }
 
-:host ::ng-deep #translated_text,
 :host ::ng-deep #annotation {
   font-family: var(--font-family-base) !important;
   font-weight: var(--font-weight-light) !important;
   font-size: var(--font-size-detail) !important;
 }
 
-#translated_text,
 #annotation {
   scrollbar-width: thin;
   scrollbar-color: #cbd5e1 #f1f5f9;
 }
 
-#translated_text::-webkit-scrollbar,
 #annotation::-webkit-scrollbar {
   width: 6px;
 }
 
-#translated_text::-webkit-scrollbar-track,
 #annotation::-webkit-scrollbar-track {
   background: #f1f5f9;
   border-radius: 10px;
 }
 
-#translated_text::-webkit-scrollbar-thumb,
 #annotation::-webkit-scrollbar-thumb {
   background: #cbd5e1;
   border-radius: 10px;
 }
 
-#translated_text::-webkit-scrollbar-button,
-#annotation::-webkit-scrollbar-button {
-  display: none;
-  width: 0;
-  height: 0;
-  background: transparent;
-}
-
-#translated_text::-webkit-scrollbar-button:single-button,
+#annotation::-webkit-scrollbar-button,
 #annotation::-webkit-scrollbar-button:single-button {
   display: none;
   width: 0;
   height: 0;
+  background: transparent;
 }
 
 .prime-field {
@@ -226,12 +214,6 @@
   margin-top: 24px;
   align-items: start;
   width: 100%;
-}
-
-.title-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
 }
 
 .panel {
@@ -646,8 +628,7 @@
 }
 
 .status-title-trailing,
-.entities-title-trailing,
-.translation-title-trailing {
+.entities-title-trailing {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -666,23 +647,10 @@
   margin-bottom: 0;
 }
 
-.translation-title-row .panel-title {
-  margin-bottom: 0;
-}
-
 .translate-teg-btn {
   display: flex;
   gap: 10px;
   align-items: center;
-}
-
-.teg-btn-wrapper,
-.translate-btn-wrapper,
-.summary-btn-wrapper {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
 }
 
 .entities-sceleton-wrapper {
