@@ -27,6 +27,7 @@ const TOAST_HIDE_MS = 9000;
 @Injectable()
 export abstract class AbstractBatchToastNotifierService implements OnDestroy {
   private streamSub: Subscription | null = null;
+  private httpFallbackSub: Subscription | null = null;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private trackedBatchId: string | null = null;
   private hideTimer: ReturnType<typeof setTimeout> | null = null;
@@ -48,6 +49,8 @@ export abstract class AbstractBatchToastNotifierService implements OnDestroy {
     this.clearReconnectTimer();
     this.streamSub?.unsubscribe();
     this.streamSub = null;
+    this.httpFallbackSub?.unsubscribe();
+    this.httpFallbackSub = null;
     if (this.hideTimer) {
       clearTimeout(this.hideTimer);
       this.hideTimer = null;
@@ -91,12 +94,16 @@ export abstract class AbstractBatchToastNotifierService implements OnDestroy {
     this.clearReconnectTimer();
     this.streamSub?.unsubscribe();
     this.streamSub = null;
+    this.httpFallbackSub?.unsubscribe();
+    this.httpFallbackSub = null;
     this.trackedBatchId = null;
     localStorage.removeItem(this.storageKey);
   }
 
   private startStream(batchId: string): void {
     this.clearReconnectTimer();
+    this.httpFallbackSub?.unsubscribe();
+    this.httpFallbackSub = null;
     this.streamSub?.unsubscribe();
     this.streamSub = null;
     this.trackedBatchId = batchId;
@@ -117,7 +124,8 @@ export abstract class AbstractBatchToastNotifierService implements OnDestroy {
     if (!id) {
       return;
     }
-    this.fetchStatus(id).subscribe({
+    this.httpFallbackSub?.unsubscribe();
+    this.httpFallbackSub = this.fetchStatus(id).subscribe({
       next: (s) => this.applyIfDone(s),
       error: (e: HttpErrorResponse) => {
         if (e.status === 404) {
@@ -149,7 +157,8 @@ export abstract class AbstractBatchToastNotifierService implements OnDestroy {
     }
     this.streamSub?.unsubscribe();
     this.streamSub = null;
-    this.fetchStatus(id).subscribe({
+    this.httpFallbackSub?.unsubscribe();
+    this.httpFallbackSub = this.fetchStatus(id).subscribe({
       next: (s) => {
         if (s.done) {
           this.applyIfDone(s);

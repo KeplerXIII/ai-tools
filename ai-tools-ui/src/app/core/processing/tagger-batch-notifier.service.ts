@@ -1,5 +1,5 @@
-import { Injectable } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
+import { Injectable, OnDestroy } from '@angular/core';
 import { BehaviorSubject, Subscription } from 'rxjs';
 
 import { DocumentsApi, TaggerBatchStatusResponse } from '../../features/documents/documents-api';
@@ -17,12 +17,13 @@ const TOAST_HIDE_MS = 9000;
 @Injectable({
   providedIn: 'root',
 })
-export class TaggerBatchNotifierService {
+export class TaggerBatchNotifierService implements OnDestroy {
   private readonly storageKeys: Record<TaggerSource, string> = {
     original: 'tagger_batch_original',
     translated: 'tagger_batch_translated',
   };
   private streamSubs: Partial<Record<TaggerSource, Subscription>> = {};
+  private httpFallbackSubs: Partial<Record<TaggerSource, Subscription>> = {};
   private reconnectTimers: Partial<Record<TaggerSource, ReturnType<typeof setTimeout>>> = {};
   private trackedIds: Partial<Record<TaggerSource, string>> = {};
   private hideTimer: ReturnType<typeof setTimeout> | null = null;
@@ -34,6 +35,20 @@ export class TaggerBatchNotifierService {
     private readonly batchStream: ProcessingBatchStreamApi,
     private readonly documentsApi: DocumentsApi,
   ) {}
+
+  ngOnDestroy(): void {
+    (['original', 'translated'] as const).forEach((source) => {
+      this.clearReconnect(source);
+      this.streamSubs[source]?.unsubscribe();
+      delete this.streamSubs[source];
+      this.httpFallbackSubs[source]?.unsubscribe();
+      delete this.httpFallbackSubs[source];
+    });
+    if (this.hideTimer) {
+      clearTimeout(this.hideTimer);
+      this.hideTimer = null;
+    }
+  }
 
   initFromStorage(): void {
     (['original', 'translated'] as const).forEach((source) => {
@@ -75,6 +90,8 @@ export class TaggerBatchNotifierService {
 
   private startStream(source: TaggerSource, batchId: string): void {
     this.clearReconnect(source);
+    this.httpFallbackSubs[source]?.unsubscribe();
+    delete this.httpFallbackSubs[source];
     this.streamSubs[source]?.unsubscribe();
     delete this.streamSubs[source];
     this.trackedIds[source] = batchId;
@@ -95,7 +112,8 @@ export class TaggerBatchNotifierService {
     if (!id) {
       return;
     }
-    this.documentsApi.getTaggerBatchStatus(id).subscribe({
+    this.httpFallbackSubs[source]?.unsubscribe();
+    this.httpFallbackSubs[source] = this.documentsApi.getTaggerBatchStatus(id).subscribe({
       next: (s) => this.applyIfDone(source, s),
       error: (e: HttpErrorResponse) => {
         if (e.status === 404) {
@@ -132,7 +150,8 @@ export class TaggerBatchNotifierService {
     }
     this.streamSubs[source]?.unsubscribe();
     delete this.streamSubs[source];
-    this.documentsApi.getTaggerBatchStatus(id).subscribe({
+    this.httpFallbackSubs[source]?.unsubscribe();
+    this.httpFallbackSubs[source] = this.documentsApi.getTaggerBatchStatus(id).subscribe({
       next: (s) => {
         if (s.done) {
           this.applyIfDone(source, s);
@@ -172,6 +191,8 @@ export class TaggerBatchNotifierService {
     this.clearReconnect(source);
     this.streamSubs[source]?.unsubscribe();
     delete this.streamSubs[source];
+    this.httpFallbackSubs[source]?.unsubscribe();
+    delete this.httpFallbackSubs[source];
     delete this.trackedIds[source];
     localStorage.removeItem(this.storageKeys[source]);
   }

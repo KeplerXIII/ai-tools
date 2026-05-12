@@ -33,6 +33,7 @@ export class ProcessingBatchStreamApi {
     return new Observable<ProcessingBatchStreamSnapshot>((observer) => {
       const token = this.auth.getToken();
       const controller = new AbortController();
+      const outcome = { finalized: false };
 
       fetch(url, {
         method: 'GET',
@@ -52,13 +53,17 @@ export class ProcessingBatchStreamApi {
           let eventName = 'message';
           let dataLines: string[] = [];
 
-          const dispatchEvent = () => {
+          const dispatchEvent = (): void => {
+            if (outcome.finalized) {
+              return;
+            }
             if (eventName === 'heartbeat') {
               eventName = 'message';
               dataLines = [];
               return;
             }
             if (eventName === 'error') {
+              outcome.finalized = true;
               observer.error(new Error(dataLines.join('\n') || 'Ошибка SSE stream'));
               return;
             }
@@ -80,45 +85,66 @@ export class ProcessingBatchStreamApi {
               const payload = JSON.parse(payloadText) as ProcessingBatchStreamSnapshot;
               observer.next(payload);
             } catch {
+              outcome.finalized = true;
               observer.error(new Error('Некорректный JSON в SSE snapshot'));
+              return;
             } finally {
-              eventName = 'message';
-              dataLines = [];
+              if (!outcome.finalized) {
+                eventName = 'message';
+                dataLines = [];
+              }
             }
           };
 
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) {
-              if (dataLines.length > 0) {
-                dispatchEvent();
+          try {
+            while (!outcome.finalized) {
+              const { done, value } = await reader.read();
+              if (outcome.finalized) {
+                break;
               }
-              observer.complete();
-              break;
+              if (done) {
+                if (dataLines.length > 0) {
+                  dispatchEvent();
+                }
+                if (!outcome.finalized) {
+                  outcome.finalized = true;
+                  observer.complete();
+                }
+                break;
+              }
+              buffer += decoder.decode(value, { stream: true });
+              const lines = buffer.split(/\r?\n/);
+              buffer = lines.pop() ?? '';
+              for (const line of lines) {
+                if (outcome.finalized) {
+                  break;
+                }
+                const normalized = line.replace(/^\uFEFF/, '');
+                if (normalized.trim() === '') {
+                  dispatchEvent();
+                  if (outcome.finalized) {
+                    break;
+                  }
+                  continue;
+                }
+                const trimmedStart = normalized.trimStart();
+                if (/^event:/i.test(trimmedStart)) {
+                  eventName = trimmedStart.replace(/^event:/i, '').trim();
+                  continue;
+                }
+                if (/^data:/i.test(trimmedStart)) {
+                  dataLines.push(trimmedStart.replace(/^data:/i, '').trimStart());
+                }
+              }
             }
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split(/\r?\n/);
-            buffer = lines.pop() ?? '';
-            for (const line of lines) {
-              const normalized = line.replace(/^\uFEFF/, '');
-              if (normalized.trim() === '') {
-                dispatchEvent();
-                continue;
-              }
-              const trimmedStart = normalized.trimStart();
-              if (/^event:/i.test(trimmedStart)) {
-                eventName = trimmedStart.replace(/^event:/i, '').trim();
-                continue;
-              }
-              if (/^data:/i.test(trimmedStart)) {
-                dataLines.push(trimmedStart.replace(/^data:/i, '').trimStart());
-              }
-            }
+          } finally {
+            await reader.cancel().catch(() => undefined);
           }
         })
         .catch((error: unknown) => {
           const fetchError = error as { name?: string };
-          if (fetchError?.name !== 'AbortError') {
+          if (fetchError?.name !== 'AbortError' && !outcome.finalized) {
+            outcome.finalized = true;
             observer.error(error);
           }
         });
