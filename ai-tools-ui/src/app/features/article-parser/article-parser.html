@@ -20,6 +20,27 @@
   }
 
   @if (state.article) {
+    <div class="full-pipeline-bar">
+      <button
+        mat-stroked-button
+        type="button"
+        color="primary"
+        [disabled]="isDisabled"
+        (click)="enqueueFullLlmPipeline()"
+      >
+        {{ loadingFullPipeline ? 'Постановка в очередь…' : 'Полный LLM-пайплайн (очередь)' }}
+      </button>
+      <p class="full-pipeline-bar__hint">
+        Фаза A: теги оригинала, перевод, сущности. После успешного перевода — теги перевода, аннотация,
+        категоризация.
+      </p>
+      @if (fullPipelineError) {
+        <div class="field-error full-pipeline-bar__message">{{ fullPipelineError }}</div>
+      } @else if (fullPipelineMessage) {
+        <div class="full-pipeline-bar__message full-pipeline-bar__message_ok">{{ fullPipelineMessage }}</div>
+      }
+    </div>
+
     <div class="article-grid">
       <app-article-parser-status [article]="state.article" />
       <app-article-parser-meta [article]="state.article" />

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import UTC, datetime, timedelta
 from time import perf_counter
@@ -18,8 +19,11 @@ from app.services.documents.document_pipeline import (
 )
 from app.services.parsing.parse_source_runner import execute_parse_source
 from app.services.processing.jobs import JobStatus
+from app.services.processing.pipeline_followup import schedule_post_translate_pipeline_jobs
 from app.services.processing.redis_batch_store import inc_processing_batch
 from app.services.processing.saq_job_runner import run_tracked_document_job
+
+_log = logging.getLogger(__name__)
 
 
 async def translate_document_job(
@@ -30,6 +34,8 @@ async def translate_document_job(
     started_by_id: str | None = None,
     batch_id: str | None = None,
     processing_job_id: str | None = None,
+    pipeline_correlation_id: str | None = None,
+    pipeline_max_tags: int = 10,
 ) -> dict[str, str]:
     async def work(session, doc_id, started_by, pj):
         await run_translate_document(
@@ -40,7 +46,7 @@ async def translate_document_job(
             track_job=pj is None,
         )
 
-    return await run_tracked_document_job(
+    result = await run_tracked_document_job(
         document_id=document_id,
         started_by_id=started_by_id,
         batch_id=batch_id,
@@ -50,6 +56,21 @@ async def translate_document_job(
         success_status="translated",
         work=work,
     )
+    if result.get("status") == "translated" and pipeline_correlation_id:
+        try:
+            await schedule_post_translate_pipeline_jobs(
+                document_id=document_id,
+                correlation_id=pipeline_correlation_id,
+                max_tags=pipeline_max_tags,
+                started_by_id=started_by_id,
+            )
+        except Exception:
+            _log.exception(
+                "pipeline follow-up enqueue failed document_id=%s correlation_id=%s",
+                document_id,
+                pipeline_correlation_id,
+            )
+    return result
 
 
 async def annotate_document_job(

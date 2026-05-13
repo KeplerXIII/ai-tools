@@ -27,6 +27,8 @@ from app.schemas.processing import (
     EnqueueCategorizeResponse,
     EnqueueExtractorRequest,
     EnqueueExtractorResponse,
+    EnqueueFullLlmPipelineRequest,
+    EnqueueFullLlmPipelineResponse,
     EnqueueTaggerRequest,
     EnqueueTaggerResponse,
     EnqueueTranslateRequest,
@@ -35,7 +37,11 @@ from app.schemas.processing import (
     TaggerBatchStatusResponse,
     TranslateBatchStatusResponse,
 )
-from app.services.processing.enqueue_locks import try_acquire_enqueue_lock
+from app.services.processing.enqueue_locks import release_enqueue_lock, try_acquire_enqueue_lock
+from app.services.processing.processing_enqueue_queries import (
+    filter_out_active_jobs,
+    require_documents_exist,
+)
 from app.services.processing.jobs import JobStatus, JobType, provider_label_for_task
 from app.services.processing.redis_batch_store import (
     ProcessingBatchKind,
@@ -52,48 +58,6 @@ from app.services.processing.saq_queue import (
 )
 
 router = APIRouter(prefix="/processing", tags=["processing"])
-
-
-def _dedupe_document_ids_preserve_order(document_ids: list[UUID]) -> list[UUID]:
-    return list(dict.fromkeys(document_ids))
-
-
-async def _require_documents_exist(db: AsyncSession, document_ids: list[UUID]) -> list[str]:
-    ordered = _dedupe_document_ids_preserve_order(document_ids)
-    if not ordered:
-        raise HTTPException(status_code=422, detail="Список document_ids пуст")
-    rows = (await db.scalars(select(Document.id).where(Document.id.in_(ordered)))).all()
-    found: set[UUID] = set(rows)
-    missing = [str(i) for i in ordered if i not in found]
-    if missing:
-        head = ", ".join(missing[:20])
-        suffix = "…" if len(missing) > 20 else ""
-        raise HTTPException(
-            status_code=422,
-            detail=f"Документы не найдены: {head}{suffix}",
-        )
-    return [str(i) for i in ordered]
-
-
-async def _filter_out_active_jobs(
-    db: AsyncSession,
-    document_ids: list[str],
-    job_type: JobType,
-    *,
-    queue_job_key_like: str | None = None,
-) -> list[str]:
-    if not document_ids:
-        return []
-    uuids = [UUID(d) for d in document_ids]
-    stmt = select(ProcessingJob.document_id).where(
-        ProcessingJob.document_id.in_(uuids),
-        ProcessingJob.job_type == job_type,
-        ProcessingJob.status.in_((JobStatus.RUNNING, JobStatus.PENDING)),
-    )
-    if queue_job_key_like is not None:
-        stmt = stmt.where(ProcessingJob.queue_job_key.like(queue_job_key_like))
-    busy = set((await db.scalars(stmt)).all())
-    return [d for d in document_ids if UUID(d) not in busy]
 
 
 BatchKind = ProcessingBatchKind
@@ -210,14 +174,193 @@ async def _collect_dashboard_payload(session: AsyncSession) -> dict:
     }
 
 
+@router.post("/documents/full-llm-pipeline", response_model=EnqueueFullLlmPipelineResponse)
+async def enqueue_full_llm_pipeline(
+    payload: EnqueueFullLlmPipelineRequest,
+    db: AsyncSession = Depends(get_db),
+    started_by_id: UUID | None = Depends(get_optional_started_by_id),
+) -> EnqueueFullLlmPipelineResponse:
+    """Фаза A параллельно: теги оригинал, перевод, сущности. После успешного перевода — фаза B (теги перевода, аннотация, категоризация)."""
+    correlation_id = str(uuid.uuid4())
+    all_ids = await require_documents_exist(db, payload.document_ids)
+    tr_free = set(await filter_out_active_jobs(db, all_ids, JobType.TRANSLATE))
+    tag_free = set(
+        await filter_out_active_jobs(
+            db,
+            all_ids,
+            JobType.TAG,
+            queue_job_key_like="tagger-original:%",
+        )
+    )
+    ext_free = set(await filter_out_active_jobs(db, all_ids, JobType.ENTITY_EXTRACT))
+    eligible = [d for d in all_ids if d in tr_free and d in tag_free and d in ext_free]
+
+    translate_batch_id = str(uuid.uuid4())
+    tagger_batch_id = str(uuid.uuid4())
+    extractor_batch_id = str(uuid.uuid4())
+    await init_processing_batch("translate", translate_batch_id, scanned=len(eligible))
+    await init_processing_batch("tagger", tagger_batch_id, scanned=len(eligible))
+    await init_processing_batch("extractor", extractor_batch_id, scanned=len(eligible))
+
+    translate_queue = get_saq_translate_queue()
+    tagger_queue = get_saq_tagger_queue()
+    extractor_queue = get_saq_extractor_queue()
+    await translate_queue.connect()
+    await tagger_queue.connect()
+    await extractor_queue.connect()
+    enqueued = 0
+    started_by = str(started_by_id) if started_by_id else None
+    try:
+        for document_id in eligible:
+            if not await try_acquire_enqueue_lock(
+                "translate",
+                document_id,
+                ttl_sec=settings.saq_translate_job_timeout_sec + 300,
+            ):
+                continue
+            if not await try_acquire_enqueue_lock(
+                "tagger_original",
+                document_id,
+                ttl_sec=settings.saq_tagger_job_timeout_sec + 300,
+            ):
+                await release_enqueue_lock("translate", document_id)
+                continue
+            if not await try_acquire_enqueue_lock(
+                "extractor",
+                document_id,
+                ttl_sec=settings.saq_extractor_job_timeout_sec + 300,
+            ):
+                await release_enqueue_lock("translate", document_id)
+                await release_enqueue_lock("tagger_original", document_id)
+                continue
+
+            now = datetime.now(UTC)
+            tag_key = f"tagger-original:{tagger_batch_id}:{document_id}"
+            tr_key = f"translate:{translate_batch_id}:{document_id}"
+            ex_key = f"extractor:{extractor_batch_id}:{document_id}"
+
+            tag_pj = ProcessingJob(
+                document_id=UUID(document_id),
+                job_type=JobType.TAG,
+                status=JobStatus.PENDING,
+                model_name=settings.model_tagging,
+                provider=provider_label_for_task(LLMTask.TAGGING),
+                batch_id=tagger_batch_id,
+                queue_name=tagger_queue.name,
+                queue_job_key=tag_key,
+                started_by_id=started_by_id,
+            )
+            tr_pj = ProcessingJob(
+                document_id=UUID(document_id),
+                job_type=JobType.TRANSLATE,
+                status=JobStatus.PENDING,
+                model_name=settings.model_translation,
+                provider=provider_label_for_task(LLMTask.TRANSLATION),
+                batch_id=translate_batch_id,
+                queue_name=translate_queue.name,
+                queue_job_key=tr_key,
+                started_by_id=started_by_id,
+            )
+            ex_pj = ProcessingJob(
+                document_id=UUID(document_id),
+                job_type=JobType.ENTITY_EXTRACT,
+                status=JobStatus.PENDING,
+                model_name=settings.model_entity_extraction,
+                provider=provider_label_for_task(LLMTask.ENTITY_EXTRACTION),
+                batch_id=extractor_batch_id,
+                queue_name=extractor_queue.name,
+                queue_job_key=ex_key,
+                started_by_id=started_by_id,
+            )
+            db.add(tag_pj)
+            db.add(tr_pj)
+            db.add(ex_pj)
+            await db.flush()
+            await db.commit()
+
+            tag_job = await tagger_queue.enqueue(
+                "tagger_document_job",
+                key=tag_key,
+                document_id=document_id,
+                use_translation=False,
+                max_tags=payload.max_tags,
+                started_by_id=started_by,
+                batch_id=tagger_batch_id,
+                processing_job_id=str(tag_pj.id),
+                timeout=settings.saq_tagger_job_timeout_sec,
+            )
+            tr_job = await translate_queue.enqueue(
+                "translate_document_job",
+                key=tr_key,
+                document_id=document_id,
+                target_lang=payload.target_lang,
+                started_by_id=started_by,
+                batch_id=translate_batch_id,
+                processing_job_id=str(tr_pj.id),
+                pipeline_correlation_id=correlation_id,
+                pipeline_max_tags=payload.max_tags,
+                timeout=settings.saq_translate_job_timeout_sec,
+            )
+            ex_job = await extractor_queue.enqueue(
+                "extractor_document_job",
+                key=ex_key,
+                document_id=document_id,
+                started_by_id=started_by,
+                batch_id=extractor_batch_id,
+                processing_job_id=str(ex_pj.id),
+                timeout=settings.saq_extractor_job_timeout_sec,
+            )
+
+            ok = tag_job is not None and tr_job is not None and ex_job is not None
+            if not ok:
+                if tag_job is None:
+                    tag_pj.status = JobStatus.CANCELLED
+                    tag_pj.finished_at = now
+                    await release_enqueue_lock("tagger_original", document_id)
+                else:
+                    await inc_processing_batch("tagger", tagger_batch_id, "enqueued")
+                if tr_job is None:
+                    tr_pj.status = JobStatus.CANCELLED
+                    tr_pj.finished_at = now
+                    await release_enqueue_lock("translate", document_id)
+                else:
+                    await inc_processing_batch("translate", translate_batch_id, "enqueued")
+                if ex_job is None:
+                    ex_pj.status = JobStatus.CANCELLED
+                    ex_pj.finished_at = now
+                    await release_enqueue_lock("extractor", document_id)
+                else:
+                    await inc_processing_batch("extractor", extractor_batch_id, "enqueued")
+                await db.commit()
+                continue
+
+            await inc_processing_batch("tagger", tagger_batch_id, "enqueued")
+            await inc_processing_batch("translate", translate_batch_id, "enqueued")
+            await inc_processing_batch("extractor", extractor_batch_id, "enqueued")
+            enqueued += 1
+    finally:
+        await translate_queue.disconnect()
+        await tagger_queue.disconnect()
+        await extractor_queue.disconnect()
+
+    return EnqueueFullLlmPipelineResponse(
+        pipeline_correlation_id=correlation_id,
+        translate_batch_id=translate_batch_id,
+        tagger_original_batch_id=tagger_batch_id,
+        extractor_batch_id=extractor_batch_id,
+        scanned=len(eligible),
+        enqueued=enqueued,
+    )
+
+
 @router.post("/documents/translate", response_model=EnqueueTranslateResponse)
 async def enqueue_translate_documents(
     payload: EnqueueTranslateRequest,
     db: AsyncSession = Depends(get_db),
     started_by_id: UUID | None = Depends(get_optional_started_by_id),
 ) -> EnqueueTranslateResponse:
-    document_ids = await _require_documents_exist(db, payload.document_ids)
-    document_ids = await _filter_out_active_jobs(db, document_ids, JobType.TRANSLATE)
+    document_ids = await require_documents_exist(db, payload.document_ids)
+    document_ids = await filter_out_active_jobs(db, document_ids, JobType.TRANSLATE)
     batch_id = str(uuid.uuid4())
     await init_processing_batch("translate", batch_id, scanned=len(document_ids))
 
@@ -293,8 +436,8 @@ async def enqueue_annotate_documents(
     db: AsyncSession = Depends(get_db),
     started_by_id: UUID | None = Depends(get_optional_started_by_id),
 ) -> EnqueueAnnotateResponse:
-    document_ids = await _require_documents_exist(db, payload.document_ids)
-    document_ids = await _filter_out_active_jobs(db, document_ids, JobType.SUMMARY)
+    document_ids = await require_documents_exist(db, payload.document_ids)
+    document_ids = await filter_out_active_jobs(db, document_ids, JobType.SUMMARY)
     batch_id = str(uuid.uuid4())
     await init_processing_batch("annotate", batch_id, scanned=len(document_ids))
 
@@ -368,8 +511,8 @@ async def enqueue_categorize_documents(
     db: AsyncSession = Depends(get_db),
     started_by_id: UUID | None = Depends(get_optional_started_by_id),
 ) -> EnqueueCategorizeResponse:
-    document_ids = await _require_documents_exist(db, payload.document_ids)
-    document_ids = await _filter_out_active_jobs(db, document_ids, JobType.CATEGORIZE)
+    document_ids = await require_documents_exist(db, payload.document_ids)
+    document_ids = await filter_out_active_jobs(db, document_ids, JobType.CATEGORIZE)
     batch_id = str(uuid.uuid4())
     await init_processing_batch("categorize", batch_id, scanned=len(document_ids))
 
@@ -443,8 +586,8 @@ async def enqueue_extractor_documents(
     db: AsyncSession = Depends(get_db),
     started_by_id: UUID | None = Depends(get_optional_started_by_id),
 ) -> EnqueueExtractorResponse:
-    document_ids = await _require_documents_exist(db, payload.document_ids)
-    document_ids = await _filter_out_active_jobs(db, document_ids, JobType.ENTITY_EXTRACT)
+    document_ids = await require_documents_exist(db, payload.document_ids)
+    document_ids = await filter_out_active_jobs(db, document_ids, JobType.ENTITY_EXTRACT)
     batch_id = str(uuid.uuid4())
     await init_processing_batch("extractor", batch_id, scanned=len(document_ids))
 
@@ -522,8 +665,8 @@ async def _enqueue_tagger_documents(
     source = "translated" if use_translation else "original"
     same_source_active_key_prefix = f"tagger-{source}:"
 
-    document_ids = await _require_documents_exist(db, payload.document_ids)
-    document_ids = await _filter_out_active_jobs(
+    document_ids = await require_documents_exist(db, payload.document_ids)
+    document_ids = await filter_out_active_jobs(
         db,
         document_ids,
         JobType.TAG,

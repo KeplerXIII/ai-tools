@@ -22,6 +22,8 @@ import {
 } from './api/article-parser-api';
 import { ArticleParserState } from './model/article-parser-state';
 import { scrollToElement } from './lib/scroll-to-element';
+import { HttpErrorResponse } from '@angular/common/http';
+import { DocumentsApi } from '../documents/documents-api';
 
 @Component({
   selector: 'app-article-parser',
@@ -59,6 +61,9 @@ export class ArticleParser implements OnInit {
   loadingSummary = false;
   loadingOriginalTags = false;
   loadingTranslatedTags = false;
+  loadingFullPipeline = false;
+  fullPipelineMessage = '';
+  fullPipelineError = '';
   articleError = '';
   originalTagsError = '';
   translationError = '';
@@ -70,6 +75,7 @@ export class ArticleParser implements OnInit {
 
   constructor(
     private api: ArticleParserApi,
+    private documentsApi: DocumentsApi,
     public state: ArticleParserState,
     private cdr: ChangeDetectorRef,
     private ngZone: NgZone,
@@ -111,6 +117,8 @@ export class ArticleParser implements OnInit {
     this.translationError = '';
     this.translatedTagsError = '';
     this.summaryError = '';
+    this.fullPipelineMessage = '';
+    this.fullPipelineError = '';
     this.loadingCategories = false;
     this.state.article = null;
     this.state.entities = null;
@@ -218,6 +226,39 @@ export class ArticleParser implements OnInit {
     this.translationError = '';
     this.translatedTagsError = '';
     this.summaryError = '';
+    this.fullPipelineMessage = '';
+    this.fullPipelineError = '';
+  }
+
+  enqueueFullLlmPipeline(): void {
+    const documentId = this.state.article?.document_id;
+    if (!documentId) {
+      return;
+    }
+    this.loadingFullPipeline = true;
+    this.fullPipelineError = '';
+    this.fullPipelineMessage = '';
+    this.documentsApi
+      .enqueueFullLlmPipeline({ document_ids: [documentId], target_lang: 'ru', max_tags: 12 })
+      .subscribe({
+        next: (r) => {
+          this.loadingFullPipeline = false;
+          this.fullPipelineMessage =
+            r.enqueued > 0
+              ? `В очередь поставлено ${r.enqueued} из ${r.scanned} (фаза A). После перевода запустится фаза B. Correlation: ${r.pipeline_correlation_id.slice(0, 8)}…`
+              : `Ничего не поставлено: ${r.scanned} в выборке или уже есть активные джобы.`;
+          this.cdr.markForCheck();
+        },
+        error: (err: unknown) => {
+          this.loadingFullPipeline = false;
+          const detail =
+            err instanceof HttpErrorResponse && typeof err.error?.detail === 'string'
+              ? err.error.detail
+              : null;
+          this.fullPipelineError = detail ?? 'Ошибка постановки полного пайплайна в очередь';
+          this.cdr.markForCheck();
+        },
+      });
   }
 
   // =========================
@@ -312,7 +353,8 @@ export class ArticleParser implements OnInit {
       this.loadingTranslation ||
       this.loadingSummary ||
       this.loadingOriginalTags ||
-      this.loadingTranslatedTags
+      this.loadingTranslatedTags ||
+      this.loadingFullPipeline
     );
   }
 

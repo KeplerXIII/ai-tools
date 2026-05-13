@@ -69,6 +69,36 @@
   max-width: 1400px;
   font-family: var(--font-family-base);
 }
+
+.full-pipeline-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 16px;
+  margin-bottom: 20px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: var(--bg-light-grey, #f4f4f5);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.full-pipeline-bar__hint {
+  margin: 0;
+  flex: 1 1 220px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--muted-text-color, #57534e);
+}
+
+.full-pipeline-bar__message {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 13px;
+}
+
+.full-pipeline-bar__message_ok {
+  color: #166534;
+}
 .url-form-wrapper {
   display: flex;
 }

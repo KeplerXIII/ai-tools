@@ -127,3 +127,21 @@ class TaggerBatchStatusResponse(BaseModel):
     skipped: int
     pending: int
     done: bool
+
+
+class EnqueueFullLlmPipelineRequest(BaseModel):
+    """Фаза A: теги оригинал + перевод + сущности параллельно; фаза B после успешного перевода — теги перевода, аннотация, категоризация."""
+
+    document_ids: list[UUID] = Field(..., min_length=1, max_length=10_000)
+    target_lang: str = Field(default="ru", min_length=2, max_length=8)
+    max_tags: int = Field(default=10, ge=1, le=100)
+
+
+class EnqueueFullLlmPipelineResponse(BaseModel):
+    ok: bool = True
+    pipeline_correlation_id: str
+    translate_batch_id: str
+    tagger_original_batch_id: str
+    extractor_batch_id: str
+    scanned: int
+    enqueued: int

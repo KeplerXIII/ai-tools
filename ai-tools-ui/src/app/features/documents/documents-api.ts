@@ -178,6 +178,16 @@ export interface TaggerBatchStatusResponse {
   done: boolean;
 }
 
+export interface EnqueueFullLlmPipelineResponse {
+  ok: boolean;
+  pipeline_correlation_id: string;
+  translate_batch_id: string;
+  tagger_original_batch_id: string;
+  extractor_batch_id: string;
+  scanned: number;
+  enqueued: number;
+}
+
 export interface ListDocumentsFilters {
   statusCode?: string;
   documentTypeCode?: string;
@@ -300,5 +310,16 @@ export class DocumentsApi {
 
   getTaggerBatchStatus(batchId: string): Observable<TaggerBatchStatusResponse> {
     return this.http.get<TaggerBatchStatusResponse>(`/api/v1/processing/documents/tagger/${batchId}`);
+  }
+
+  enqueueFullLlmPipeline(payload: {
+    document_ids: string[];
+    target_lang?: string;
+    max_tags?: number;
+  }): Observable<EnqueueFullLlmPipelineResponse> {
+    return this.http.post<EnqueueFullLlmPipelineResponse>(
+      '/api/v1/processing/documents/full-llm-pipeline',
+      payload,
+    );
   }
 }
