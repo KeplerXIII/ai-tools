@@ -245,8 +245,8 @@ export class ArticleParser implements OnInit {
           this.loadingFullPipeline = false;
           this.fullPipelineMessage =
             r.enqueued > 0
-              ? `В очередь поставлено ${r.enqueued} из ${r.scanned} (фаза A). После перевода запустится фаза B. Correlation: ${r.pipeline_correlation_id.slice(0, 8)}…`
-              : `Ничего не поставлено: ${r.scanned} в выборке или уже есть активные джобы.`;
+              ? `В очередь: ${r.enqueued} из ${r.scanned} (фаза A и/или B). Заблокировано активными джобами: ${r.skipped_blocked}, уже всё готово: ${r.skipped_already_complete}. Correlation: ${r.pipeline_correlation_id.slice(0, 8)}…`
+              : `Ничего не поставлено (${r.scanned} в запросе). Заблокировано: ${r.skipped_blocked}, уже готово: ${r.skipped_already_complete}.`;
           this.cdr.markForCheck();
         },
         error: (err: unknown) => {

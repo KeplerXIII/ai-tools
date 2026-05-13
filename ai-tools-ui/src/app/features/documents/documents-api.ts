@@ -186,6 +186,8 @@ export interface EnqueueFullLlmPipelineResponse {
   extractor_batch_id: string;
   scanned: number;
   enqueued: number;
+  skipped_blocked: number;
+  skipped_already_complete: number;
 }
 
 export interface ListDocumentsFilters {

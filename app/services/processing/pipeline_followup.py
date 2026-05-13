@@ -56,11 +56,14 @@ async def schedule_post_translate_pipeline_jobs(
     correlation_id: str,
     max_tags: int,
     started_by_id: str | None,
-) -> None:
-    """Ставит три джоба фазы B для одного документа (после успешного перевода в рамках пайплайна)."""
+) -> bool:
+    """Ставит три джоба фазы B для одного документа (после успешного перевода в рамках пайплайна).
+
+    Returns True, если хотя бы одна задача реально ушла в SAQ.
+    """
     claimed = await try_claim_pipeline_followup_once(correlation_id=correlation_id, document_id=document_id)
     if not claimed:
-        return
+        return False
 
     db_committed = False
     parsed_started_by = UUID(started_by_id) if started_by_id else None
@@ -71,7 +74,7 @@ async def schedule_post_translate_pipeline_jobs(
         async with AsyncSessionLocal() as db:
             doc_row = await db.scalar(select(Document.id).where(Document.id == doc_uuid))
             if doc_row is None:
-                return
+                return False
 
             tag_ready = await filter_out_active_jobs(
                 db,
@@ -82,7 +85,7 @@ async def schedule_post_translate_pipeline_jobs(
             ann_ready = await filter_out_active_jobs(db, [document_id], JobType.SUMMARY)
             cat_ready = await filter_out_active_jobs(db, [document_id], JobType.CATEGORIZE)
             if document_id not in tag_ready or document_id not in ann_ready or document_id not in cat_ready:
-                return
+                return False
 
             tag_lock = await try_acquire_enqueue_lock(
                 "tagger_translated",
@@ -90,7 +93,7 @@ async def schedule_post_translate_pipeline_jobs(
                 ttl_sec=settings.saq_tagger_job_timeout_sec + 300,
             )
             if not tag_lock:
-                return
+                return False
             ann_lock = await try_acquire_enqueue_lock(
                 "annotate",
                 document_id,
@@ -98,7 +101,7 @@ async def schedule_post_translate_pipeline_jobs(
             )
             if not ann_lock:
                 await release_enqueue_lock("tagger_translated", document_id)
-                return
+                return False
             cat_lock = await try_acquire_enqueue_lock(
                 "categorize",
                 document_id,
@@ -107,7 +110,7 @@ async def schedule_post_translate_pipeline_jobs(
             if not cat_lock:
                 await release_enqueue_lock("tagger_translated", document_id)
                 await release_enqueue_lock("annotate", document_id)
-                return
+                return False
 
             tag_batch = str(uuid.uuid4())
             ann_batch = str(uuid.uuid4())
@@ -122,6 +125,7 @@ async def schedule_post_translate_pipeline_jobs(
             await tag_queue.connect()
             await ann_queue.connect()
             await cat_queue.connect()
+            any_saq_ok = False
             try:
                 tag_key = f"tagger-translated:{tag_batch}:{document_id}"
                 tag_pj = ProcessingJob(
@@ -184,6 +188,7 @@ async def schedule_post_translate_pipeline_jobs(
                     tag_pj.finished_at = datetime.now(UTC)
                     await db.commit()
                 else:
+                    any_saq_ok = True
                     await inc_processing_batch("tagger", tag_batch, "enqueued")
 
                 ann_job = await ann_queue.enqueue(
@@ -200,6 +205,7 @@ async def schedule_post_translate_pipeline_jobs(
                     ann_pj.finished_at = datetime.now(UTC)
                     await db.commit()
                 else:
+                    any_saq_ok = True
                     await inc_processing_batch("annotate", ann_batch, "enqueued")
 
                 cat_job = await cat_queue.enqueue(
@@ -216,11 +222,17 @@ async def schedule_post_translate_pipeline_jobs(
                     cat_pj.finished_at = datetime.now(UTC)
                     await db.commit()
                 else:
+                    any_saq_ok = True
                     await inc_processing_batch("categorize", cat_batch, "enqueued")
             finally:
                 await tag_queue.disconnect()
                 await ann_queue.disconnect()
                 await cat_queue.disconnect()
+
+            if db_committed and not any_saq_ok:
+                await release_pipeline_followup_claim(correlation_id=correlation_id, document_id=document_id)
+                return False
+            return any_saq_ok
     finally:
         if claimed and not db_committed:
             await release_pipeline_followup_claim(correlation_id=correlation_id, document_id=document_id)
