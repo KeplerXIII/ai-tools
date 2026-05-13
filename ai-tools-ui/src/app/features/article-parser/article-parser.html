@@ -20,25 +20,27 @@
   }
 
   @if (state.article) {
-    <div class="full-pipeline-bar">
-      <button
-        mat-stroked-button
-        type="button"
-        color="primary"
-        [disabled]="isDisabled"
-        (click)="enqueueFullLlmPipeline()"
-      >
-        {{ loadingFullPipeline ? 'Постановка в очередь…' : 'Полный LLM-пайплайн (очередь)' }}
-      </button>
-      <p class="full-pipeline-bar__hint">
-        Ставит в очередь только недостающие шаги: фаза A — теги оригинала, перевод на ru, сущности; если перевод уже есть — перевод не дублируется. Фаза B — теги по переводу, аннотация, категоризация (после перевода или сразу, если перевод готов).
-      </p>
-      @if (fullPipelineError) {
-        <div class="field-error full-pipeline-bar__message">{{ fullPipelineError }}</div>
-      } @else if (fullPipelineMessage) {
-        <div class="full-pipeline-bar__message full-pipeline-bar__message_ok">{{ fullPipelineMessage }}</div>
-      }
-    </div>
+    <p-panel header="Автоматизированный LLM-пайплайн" [toggleable]="true">
+      <div class="full-pipeline-bar">
+        <app-outline-button
+          [disabled]="isDisabled"
+          [text]="loadingFullPipeline ? 'Постановка в очередь…' : 'Полный LLM-пайплайн (очередь)'"
+          (clicked)="enqueueFullLlmPipeline()"
+        />
+        <p class="full-pipeline-bar__hint">
+          Ставит в очередь только недостающие шаги: фаза A — теги оригинала, перевод на ru,
+          сущности; если перевод уже есть — перевод не дублируется. Фаза B — теги по переводу,
+          аннотация, категоризация (после перевода или сразу, если перевод готов).
+        </p>
+        @if (fullPipelineError) {
+          <div class="field-error full-pipeline-bar__message">{{ fullPipelineError }}</div>
+        } @else if (fullPipelineMessage) {
+          <div class="full-pipeline-bar__message full-pipeline-bar__message_ok">
+            {{ fullPipelineMessage }}
+          </div>
+        }
+      </div>
+    </p-panel>
 
     <div class="article-grid">
       <app-article-parser-status [article]="state.article" />

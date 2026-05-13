@@ -3,7 +3,6 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { InputTextModule } from 'primeng/inputtext';
-import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -24,12 +23,14 @@ import { ArticleParserState } from './model/article-parser-state';
 import { scrollToElement } from './lib/scroll-to-element';
 import { HttpErrorResponse } from '@angular/common/http';
 import { DocumentsApi } from '../documents/documents-api';
+import { PanelModule } from 'primeng/panel';
+import { OutlineButtonComponent } from '../../shared/ui/outline-button/outline-button.component';
 
 @Component({
   selector: 'app-article-parser',
   imports: [
+    PanelModule,
     FormsModule,
-    MatButtonModule,
     MatCardModule,
     MatFormFieldModule,
     MatInputModule,
@@ -43,6 +44,7 @@ import { DocumentsApi } from '../documents/documents-api';
     ArticleParserTranslationComponent,
     ArticleParserAnnotationComponent,
     ArticleParserArticleLoadingComponent,
+    OutlineButtonComponent,
   ],
   templateUrl: './article-parser.html',
   styleUrl: './article-parser.scss',
