@@ -98,6 +98,15 @@ export class ArticleParserMetaComponent implements OnChanges {
     return this.article?.main_image?.trim() || '';
   }
 
+  /** Для печати: главное изображение; если в метаданных пусто — первое из галереи. */
+  get printPrimaryImageUrl(): string {
+    const main = this.mainImageUrl;
+    if (main) {
+      return main;
+    }
+    return this.galleriaItems[0]?.itemImageSrc?.trim() ?? '';
+  }
+
   showImagePreview(): boolean {
     if (this.hasGalleryImages()) {
       return this.galleriaItems.length > 0;
