@@ -749,7 +749,7 @@ async def remove_document_status(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    _ = user
+    user_id = user.id
     normalized_code = status_code.strip().lower()
     if not normalized_code:
         raise HTTPException(status_code=400, detail="Код статуса не должен быть пустым")
@@ -773,7 +773,7 @@ async def remove_document_status(
         await sync_document_statuses(
             db,
             document_id=document_id,
-            assigned_by_id=user.id,
+            assigned_by_id=user_id,
         )
     return {"ok": True, "document_id": str(document_id), "status_code": normalized_code}
 
@@ -918,7 +918,7 @@ async def assign_document_tag(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    _ = user
+    user_id = user.id
     doc = await db.get(Document, document_id)
     if doc is None:
         raise HTTPException(status_code=404, detail="Документ не найден")
@@ -946,7 +946,7 @@ async def assign_document_tag(
         await sync_document_statuses(
             db,
             document_id=document_id,
-            assigned_by_id=user.id,
+            assigned_by_id=user_id,
         )
     return {"ok": True, "document_id": str(document_id), "tag_id": str(payload.tag_id)}
 
@@ -958,7 +958,7 @@ async def remove_document_tag(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    _ = user
+    user_id = user.id
     doc = await db.get(Document, document_id)
     if doc is None:
         raise HTTPException(status_code=404, detail="Документ не найден")
@@ -974,7 +974,7 @@ async def remove_document_tag(
         await sync_document_statuses(
             db,
             document_id=document_id,
-            assigned_by_id=user.id,
+            assigned_by_id=user_id,
         )
     return {"ok": True, "document_id": str(document_id), "tag_id": str(tag_id)}
 
@@ -1068,7 +1068,7 @@ async def assign_document_entity(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    _ = user
+    user_id = user.id
     doc = await db.get(Document, document_id)
     if doc is None:
         raise HTTPException(status_code=404, detail="Документ не найден")
@@ -1094,7 +1094,7 @@ async def assign_document_entity(
         await sync_document_statuses(
             db,
             document_id=document_id,
-            assigned_by_id=user.id,
+            assigned_by_id=user_id,
         )
     return {"ok": True, "document_id": str(document_id), "entity_id": str(payload.entity_id)}
 
@@ -1106,7 +1106,7 @@ async def remove_document_entity(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    _ = user
+    user_id = user.id
     doc = await db.get(Document, document_id)
     if doc is None:
         raise HTTPException(status_code=404, detail="Документ не найден")
@@ -1122,7 +1122,7 @@ async def remove_document_entity(
         await sync_document_statuses(
             db,
             document_id=document_id,
-            assigned_by_id=user.id,
+            assigned_by_id=user_id,
         )
     return {"ok": True, "document_id": str(document_id), "entity_id": str(entity_id)}
 
@@ -1226,7 +1226,7 @@ async def assign_document_category(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    _ = user
+    user_id = user.id
     doc = await db.get(Document, document_id)
     if doc is None:
         raise HTTPException(status_code=404, detail="Документ не найден")
@@ -1256,7 +1256,7 @@ async def assign_document_category(
         await sync_document_statuses(
             db,
             document_id=document_id,
-            assigned_by_id=user.id,
+            assigned_by_id=user_id,
         )
     return {"ok": True, "document_id": str(document_id), "category_id": str(payload.category_id)}
 
@@ -1268,7 +1268,7 @@ async def remove_document_category(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    _ = user
+    user_id = user.id
     doc = await db.get(Document, document_id)
     if doc is None:
         raise HTTPException(status_code=404, detail="Документ не найден")
@@ -1284,7 +1284,7 @@ async def remove_document_category(
         await sync_document_statuses(
             db,
             document_id=document_id,
-            assigned_by_id=user.id,
+            assigned_by_id=user_id,
         )
     return {"ok": True, "document_id": str(document_id), "category_id": str(category_id)}
 

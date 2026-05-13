@@ -120,6 +120,12 @@ export class ArticleParser implements OnInit {
     this.fullPipelineMessage = '';
     this.fullPipelineError = '';
     this.loadingCategories = false;
+    this.loadingEntitiesSection = false;
+    this.loadingTranslation = false;
+    this.loadingSummary = false;
+    this.loadingOriginalTags = false;
+    this.loadingTranslatedTags = false;
+    this.loadingFullPipeline = false;
     this.state.article = null;
     this.state.entities = null;
     this.state.categories = null;
@@ -220,6 +226,13 @@ export class ArticleParser implements OnInit {
   }
   clear(): void {
     this.resetBlockEditors();
+    this.loadingEntitiesSection = false;
+    this.loadingCategories = false;
+    this.loadingTranslation = false;
+    this.loadingSummary = false;
+    this.loadingOriginalTags = false;
+    this.loadingTranslatedTags = false;
+    this.loadingFullPipeline = false;
     this.state.clear();
     this.articleError = '';
     this.originalTagsError = '';

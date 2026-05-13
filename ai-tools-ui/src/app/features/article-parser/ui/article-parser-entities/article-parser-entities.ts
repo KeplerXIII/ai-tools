@@ -6,6 +6,7 @@ import {
   inject,
   Injector,
   Input,
+  OnDestroy,
   Output,
   ViewChild,
 } from '@angular/core';
@@ -38,7 +39,7 @@ type TagScope = 'original' | 'translated';
   templateUrl: './article-parser-entities.html',
   styleUrl: './article-parser-entities.scss',
 })
-export class ArticleParserEntitiesComponent {
+export class ArticleParserEntitiesComponent implements OnDestroy {
   @Input({ required: true }) article!: ExtractResponse;
   @Input({ required: true }) buttonsDisabled!: boolean;
   @Input() loadingOriginalTags = false;
@@ -81,6 +82,10 @@ export class ArticleParserEntitiesComponent {
     private api: ArticleParserApi,
     public state: ArticleParserState,
   ) {}
+
+  ngOnDestroy(): void {
+    this.entitiesLoadingChange.emit(false);
+  }
 
   @HostListener('document:pointerdown', ['$event'])
   onDocumentPointerDown(event: PointerEvent): void {
