@@ -10,6 +10,7 @@ import {
   LanguageCatalogItem,
   ParseSourceRunResponse,
   ParseSourceRunSnapshotPayload,
+  PostParseProcessingOptions,
   SourceCreateRequestBody,
   SourceListItem,
   SourcesApi,
@@ -55,6 +56,17 @@ export class Sources implements OnInit, OnDestroy {
   parseDays = 3;
   /** Соответствует skip_undated в API: после извлечения не сохранять материалы без итоговой даты. */
   parseSkipUndated = true;
+
+  parsePostFullPipeline = false;
+  parsePostLlmTagOriginal = false;
+  parsePostLlmTranslate = false;
+  parsePostLlmExtractor = false;
+  parsePostLlmTagTranslated = false;
+  parsePostLlmAnnotate = false;
+  parsePostLlmCategorize = false;
+  parsePostTargetLang = 'ru';
+  parsePostMaxTags = 12;
+
   parsingSourceId: string | null = null;
   lastParsedSourceId: string | null = null;
   parseFeedback = '';
@@ -360,6 +372,61 @@ export class Sources implements OnInit, OnDestroy {
     );
   }
 
+  /** Хотя бы один отдельный LLM-шаг (без полного пайплайна). */
+  parsePostHasAnyGranular(): boolean {
+    return (
+      this.parsePostLlmTagOriginal ||
+      this.parsePostLlmTranslate ||
+      this.parsePostLlmExtractor ||
+      this.parsePostLlmTagTranslated ||
+      this.parsePostLlmAnnotate ||
+      this.parsePostLlmCategorize
+    );
+  }
+
+  /** Язык перевода и лимит тегов нужны и для полного пайплайна, и для отдельных шагов. */
+  parsePostShowLangAndMaxTags(): boolean {
+    return this.parsePostFullPipeline || this.parsePostHasAnyGranular();
+  }
+
+  parsePostDependsOnTranslateDisabled(srcActive: boolean, parsing: boolean): boolean {
+    return (
+      !srcActive ||
+      parsing ||
+      this.parsePostFullPipeline ||
+      !this.parsePostLlmTranslate
+    );
+  }
+
+  parsePostOnTranslateToggled(enabled: boolean): void {
+    if (!enabled) {
+      this.parsePostLlmTagTranslated = false;
+      this.parsePostLlmAnnotate = false;
+    }
+  }
+
+  private buildPostParsePayload(): PostParseProcessingOptions | undefined {
+    const target_lang = (this.parsePostTargetLang || 'ru').trim().slice(0, 8) || 'ru';
+    const max_tags = Math.min(100, Math.max(1, Math.floor(Number(this.parsePostMaxTags)) || 12));
+    if (this.parsePostFullPipeline) {
+      return { full_llm_pipeline: true, target_lang, max_tags };
+    }
+    if (!this.parsePostHasAnyGranular()) {
+      return undefined;
+    }
+    return {
+      full_llm_pipeline: false,
+      llm_tag_original: this.parsePostLlmTagOriginal || undefined,
+      llm_translate: this.parsePostLlmTranslate || undefined,
+      llm_extractor: this.parsePostLlmExtractor || undefined,
+      llm_tag_translated: this.parsePostLlmTagTranslated || undefined,
+      llm_annotate: this.parsePostLlmAnnotate || undefined,
+      llm_categorize: this.parsePostLlmCategorize || undefined,
+      target_lang,
+      max_tags,
+    };
+  }
+
   private formatParseProgress(
     snap: Pick<ParseSourceRunSnapshotPayload, 'status' | 'phase' | 'found_total' | 'created_total'>,
   ): string {
@@ -502,6 +569,7 @@ export class Sources implements OnInit, OnDestroy {
         source_id: src.source_id,
         days,
         skip_undated: this.parseSkipUndated,
+        post_parse: this.buildPostParsePayload(),
       })
       .pipe(
         tap((enq) => {

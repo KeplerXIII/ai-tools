@@ -451,6 +451,132 @@
   margin-bottom: 0;
 }
 
+.source-parse__llm {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed #e2e8f0;
+}
+
+.source-parse__llm-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 14px;
+  color: #334155;
+  cursor: pointer;
+  margin: 0;
+}
+
+.source-parse__llm-main input {
+  width: auto;
+  margin-top: 2px;
+  cursor: pointer;
+}
+
+.source-parse__llm-hint {
+  margin: 6px 0 0 24px;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.source-parse__llm-granular {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  margin-left: 24px;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.source-parse__llm-granular-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.source-parse__llm-stage {
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+}
+
+.source-parse__llm-stage_after_translate {
+  border-color: #c7d2fe;
+  background: linear-gradient(#fff, #f5f7ff);
+}
+
+.source-parse__llm-stage-title {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #64748b;
+  margin-bottom: 8px;
+}
+
+.source-parse__llm-stage-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 6px 12px;
+}
+
+.source-parse__llm-microhint {
+  margin: 8px 0 0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: #64748b;
+}
+
+.source-parse__llm-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 13px;
+  color: #334155;
+  cursor: pointer;
+  margin: 0;
+}
+
+.source-parse__llm-step input {
+  width: auto;
+  margin-top: 3px;
+  cursor: pointer;
+}
+
+.source-parse__llm-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: end;
+  margin-top: 10px;
+  margin-left: 24px;
+}
+
+.source-parse__llm-lang input,
+.source-parse__llm-maxtags input {
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  height: 36px;
+  padding: 0 10px;
+  background: #fff;
+  width: 100%;
+}
+
+.source-parse__llm-lang {
+  min-width: 100px;
+}
+
+.source-parse__llm-maxtags {
+  min-width: 90px;
+  max-width: 110px;
+}
+
 .source-parse__message {
   padding: 8px 0 0;
   margin: 0;
