@@ -33,6 +33,37 @@ class SourceCreateResponse(BaseModel):
     document_type_name: str
 
 
+class PostParseProcessingOptions(BaseModel):
+    """Фоновая обработка после успешного разбора источника.
+
+    При ``full_llm_pipeline=True`` остальные флаги игнорируются (умный сквозной пайплайн).
+
+    При гранулярных флагах без полного пайплайна независимые шаги (оригинал, перевод как таковой, сущности) ставятся
+    батчами; тегирование по переводу, аннотация по переводу и категоризация **в связке с** ``llm_translate`` ставятся
+    только после успешного сохранения перевода. Категоризация **без** ``llm_translate`` идёт сразу по правилам модели:
+    есть перевод в БД — по нему, иначе по оригиналу.
+    """
+
+    full_llm_pipeline: bool = Field(
+        default=False,
+        description="Умный полный LLM-пайплайн для новых документов (как POST .../full-llm-pipeline)",
+    )
+    llm_tag_original: bool = Field(default=False, description="Теги по языку оригинала")
+    llm_translate: bool = Field(default=False, description="Перевод на target_lang")
+    llm_extractor: bool = Field(default=False, description="Извлечение сущностей")
+    llm_tag_translated: bool = Field(default=False, description="Теги по тексту перевода")
+    llm_annotate: bool = Field(default=False, description="Аннотация (summary по переводу)")
+    llm_categorize: bool = Field(
+        default=False,
+        description=(
+            "Без llm_translate: категоризация сразу (перевод в БД, если есть, иначе оригинал). "
+            "С llm_translate: только после успешного перевода, по переводу"
+        ),
+    )
+    target_lang: str = Field(default="ru", min_length=2, max_length=8)
+    max_tags: int = Field(default=10, ge=1, le=100)
+
+
 class ParseSourceRequest(BaseModel):
     source_id: uuid.UUID
     days: int = Field(default=3, ge=1, le=30)
@@ -41,6 +72,10 @@ class ParseSourceRequest(BaseModel):
         description=(
             "После извлечения не сохранять документ, если итоговая дата публикации неизвестна."
         ),
+    )
+    post_parse: PostParseProcessingOptions | None = Field(
+        default=None,
+        description="Опционально: что запустить после успешного разбора для созданных документов",
     )
 
 

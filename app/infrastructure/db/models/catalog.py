@@ -191,6 +191,7 @@ class SourceParseRun(Base):
     found_total: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_total: Mapped[int | None] = mapped_column(Integer, nullable=True)
     new_document_ids: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    post_parse_options: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     phase: Mapped[str | None] = mapped_column(String(64), nullable=True)
     processing_job_id: Mapped[uuid.UUID | None] = mapped_column(

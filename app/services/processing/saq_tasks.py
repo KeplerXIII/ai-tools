@@ -5,11 +5,14 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from time import perf_counter
 
+from collections.abc import Mapping
+
 from app.core.config import settings
 from app.domain.errors import ValidationError
 from app.infrastructure.db.models import ProcessingJob, SourceParseRun
 from app.infrastructure.db.session import AsyncSessionLocal
 from app.schemas.documents import SummarySource
+from app.services.processing.post_parse_llm_dispatch import dispatch_post_parse_llm_jobs
 from app.services.documents.document_pipeline import (
     run_categorize_document,
     run_entity_extract_document,
@@ -26,6 +29,14 @@ from app.services.processing.saq_job_runner import run_tracked_document_job
 _log = logging.getLogger(__name__)
 
 
+def _post_parse_options_as_dict(raw: object) -> dict | None:
+    if raw is None:
+        return None
+    if isinstance(raw, Mapping):
+        return dict(raw)
+    return None
+
+
 async def translate_document_job(
     ctx: dict,
     *,
@@ -36,6 +47,9 @@ async def translate_document_job(
     processing_job_id: str | None = None,
     pipeline_correlation_id: str | None = None,
     pipeline_max_tags: int = 10,
+    pipeline_followup_tag_translated: bool = True,
+    pipeline_followup_annotate: bool = True,
+    pipeline_followup_categorize: bool = True,
 ) -> dict[str, str]:
     async def work(session, doc_id, started_by, pj):
         await run_translate_document(
@@ -56,13 +70,25 @@ async def translate_document_job(
         success_status="translated",
         work=work,
     )
-    if result.get("status") == "translated" and pipeline_correlation_id:
+    wants_followup = (
+        pipeline_followup_tag_translated
+        or pipeline_followup_annotate
+        or pipeline_followup_categorize
+    )
+    if (
+        result.get("status") == "translated"
+        and pipeline_correlation_id
+        and wants_followup
+    ):
         try:
             await schedule_post_translate_pipeline_jobs(
                 document_id=document_id,
                 correlation_id=pipeline_correlation_id,
                 max_tags=pipeline_max_tags,
                 started_by_id=started_by_id,
+                want_tag_translated=pipeline_followup_tag_translated,
+                want_annotate=pipeline_followup_annotate,
+                want_categorize=pipeline_followup_categorize,
             )
         except Exception:
             _log.exception(
@@ -275,7 +301,44 @@ async def parse_source_job(ctx: dict, *, parse_run_id: str) -> dict[str, str]:
                 pj.status = JobStatus.COMPLETED
                 pj.finished_at = datetime.now(UTC)
                 pj.duration_ms = int((perf_counter() - t0) * 1000)
+            # До commit: иначе после expire объекта run доступ к полям даёт слабую загрузку.
+            raw_post_parse = run.post_parse_options
+            pipeline_started_by_id = run.created_by_id
             await session.commit()
+
+            opts = _post_parse_options_as_dict(raw_post_parse)
+
+            if not opts:
+                _log.info(
+                    "post-parse LLM skipped parse_run_id=%s (no post_parse options)",
+                    parse_run_id,
+                )
+            elif not outcome.new_document_ids:
+                _log.info(
+                    "post-parse LLM skipped parse_run_id=%s (no new documents)",
+                    parse_run_id,
+                )
+            else:
+                try:
+                    async with AsyncSessionLocal() as pipeline_session:
+                        summary = await dispatch_post_parse_llm_jobs(
+                            pipeline_session,
+                            document_ids=list(outcome.new_document_ids),
+                            started_by_id=pipeline_started_by_id,
+                            opts=opts,
+                        )
+                    _log.info(
+                        "post-parse LLM parse_run_id=%s documents=%s summary=%s",
+                        parse_run_id,
+                        len(outcome.new_document_ids),
+                        summary,
+                    )
+                except Exception:
+                    _log.exception(
+                        "post-parse LLM dispatch failed parse_run_id=%s",
+                        parse_run_id,
+                    )
+
             return {"parse_run_id": parse_run_id, "status": "completed"}
         except ValidationError as exc:
             await session.rollback()

@@ -51,11 +51,24 @@ export interface SourceCreateResponse {
   document_type_name: string;
 }
 
+export interface PostParseProcessingOptions {
+  full_llm_pipeline: boolean;
+  llm_tag_original?: boolean;
+  llm_translate?: boolean;
+  llm_extractor?: boolean;
+  llm_tag_translated?: boolean;
+  llm_annotate?: boolean;
+  llm_categorize?: boolean;
+  target_lang?: string;
+  max_tags?: number;
+}
+
 export interface ParseSourceRequestBody {
   source_id: string;
   days?: number;
   /** По умолчанию true: не брать ссылки без даты и не сохранять без итоговой даты. */
   skip_undated?: boolean;
+  post_parse?: PostParseProcessingOptions;
 }
 
 export interface ParseSourceDocumentItem {

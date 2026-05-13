@@ -292,6 +292,157 @@
                     {{ parsingSourceId === src.source_id ? 'Разбор…' : 'Разобрать' }}
                   </button>
                 </div>
+                <div class="source-parse__llm">
+                  <label class="source-parse__llm-main">
+                    <input
+                      type="checkbox"
+                      name="parsePostFullPipeline_{{ src.source_id }}"
+                      [(ngModel)]="parsePostFullPipeline"
+                      [disabled]="
+                        !src.is_active || parsingSourceId === src.source_id || parsePostHasAnyGranular()
+                      "
+                    />
+                    <span>После разбора — полный LLM-пайплайн (автоматические фазы A/B)</span>
+                  </label>
+                  <p class="source-parse__llm-hint">
+                    Если отмечено, отдельные шаги ниже игнорируются. Иначе: шаги без зависимости от перевода («Перевод»
+                    не считается) ставятся параллельно; тегирование по переводу, аннотация и категоризация совместно с «Перевод»
+                    ставятся только после успешного сохранения перевода.
+                  </p>
+
+                  <div class="source-parse__llm-granular">
+                    <span class="source-parse__llm-granular-title">Либо отдельные шаги</span>
+
+                    <div class="source-parse__llm-stage">
+                      <span class="source-parse__llm-stage-title">По исходному тексту или без перевода</span>
+                      <div class="source-parse__llm-stage-grid">
+                        <label class="source-parse__llm-step">
+                          <input
+                            type="checkbox"
+                            name="parsePostTagOrig_{{ src.source_id }}"
+                            [(ngModel)]="parsePostLlmTagOriginal"
+                            [disabled]="
+                              !src.is_active ||
+                              parsingSourceId === src.source_id ||
+                              parsePostFullPipeline
+                            "
+                          />
+                          <span>Теги по оригиналу</span>
+                        </label>
+                        <label class="source-parse__llm-step">
+                          <input
+                            type="checkbox"
+                            name="parsePostTranslate_{{ src.source_id }}"
+                            [(ngModel)]="parsePostLlmTranslate"
+                            (ngModelChange)="parsePostOnTranslateToggled($event)"
+                            [disabled]="
+                              !src.is_active ||
+                              parsingSourceId === src.source_id ||
+                              parsePostFullPipeline
+                            "
+                          />
+                          <span>Перевод</span>
+                        </label>
+                        <label class="source-parse__llm-step">
+                          <input
+                            type="checkbox"
+                            name="parsePostExtractor_{{ src.source_id }}"
+                            [(ngModel)]="parsePostLlmExtractor"
+                            [disabled]="
+                              !src.is_active ||
+                              parsingSourceId === src.source_id ||
+                              parsePostFullPipeline
+                            "
+                          />
+                          <span>Сущности (extractor)</span>
+                        </label>
+                        <label class="source-parse__llm-step">
+                          <input
+                            type="checkbox"
+                            name="parsePostCategorize_{{ src.source_id }}"
+                            [(ngModel)]="parsePostLlmCategorize"
+                            [disabled]="
+                              !src.is_active ||
+                              parsingSourceId === src.source_id ||
+                              parsePostFullPipeline
+                            "
+                          />
+                          <span>Категоризация</span>
+                        </label>
+                      </div>
+                      <p class="source-parse__llm-microhint">
+                        Категоризация без «Перевода»: по текущему тексту в документе (есть перевод в базе — по нему, иначе по
+                        оригиналу). Если отмечены и «Перевод», и «Категоризация» — категоризация выполняется после успешного
+                        перевода и всегда по переводу.
+                      </p>
+                    </div>
+
+                    <div class="source-parse__llm-stage source-parse__llm-stage_after_translate">
+                      <span class="source-parse__llm-stage-title">Только при наличии перевода</span>
+                      <div class="source-parse__llm-stage-grid">
+                        <label class="source-parse__llm-step">
+                          <input
+                            type="checkbox"
+                            name="parsePostTagTr_{{ src.source_id }}"
+                            [(ngModel)]="parsePostLlmTagTranslated"
+                            [disabled]="
+                              parsePostDependsOnTranslateDisabled(
+                                src.is_active,
+                                parsingSourceId === src.source_id
+                              )
+                            "
+                          />
+                          <span>Теги по переводу</span>
+                        </label>
+                        <label class="source-parse__llm-step">
+                          <input
+                            type="checkbox"
+                            name="parsePostAnnotate_{{ src.source_id }}"
+                            [(ngModel)]="parsePostLlmAnnotate"
+                            [disabled]="
+                              parsePostDependsOnTranslateDisabled(
+                                src.is_active,
+                                parsingSourceId === src.source_id
+                              )
+                            "
+                          />
+                          <span>Аннотация (по переводу)</span>
+                        </label>
+                      </div>
+                      <p class="source-parse__llm-microhint">
+                        Сначала отметьте «Перевод». Эти шаги запускаются автоматически после того, как перевод сохранён в
+                        документе (без гонки с очередью перевода).
+                      </p>
+                    </div>
+                  </div>
+
+                  @if (parsePostShowLangAndMaxTags()) {
+                    <div class="source-parse__llm-row">
+                      <label class="filter-item source-parse__llm-lang">
+                        <span>Язык перевода</span>
+                        <input
+                          type="text"
+                          name="parsePostTargetLang_{{ src.source_id }}"
+                          [(ngModel)]="parsePostTargetLang"
+                          maxlength="8"
+                          autocomplete="off"
+                          [disabled]="!src.is_active || parsingSourceId === src.source_id"
+                        />
+                      </label>
+                      <label class="filter-item source-parse__llm-maxtags">
+                        <span>Макс. тегов</span>
+                        <input
+                          type="number"
+                          name="parsePostMaxTags_{{ src.source_id }}"
+                          [(ngModel)]="parsePostMaxTags"
+                          min="1"
+                          max="100"
+                          [disabled]="!src.is_active || parsingSourceId === src.source_id"
+                        />
+                      </label>
+                    </div>
+                  }
+                </div>
                 @if (parseError && lastParsedSourceId === src.source_id) {
                   <div class="state-message state-message_error source-parse__message">{{ parseError }}</div>
                 } @else if (parseFeedback && lastParsedSourceId === src.source_id) {

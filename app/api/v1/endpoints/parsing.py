@@ -319,6 +319,7 @@ async def parse_source(
         days=payload.days,
         skip_undated=payload.skip_undated,
         created_by_id=user.id if user else None,
+        post_parse_options=payload.post_parse.model_dump(mode="json") if payload.post_parse is not None else None,
     )
     db.add(run)
     await db.flush()
