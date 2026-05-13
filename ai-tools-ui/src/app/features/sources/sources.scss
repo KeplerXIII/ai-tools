@@ -1,11 +1,21 @@
 .sources-page {
-  padding: 24px;
+  font-family: var(--font-family-base);
+  max-width: 1400px;
+}
+
+.source-create {
+  margin-bottom: 24px;
+  background: var(--select-color-light);
+  padding: 12px 16px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--primary-text-color);
 }
 
 .sources-title {
   margin: 0 0 16px;
   font-size: 32px;
   font-weight: 700;
+  color: var(--primary-text-color);
 }
 
 .sources-filters {
@@ -31,6 +41,16 @@
   background: #fff;
 }
 
+.sources-filters .filter-item .sources-filter-select {
+  display: block;
+  width: 100%;
+}
+
+.sources-filters__reset {
+  align-self: end;
+  flex-shrink: 0;
+}
+
 .reset-btn {
   height: 40px;
   border: 1px solid #cbd5e1;
@@ -45,72 +65,76 @@
   cursor: not-allowed;
 }
 
-.source-create {
-  border: 1px solid #dbe3ee;
-  border-radius: 12px;
-  padding: 12px 16px 14px;
-  margin-bottom: 24px;
-  background: #fff;
-}
-
 .source-create_collapsed {
   padding-bottom: 12px;
 }
 
-.source-create__header {
-  margin: 0;
+.source-create-accordion {
+  background: var(--select-color-light);
 }
 
-.source-create__toggle {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  padding: 6px 4px;
-  margin: 0;
+/* Тема PrimeNG задаёт фон на вложенных обёртках контента — без этого внутри остаётся «белая подложка». */
+:host ::ng-deep .source-create-accordion .p-accordionpanel {
+  border: none;
+  background: var(--select-color-light);
+}
+
+:host ::ng-deep .source-create-accordion .p-accordioncontent,
+:host ::ng-deep .source-create-accordion .p-accordioncontent-wrapper,
+:host ::ng-deep .source-create-accordion .p-accordioncontent-content,
+:host ::ng-deep .source-create-accordion .p-accordioncontent .p-motion {
+  background: var(--select-color-light);
+}
+
+:host ::ng-deep .source-create-accordion .p-accordionheader {
   border: none;
   border-radius: 8px;
-  background: transparent;
-  cursor: pointer;
-  text-align: left;
-  color: inherit;
-  font: inherit;
+  padding: 6px 4px;
+  /* Тема PrimeNG перебивает transparent — иначе заголовок остаётся белым на фоне панели */
+  background: var(--select-color-light) !important;
+  background-color: var(--select-color-light) !important;
 }
 
-.source-create__toggle:hover {
-  background: #f8fafc;
+:host ::ng-deep .source-create-accordion .p-accordionheader:not(.p-disabled):hover,
+:host ::ng-deep .source-create-accordion .p-accordionheader.p-focus {
+  background: var(--select-color-light) !important;
+  background-color: var(--select-color-light) !important;
 }
 
 .source-create__heading {
-  flex: 1 1 auto;
   font-size: 20px;
   font-weight: 600;
   margin: 0;
 }
 
 .source-create__toggle-hint {
-  flex-shrink: 0;
   font-size: 13px;
   color: #64748b;
 }
 
-.source-create__chevron {
-  flex-shrink: 0;
-  font-size: 14px;
-  color: #475569;
-  transition: transform 0.2s ease;
+.source-create__accordion-header-inner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
 }
 
-.source-create__chevron_open {
-  transform: rotate(180deg);
+.source-create__accordion-header-inner .source-create__heading {
+  flex: 1 1 auto;
+}
+
+.source-create__accordion-header-inner .source-create__toggle-hint {
+  flex-shrink: 0;
+}
+
+.source-create__accordion-toggle-icon {
+  font-size: 14px;
+  color: #475569;
 }
 
 .source-create__panel {
   padding-top: 12px;
-}
-
-.source-create__panel[hidden] {
-  display: none !important;
 }
 
 .source-create__hint {
@@ -127,6 +151,12 @@
   align-items: end;
 }
 
+/* Не задавать display: block — у Prime .p-inputgroup это flex-row; block ломает строку. */
+.source-create__form .filter-item p-inputgroup {
+  width: 100%;
+  min-width: 0;
+}
+
 .source-create__form .filter-item input,
 .source-create__form .filter-item select {
   border: 1px solid #d1d5db;
@@ -140,6 +170,13 @@
 .source-create__form .filter-item select:disabled {
   opacity: 0.65;
   cursor: not-allowed;
+}
+
+.source-create__form .source-create__placeholder-hint::placeholder {
+  color: var(--grey-text-color);
+  opacity: 1;
+  font-weight: var(--font-weight-light);
+  font-size: var(--font-size-table);
 }
 
 .source-create__field {
@@ -198,25 +235,53 @@
 }
 
 .sources-list {
+  width: 100%;
+}
+
+.sources-list-accordion {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  width: 100%;
+  border: none;
+  background: transparent;
 }
 
-.source-row {
-  border: 1px solid #dbe3ee;
-  border-radius: 12px;
+:host ::ng-deep .sources-list-accordion .p-accordionpanel {
   padding: 14px 16px;
-  background: #fff;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 0;
+}
+
+:host ::ng-deep .sources-list-accordion .p-accordionheader {
+  border: none;
+  background: transparent;
+  padding: 0;
+}
+
+:host ::ng-deep .sources-list-accordion .p-accordionheader .source-row-top_accordion {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+:host ::ng-deep .sources-list-accordion .p-accordioncontent-content {
+  padding: 0;
+}
+
+.source-row-top_accordion {
+  grid-template-columns: minmax(0, 1fr) minmax(100px, 140px) minmax(120px, 160px) minmax(
+      180px,
+      220px
+    );
 }
 
 .source-row-top {
   display: grid;
   width: 100%;
-  grid-template-columns: minmax(0, 1fr) minmax(100px, 140px) minmax(120px, 160px) minmax(180px, 220px) 36px;
+  grid-template-columns:
+    minmax(0, 1fr) minmax(100px, 140px) minmax(120px, 160px) minmax(180px, 220px)
+    36px;
   align-items: center;
   gap: 10px;
 }
@@ -274,30 +339,6 @@
   font-size: 13px;
   white-space: nowrap;
   flex-shrink: 0;
-}
-
-.expand-btn {
-  width: 36px;
-  height: 36px;
-  border: 1px solid #cbd5e1;
-  border-radius: 50%;
-  padding: 0;
-  background: #fff;
-  cursor: pointer;
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: #475569;
-  transition: transform 0.2s ease;
-}
-
-.expand-btn i {
-  font-size: 13px;
-}
-
-.expand-btn_open i {
-  transform: rotate(180deg);
 }
 
 .source-badges {
@@ -589,4 +630,16 @@
 
 .state-message_error {
   color: #b91c1c;
+}
+
+.filter-item__label {
+  font-size: var(--font-size-small);
+  font-weight: var(--font-weight-light);
+  color: var(--grey-text-color);
+}
+
+.new-source-form-label {
+  font-size: var(--font-size-small);
+  font-weight: var(--font-weight-light);
+  color: var(--primary-text-color);
 }

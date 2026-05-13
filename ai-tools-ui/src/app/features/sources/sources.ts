@@ -2,6 +2,12 @@ import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { SelectModule } from 'primeng/select';
+import { AccordionModule } from 'primeng/accordion';
+import { InputGroupModule } from 'primeng/inputgroup';
+import { InputGroupAddonModule } from 'primeng/inputgroupaddon';
+import { InputTextModule } from 'primeng/inputtext';
+import { OutlineButtonComponent } from '../../shared/ui/outline-button/outline-button.component';
 import { finalize, switchMap, tap } from 'rxjs/operators';
 import { Subscription } from 'rxjs';
 import { DocumentTypeCatalogItem, DocumentsApi } from '../documents/documents-api';
@@ -21,7 +27,16 @@ type SortMode = 'created_desc' | 'created_asc' | 'user_asc';
 @Component({
   selector: 'app-sources',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [
+    CommonModule,
+    FormsModule,
+    SelectModule,
+    OutlineButtonComponent,
+    AccordionModule,
+    InputGroupModule,
+    InputGroupAddonModule,
+    InputTextModule,
+  ],
   templateUrl: './sources.html',
   styleUrl: './sources.scss',
 })
@@ -46,12 +61,17 @@ export class Sources implements OnInit, OnDestroy {
   createSubmitting = false;
   createError = '';
   createSuccess = '';
-  /** Панель «Новый источник» по умолчанию свёрнута, чтобы не занимать место. */
-  createSectionOpen = false;
+  /** Открытая панель аккордеона «Новый источник» (`create`); `undefined` — свёрнуто. */
+  sourceCreateAccordionValue: string | undefined = undefined;
 
   selectedUserId = '';
   sortMode: SortMode = 'created_desc';
-  expandedSourceId: string | null = null;
+  sortSelectOptions: { label: string; value: SortMode }[] = [
+    { label: 'По дате добавления (сначала новые)', value: 'created_desc' },
+    { label: 'По дате добавления (сначала старые)', value: 'created_asc' },
+    { label: 'По пользователю (А–Я)', value: 'user_asc' },
+  ];
+  expandedSourceId: string | undefined = undefined;
 
   parseDays = 3;
   /** Соответствует skip_undated в API: после извлечения не сохранять материалы без итоговой даты. */
@@ -84,10 +104,6 @@ export class Sources implements OnInit, OnDestroy {
     private readonly documentsApi: DocumentsApi,
     private readonly cdr: ChangeDetectorRef,
   ) {}
-
-  toggleCreateSection(): void {
-    this.createSectionOpen = !this.createSectionOpen;
-  }
 
   ngOnInit(): void {
     this.loadLanguagesCatalog();
@@ -328,6 +344,7 @@ export class Sources implements OnInit, OnDestroy {
       this.expandedSourceId = stored;
     } else {
       sessionStorage.removeItem(this.storageExpandedKey);
+      this.expandedSourceId = undefined;
     }
   }
 
@@ -390,12 +407,7 @@ export class Sources implements OnInit, OnDestroy {
   }
 
   parsePostDependsOnTranslateDisabled(srcActive: boolean, parsing: boolean): boolean {
-    return (
-      !srcActive ||
-      parsing ||
-      this.parsePostFullPipeline ||
-      !this.parsePostLlmTranslate
-    );
+    return !srcActive || parsing || this.parsePostFullPipeline || !this.parsePostLlmTranslate;
   }
 
   parsePostOnTranslateToggled(enabled: boolean): void {
@@ -451,7 +463,10 @@ export class Sources implements OnInit, OnDestroy {
     return phaseLabels[ph] || `Статус: ${snap.status}`;
   }
 
-  private applySnapToParseUi(sourceId: string, snap: ParseSourceRunResponse | ParseSourceRunSnapshotPayload): void {
+  private applySnapToParseUi(
+    sourceId: string,
+    snap: ParseSourceRunResponse | ParseSourceRunSnapshotPayload,
+  ): void {
     this.lastParsedSourceId = sourceId;
     this.parseFeedback = this.formatParseProgress(snap);
     if (snap.status === 'failed') {
@@ -486,7 +501,9 @@ export class Sources implements OnInit, OnDestroy {
   private reconcileActiveParseStreamsAfterListLoad(): void {
     this.sourcesApi.listActiveSourceParseRuns().subscribe({
       next: (resp) => {
-        const visible = resp.items.filter((row) => this.items.some((s) => s.source_id === row.source_id));
+        const visible = resp.items.filter((row) =>
+          this.items.some((s) => s.source_id === row.source_id),
+        );
         if (!visible.length) {
           return;
         }
@@ -532,22 +549,25 @@ export class Sources implements OnInit, OnDestroy {
     this.parsingSourceId = sourceId;
     this.attachedParseRunId = parseRunId;
 
-    this.parseStreamSub = this.sourcesApi.streamParseRun(parseRunId).pipe(
-      finalize(() => {
-        this.attachedParseRunId = null;
-        this.onParseStreamFinalize(sourceId);
-      }),
-    ).subscribe({
-      next: (snap) => {
-        this.handleParseStreamSnapshot(sourceId, snap);
-        this.cdr.markForCheck();
-      },
-      error: (err) => {
-        this.attachedParseRunId = null;
-        this.onParseStreamError(err);
-        this.cdr.markForCheck();
-      },
-    });
+    this.parseStreamSub = this.sourcesApi
+      .streamParseRun(parseRunId)
+      .pipe(
+        finalize(() => {
+          this.attachedParseRunId = null;
+          this.onParseStreamFinalize(sourceId);
+        }),
+      )
+      .subscribe({
+        next: (snap) => {
+          this.handleParseStreamSnapshot(sourceId, snap);
+          this.cdr.markForCheck();
+        },
+        error: (err) => {
+          this.attachedParseRunId = null;
+          this.onParseStreamError(err);
+          this.cdr.markForCheck();
+        },
+      });
   }
 
   runParse(src: SourceListItem): void {
@@ -576,9 +596,9 @@ export class Sources implements OnInit, OnDestroy {
           this.attachedParseRunId = enq.parse_run_id;
         }),
         switchMap((enq) =>
-          this.sourcesApi.streamParseRun(enq.parse_run_id).pipe(
-            finalize(() => this.onParseStreamFinalize(src.source_id)),
-          ),
+          this.sourcesApi
+            .streamParseRun(enq.parse_run_id)
+            .pipe(finalize(() => this.onParseStreamFinalize(src.source_id))),
         ),
         finalize(() => {
           this.parsingSourceId = null;
@@ -606,6 +626,13 @@ export class Sources implements OnInit, OnDestroy {
     return 'Не удалось запустить разбор источника';
   }
 
+  get userFilterSelectOptions(): { label: string; value: string }[] {
+    return [
+      { label: 'Все', value: '' },
+      ...this.contributorOptions.map((o) => ({ label: o.label, value: o.userId })),
+    ];
+  }
+
   get contributorOptions(): { userId: string; label: string }[] {
     const map = new Map<string, string>();
     for (const item of this.items) {
@@ -629,9 +656,10 @@ export class Sources implements OnInit, OnDestroy {
     } else if (this.sortMode === 'created_asc') {
       out.sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at));
     } else {
-      out.sort((a, b) =>
-        a.added_by_username.localeCompare(b.added_by_username, 'ru') ||
-        Date.parse(b.created_at) - Date.parse(a.created_at),
+      out.sort(
+        (a, b) =>
+          a.added_by_username.localeCompare(b.added_by_username, 'ru') ||
+          Date.parse(b.created_at) - Date.parse(a.created_at),
       );
     }
     return out;
@@ -646,17 +674,19 @@ export class Sources implements OnInit, OnDestroy {
     this.sortMode = 'created_desc';
   }
 
-  toggleExpand(sourceId: string): void {
-    this.expandedSourceId = this.expandedSourceId === sourceId ? null : sourceId;
-    if (this.expandedSourceId) {
-      sessionStorage.setItem(this.storageExpandedKey, this.expandedSourceId);
+  onSourcesListAccordionValueChange(value: unknown): void {
+    const raw = Array.isArray(value) ? value[0] : value;
+    const v =
+      raw === null || raw === undefined || raw === ''
+        ? undefined
+        : typeof raw === 'string'
+          ? raw
+          : String(raw);
+    if (v) {
+      sessionStorage.setItem(this.storageExpandedKey, v);
     } else {
       sessionStorage.removeItem(this.storageExpandedKey);
     }
-  }
-
-  isExpanded(sourceId: string): boolean {
-    return this.expandedSourceId === sourceId;
   }
 
   displayTitle(item: SourceListItem): string {

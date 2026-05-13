@@ -5,135 +5,185 @@
     <div class="sources-filters">
       @if (canFilterByAllUsers) {
         <label class="filter-item">
-          <span>Пользователь</span>
-          <select [(ngModel)]="selectedUserId" (change)="onFiltersChanged()">
-            <option value="">Все</option>
-            @for (opt of contributorOptions; track opt.userId) {
-              <option [value]="opt.userId">{{ opt.label }}</option>
-            }
-          </select>
+          <span class="filter-item__label">Пользователь</span>
+          <p-select
+            class="sources-filter-select"
+            [options]="userFilterSelectOptions"
+            [(ngModel)]="selectedUserId"
+            optionLabel="label"
+            optionValue="value"
+            placeholder="Все"
+            (ngModelChange)="onFiltersChanged()"
+          />
         </label>
       }
 
       <label class="filter-item">
-        <span>Сортировка</span>
-        <select [(ngModel)]="sortMode" (change)="onFiltersChanged()">
-          <option value="created_desc">По дате добавления (сначала новые)</option>
-          <option value="created_asc">По дате добавления (сначала старые)</option>
-          <option value="user_asc">По пользователю (А–Я)</option>
-        </select>
+        <span class="filter-item__label">Сортировка</span>
+        <p-select
+          class="sources-filter-select"
+          [options]="sortSelectOptions"
+          [(ngModel)]="sortMode"
+          optionLabel="label"
+          optionValue="value"
+          (ngModelChange)="onFiltersChanged()"
+        />
       </label>
 
-      <button class="reset-btn" type="button" (click)="resetFilters()">Сбросить</button>
+      <app-outline-button
+        class="sources-filters__reset"
+        text="Сбросить"
+        size="large"
+        (clicked)="resetFilters()"
+      />
     </div>
   </header>
 
   <section
     class="source-create"
-    [class.source-create_collapsed]="!createSectionOpen"
-    aria-labelledby="source-create-title"
+    [class.source-create_collapsed]="sourceCreateAccordionValue !== 'create'"
+    aria-label="Новый источник"
   >
-    <div class="source-create__header">
-      <button
-        type="button"
-        class="source-create__toggle"
-        (click)="toggleCreateSection()"
-        [attr.aria-expanded]="createSectionOpen"
-        aria-controls="source-create-panel"
-        id="source-create-title"
-      >
-        <span class="source-create__heading">Новый источник</span>
-        <span class="source-create__toggle-hint">{{ createSectionOpen ? 'Скрыть' : 'Показать форму' }}</span>
-        <i class="pi pi-chevron-down source-create__chevron" [class.source-create__chevron_open]="createSectionOpen"></i>
-      </button>
-    </div>
+    <p-accordion
+      class="source-create-accordion"
+      [(value)]="sourceCreateAccordionValue"
+      [multiple]="false"
+    >
+      <p-accordion-panel value="create">
+        <p-accordion-header>
+          <ng-template #toggleicon let-active="active">
+            <i
+              class="p-accordionheader-toggle-icon pi source-create__accordion-toggle-icon"
+              [ngClass]="active ? 'pi-minus' : 'pi-plus'"
+              aria-hidden="true"
+            ></i>
+          </ng-template>
+          <span class="source-create__accordion-header-inner">
+            <span class="source-create__heading" id="source-create-title">Новый источник</span>
+          </span>
+        </p-accordion-header>
+        <p-accordion-content>
+          <div class="source-create__panel">
+            <p class="source-create__hint">
+              Обязателен только URL сайта. Язык, тип документа (для материалов при разборе) и страна
+              — из справочников; страна необязательна.
+            </p>
+            <form class="source-create__form" (ngSubmit)="submitCreate()">
+              <div class="filter-item source-create__field source-create__field_wide">
+                <label class="filter-item source-create__field">
+                  <span class="new-source-form-label">URL сайта <span class="req">*</span></span>
+                  <p-inputgroup>
+                    <p-inputgroup-addon>www</p-inputgroup-addon>
+                    <input
+                      pInputText
+                      class="source-create__placeholder-hint"
+                      type="url"
+                      name="url"
+                      [(ngModel)]="formUrl"
+                      placeholder="https://example.com/news"
+                      required
+                      aria-label="URL сайта, обязательное поле"
+                    />
+                  </p-inputgroup>
+                </label>
+              </div>
 
-    <div id="source-create-panel" class="source-create__panel" [hidden]="!createSectionOpen">
-      <p class="source-create__hint">
-        Обязателен только URL сайта. Язык, тип документа (для материалов при разборе) и страна — из справочников; страна
-        необязательна.
-      </p>
-      <form class="source-create__form" (ngSubmit)="submitCreate()">
-        <label class="filter-item source-create__field source-create__field_wide">
-          <span>URL сайта <span class="req">*</span></span>
-          <input type="url" name="url" [(ngModel)]="formUrl" placeholder="https://example.com/news" required />
-        </label>
+              <label class="filter-item source-create__field">
+                <span class="new-source-form-label">Название</span>
+                <input
+                  type="text"
+                  name="name"
+                  pInputText
+                  class="source-create__placeholder-hint"
+                  [(ngModel)]="formName"
+                  maxlength="255"
+                  placeholder="Краткое имя (необязательно)"
+                />
+              </label>
 
-        <label class="filter-item source-create__field">
-          <span>Название</span>
-          <input
-            type="text"
-            name="name"
-            [(ngModel)]="formName"
-            maxlength="255"
-            placeholder="Краткое имя (необязательно)"
-          />
-        </label>
+              <label class="filter-item source-create__field">
+                <span>Язык</span>
+                <select
+                  name="language_code"
+                  [(ngModel)]="formLanguageCode"
+                  [disabled]="!languagesCatalog.length || createSubmitting"
+                >
+                  @for (lang of languagesCatalog; track lang.code) {
+                    <option [value]="lang.code">{{ lang.name }} ({{ lang.code }})</option>
+                  }
+                </select>
+              </label>
 
-        <label class="filter-item source-create__field">
-          <span>Язык</span>
-          <select
-            name="language_code"
-            [(ngModel)]="formLanguageCode"
-            [disabled]="!languagesCatalog.length || createSubmitting"
-          >
-            @for (lang of languagesCatalog; track lang.code) {
-              <option [value]="lang.code">{{ lang.name }} ({{ lang.code }})</option>
-            }
-          </select>
-        </label>
+              <label class="filter-item source-create__field">
+                <span>Страна</span>
+                <select
+                  name="country_code"
+                  [(ngModel)]="formCountryCode"
+                  [disabled]="!countriesCatalog.length || createSubmitting"
+                >
+                  <option value="">Не указано</option>
+                  @for (c of countriesCatalog; track c.code) {
+                    <option [value]="c.code">{{ c.name }} ({{ c.code }})</option>
+                  }
+                </select>
+              </label>
 
-        <label class="filter-item source-create__field">
-          <span>Страна</span>
-          <select
-            name="country_code"
-            [(ngModel)]="formCountryCode"
-            [disabled]="!countriesCatalog.length || createSubmitting"
-          >
-            <option value="">Не указано</option>
-            @for (c of countriesCatalog; track c.code) {
-              <option [value]="c.code">{{ c.name }} ({{ c.code }})</option>
-            }
-          </select>
-        </label>
+              <label class="filter-item source-create__field source-create__field_wide">
+                <span>Тип документа при разборе <span class="req">*</span></span>
+                <select
+                  name="document_type_code"
+                  [(ngModel)]="formDocumentTypeCode"
+                  [disabled]="!documentTypesCatalog.length || createSubmitting"
+                >
+                  @for (dt of documentTypesCatalog; track dt.code) {
+                    <option [value]="dt.code">{{ dt.name }} ({{ dt.code }})</option>
+                  }
+                </select>
+              </label>
 
-        <label class="filter-item source-create__field source-create__field_wide">
-          <span>Тип документа при разборе <span class="req">*</span></span>
-          <select
-            name="document_type_code"
-            [(ngModel)]="formDocumentTypeCode"
-            [disabled]="!documentTypesCatalog.length || createSubmitting"
-          >
-            @for (dt of documentTypesCatalog; track dt.code) {
-              <option [value]="dt.code">{{ dt.name }} ({{ dt.code }})</option>
-            }
-          </select>
-        </label>
+              <label class="filter-item source-create__field source-create__field_wide">
+                <span>URL RSS</span>
+                <input
+                  type="url"
+                  name="rss_url"
+                  [(ngModel)]="formRssUrl"
+                  placeholder="https://example.com/feed.xml"
+                />
+              </label>
 
-        <label class="filter-item source-create__field source-create__field_wide">
-          <span>URL RSS</span>
-          <input type="url" name="rss_url" [(ngModel)]="formRssUrl" placeholder="https://example.com/feed.xml" />
-        </label>
-
-        <div class="source-create__actions">
-          <button class="submit-btn" type="submit" [disabled]="createSubmitting">
-            {{ createSubmitting ? 'Сохранение…' : 'Добавить источник' }}
-          </button>
-          <button class="reset-btn" type="button" (click)="resetCreateForm()" [disabled]="createSubmitting">
-            Очистить форму
-          </button>
-        </div>
-      </form>
-    </div>
+              <div class="source-create__actions">
+                <button class="submit-btn" type="submit" [disabled]="createSubmitting">
+                  {{ createSubmitting ? 'Сохранение…' : 'Добавить источник' }}
+                </button>
+                <button
+                  class="reset-btn"
+                  type="button"
+                  (click)="resetCreateForm()"
+                  [disabled]="createSubmitting"
+                >
+                  Очистить форму
+                </button>
+              </div>
+            </form>
+          </div>
+        </p-accordion-content>
+      </p-accordion-panel>
+    </p-accordion>
 
     @if (languagesLoadError) {
-      <div class="state-message state-message_error source-create__message">{{ languagesLoadError }}</div>
+      <div class="state-message state-message_error source-create__message">
+        {{ languagesLoadError }}
+      </div>
     }
     @if (countriesLoadError) {
-      <div class="state-message state-message_error source-create__message">{{ countriesLoadError }}</div>
+      <div class="state-message state-message_error source-create__message">
+        {{ countriesLoadError }}
+      </div>
     }
     @if (documentTypesLoadError) {
-      <div class="state-message state-message_error source-create__message">{{ documentTypesLoadError }}</div>
+      <div class="state-message state-message_error source-create__message">
+        {{ documentTypesLoadError }}
+      </div>
     }
     @if (createError) {
       <div class="state-message state-message_error source-create__message">{{ createError }}</div>
@@ -151,314 +201,332 @@
     <div class="state-message">Источники не найдены</div>
   } @else {
     <div class="sources-list">
-      @for (src of filteredAndSortedItems; track src.source_id) {
-        <article class="source-row">
-          <div class="source-row-top">
-            <div class="row-cell row-cell_title">
-              <div class="source-title-line">
-                <span class="source-row__meta"
-                  >{{ src.document_type_name }} · {{ src.language_code.toUpperCase() }}</span
-                >
-                <h3 class="source-row__title source-row__title_link">
-                  <a [href]="src.url" target="_blank" rel="noopener noreferrer">{{ displayTitle(src) }}</a>
-                </h3>
-              </div>
-            </div>
-
-            <div class="row-cell row-cell_user">
-              <span class="source-user-label">{{ src.added_by_username }}</span>
-            </div>
-
-            <div class="row-cell row-cell_date">
-              <span class="source-date">{{ formatDate(src.created_at) }}</span>
-            </div>
-
-            <div class="row-cell row-cell_statuses">
-              <div class="source-badges">
-                @if (src.is_active) {
-                  <span class="status-chip status-chip_active">Активен</span>
-                } @else {
-                  <span class="status-chip status-chip_inactive">Неактивен</span>
-                }
-                @if (src.rss_url) {
-                  <span class="status-chip status-chip_rss">RSS</span>
-                }
-              </div>
-            </div>
-
-            <button
-              class="expand-btn"
-              type="button"
-              [class.expand-btn_open]="isExpanded(src.source_id)"
-              (click)="toggleExpand(src.source_id)"
-              aria-label="Развернуть блок"
-            >
-              <i class="pi pi-chevron-down"></i>
-            </button>
-          </div>
-
-          @if (isExpanded(src.source_id)) {
-            <div class="source-expanded">
-              <div class="source-stats" aria-label="Статистика по документам источника">
-                <div class="source-stats__item">
-                  <span class="source-stats__label">Всего документов в базе</span>
-                  <span class="source-stats__value">{{ src.documents_total }}</span>
-                </div>
-                <div class="source-stats__item">
-                  <span class="source-stats__label">Создано при последнем разборе</span>
-                  <span class="source-stats__value">{{
-                    src.last_parse_created_total !== null && src.last_parse_created_total !== undefined
-                      ? src.last_parse_created_total
-                      : '—'
-                  }}</span>
-                </div>
-                <div class="source-stats__item">
-                  <span class="source-stats__label">Необработанных</span>
-                  <span class="source-stats__value">{{ src.documents_unprocessed }}</span>
-                </div>
-                @if (src.last_parse_at) {
-                  <div class="source-stats__item source-stats__item_wide">
-                    <span class="source-stats__label">Последний разбор</span>
-                    <span class="source-stats__value">{{ formatDate(src.last_parse_at) }}</span>
+      <p-accordion
+        class="sources-list-accordion"
+        [(value)]="expandedSourceId"
+        [multiple]="false"
+        (valueChange)="onSourcesListAccordionValueChange($event)"
+      >
+        @for (src of filteredAndSortedItems; track src.source_id) {
+          <p-accordion-panel [value]="src.source_id">
+            <p-accordion-header>
+              <div class="source-row-top source-row-top_accordion">
+                <div class="row-cell row-cell_title">
+                  <div class="source-title-line">
+                    <span class="source-row__meta"
+                      >{{ src.document_type_name }} · {{ src.language_code.toUpperCase() }}</span
+                    >
+                    <h3 class="source-row__title source-row__title_link">
+                      <a
+                        [href]="src.url"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        (click)="$event.stopPropagation()"
+                        >{{ displayTitle(src) }}</a
+                      >
+                    </h3>
                   </div>
-                }
-              </div>
-              <div class="source-expanded__block">
-                <h4>URL</h4>
-                <p>
-                  <a [href]="src.url" target="_blank" rel="noopener noreferrer">{{ src.url }}</a>
-                </p>
-              </div>
-              @if (src.rss_url) {
-                <div class="source-expanded__block">
-                  <h4>RSS</h4>
-                  <p>
-                    <a [href]="src.rss_url" target="_blank" rel="noopener noreferrer">{{ src.rss_url }}</a>
-                  </p>
                 </div>
-              }
-              <div class="source-expanded__grid">
-                <div class="source-expanded__block">
-                  <h4>Тип документа</h4>
-                  <p>{{ src.document_type_name }} ({{ src.document_type_code }})</p>
-                </div>
-                <div class="source-expanded__block">
-                  <h4>Страна</h4>
-                  <p>{{ src.country_code || '—' }}</p>
-                </div>
-                <div class="source-expanded__block">
-                  <h4>Добавил</h4>
-                  <p>{{ src.added_by_username }}</p>
-                </div>
-                <div class="source-expanded__block">
-                  <h4>Идентификатор</h4>
-                  <p class="source-id">{{ src.source_id }}</p>
-                </div>
-              </div>
 
-              <div class="source-parse">
-                <h4>Разбор ленты</h4>
-                <p class="source-parse__hint">
-                  Новые документы создаются с типом, заданным для источника. Глубина (1–30 дней, UTC): отсекаются
-                  материалы старше порога после извлечения текста. Без даты — по чекбоксу ниже.
-                </p>
-                <div class="source-parse__row">
-                  <label class="filter-item source-parse__days">
-                    <span>Дней назад</span>
-                    <input
-                      type="number"
-                      name="parseDays_{{ src.source_id }}"
-                      [(ngModel)]="parseDays"
-                      min="1"
-                      max="30"
-                      [disabled]="!src.is_active || parsingSourceId === src.source_id"
-                    />
-                  </label>
-                  <label class="filter-item source-parse__skip-undated">
-                    <input
-                      type="checkbox"
-                      name="parseSkipUndated_{{ src.source_id }}"
-                      [(ngModel)]="parseSkipUndated"
-                      [disabled]="!src.is_active || parsingSourceId === src.source_id"
-                    />
-                    <span>Не пропускать материалы без даты</span>
-                  </label>
-                  <button
-                    class="submit-btn source-parse__btn"
-                    type="button"
-                    [disabled]="!src.is_active || parsingSourceId === src.source_id"
-                    (click)="runParse(src)"
-                  >
-                    {{ parsingSourceId === src.source_id ? 'Разбор…' : 'Разобрать' }}
-                  </button>
+                <div class="row-cell row-cell_user">
+                  <span class="source-user-label">{{ src.added_by_username }}</span>
                 </div>
-                <div class="source-parse__llm">
-                  <label class="source-parse__llm-main">
-                    <input
-                      type="checkbox"
-                      name="parsePostFullPipeline_{{ src.source_id }}"
-                      [(ngModel)]="parsePostFullPipeline"
-                      [disabled]="
-                        !src.is_active || parsingSourceId === src.source_id || parsePostHasAnyGranular()
-                      "
-                    />
-                    <span>После разбора — полный LLM-пайплайн (автоматические фазы A/B)</span>
-                  </label>
-                  <p class="source-parse__llm-hint">
-                    Если отмечено, отдельные шаги ниже игнорируются. Иначе: шаги без зависимости от перевода («Перевод»
-                    не считается) ставятся параллельно; тегирование по переводу, аннотация и категоризация совместно с «Перевод»
-                    ставятся только после успешного сохранения перевода.
-                  </p>
 
-                  <div class="source-parse__llm-granular">
-                    <span class="source-parse__llm-granular-title">Либо отдельные шаги</span>
+                <div class="row-cell row-cell_date">
+                  <span class="source-date">{{ formatDate(src.created_at) }}</span>
+                </div>
 
-                    <div class="source-parse__llm-stage">
-                      <span class="source-parse__llm-stage-title">По исходному тексту или без перевода</span>
-                      <div class="source-parse__llm-stage-grid">
-                        <label class="source-parse__llm-step">
-                          <input
-                            type="checkbox"
-                            name="parsePostTagOrig_{{ src.source_id }}"
-                            [(ngModel)]="parsePostLlmTagOriginal"
-                            [disabled]="
-                              !src.is_active ||
-                              parsingSourceId === src.source_id ||
-                              parsePostFullPipeline
-                            "
-                          />
-                          <span>Теги по оригиналу</span>
-                        </label>
-                        <label class="source-parse__llm-step">
-                          <input
-                            type="checkbox"
-                            name="parsePostTranslate_{{ src.source_id }}"
-                            [(ngModel)]="parsePostLlmTranslate"
-                            (ngModelChange)="parsePostOnTranslateToggled($event)"
-                            [disabled]="
-                              !src.is_active ||
-                              parsingSourceId === src.source_id ||
-                              parsePostFullPipeline
-                            "
-                          />
-                          <span>Перевод</span>
-                        </label>
-                        <label class="source-parse__llm-step">
-                          <input
-                            type="checkbox"
-                            name="parsePostExtractor_{{ src.source_id }}"
-                            [(ngModel)]="parsePostLlmExtractor"
-                            [disabled]="
-                              !src.is_active ||
-                              parsingSourceId === src.source_id ||
-                              parsePostFullPipeline
-                            "
-                          />
-                          <span>Сущности (extractor)</span>
-                        </label>
-                        <label class="source-parse__llm-step">
-                          <input
-                            type="checkbox"
-                            name="parsePostCategorize_{{ src.source_id }}"
-                            [(ngModel)]="parsePostLlmCategorize"
-                            [disabled]="
-                              !src.is_active ||
-                              parsingSourceId === src.source_id ||
-                              parsePostFullPipeline
-                            "
-                          />
-                          <span>Категоризация</span>
-                        </label>
-                      </div>
-                      <p class="source-parse__llm-microhint">
-                        Категоризация без «Перевода»: по текущему тексту в документе (есть перевод в базе — по нему, иначе по
-                        оригиналу). Если отмечены и «Перевод», и «Категоризация» — категоризация выполняется после успешного
-                        перевода и всегда по переводу.
-                      </p>
-                    </div>
-
-                    <div class="source-parse__llm-stage source-parse__llm-stage_after_translate">
-                      <span class="source-parse__llm-stage-title">Только при наличии перевода</span>
-                      <div class="source-parse__llm-stage-grid">
-                        <label class="source-parse__llm-step">
-                          <input
-                            type="checkbox"
-                            name="parsePostTagTr_{{ src.source_id }}"
-                            [(ngModel)]="parsePostLlmTagTranslated"
-                            [disabled]="
-                              parsePostDependsOnTranslateDisabled(
-                                src.is_active,
-                                parsingSourceId === src.source_id
-                              )
-                            "
-                          />
-                          <span>Теги по переводу</span>
-                        </label>
-                        <label class="source-parse__llm-step">
-                          <input
-                            type="checkbox"
-                            name="parsePostAnnotate_{{ src.source_id }}"
-                            [(ngModel)]="parsePostLlmAnnotate"
-                            [disabled]="
-                              parsePostDependsOnTranslateDisabled(
-                                src.is_active,
-                                parsingSourceId === src.source_id
-                              )
-                            "
-                          />
-                          <span>Аннотация (по переводу)</span>
-                        </label>
-                      </div>
-                      <p class="source-parse__llm-microhint">
-                        Сначала отметьте «Перевод». Эти шаги запускаются автоматически после того, как перевод сохранён в
-                        документе (без гонки с очередью перевода).
-                      </p>
-                    </div>
+                <div class="row-cell row-cell_statuses">
+                  <div class="source-badges">
+                    @if (src.is_active) {
+                      <span class="status-chip status-chip_active">Активен</span>
+                    } @else {
+                      <span class="status-chip status-chip_inactive">Неактивен</span>
+                    }
+                    @if (src.rss_url) {
+                      <span class="status-chip status-chip_rss">RSS</span>
+                    }
                   </div>
-
-                  @if (parsePostShowLangAndMaxTags()) {
-                    <div class="source-parse__llm-row">
-                      <label class="filter-item source-parse__llm-lang">
-                        <span>Язык перевода</span>
-                        <input
-                          type="text"
-                          name="parsePostTargetLang_{{ src.source_id }}"
-                          [(ngModel)]="parsePostTargetLang"
-                          maxlength="8"
-                          autocomplete="off"
-                          [disabled]="!src.is_active || parsingSourceId === src.source_id"
-                        />
-                      </label>
-                      <label class="filter-item source-parse__llm-maxtags">
-                        <span>Макс. тегов</span>
-                        <input
-                          type="number"
-                          name="parsePostMaxTags_{{ src.source_id }}"
-                          [(ngModel)]="parsePostMaxTags"
-                          min="1"
-                          max="100"
-                          [disabled]="!src.is_active || parsingSourceId === src.source_id"
-                        />
-                      </label>
+                </div>
+              </div>
+            </p-accordion-header>
+            <p-accordion-content>
+              <div class="source-expanded">
+                <div class="source-stats" aria-label="Статистика по документам источника">
+                  <div class="source-stats__item">
+                    <span class="source-stats__label">Всего документов в базе</span>
+                    <span class="source-stats__value">{{ src.documents_total }}</span>
+                  </div>
+                  <div class="source-stats__item">
+                    <span class="source-stats__label">Создано при последнем разборе</span>
+                    <span class="source-stats__value">{{
+                      src.last_parse_created_total !== null &&
+                      src.last_parse_created_total !== undefined
+                        ? src.last_parse_created_total
+                        : '—'
+                    }}</span>
+                  </div>
+                  <div class="source-stats__item">
+                    <span class="source-stats__label">Необработанных</span>
+                    <span class="source-stats__value">{{ src.documents_unprocessed }}</span>
+                  </div>
+                  @if (src.last_parse_at) {
+                    <div class="source-stats__item source-stats__item_wide">
+                      <span class="source-stats__label">Последний разбор</span>
+                      <span class="source-stats__value">{{ formatDate(src.last_parse_at) }}</span>
                     </div>
                   }
                 </div>
-                @if (parseError && lastParsedSourceId === src.source_id) {
-                  <div class="state-message state-message_error source-parse__message">{{ parseError }}</div>
-                } @else if (parseFeedback && lastParsedSourceId === src.source_id) {
-                  <div
-                    class="state-message source-parse__message"
-                    [class.state-message_ok]="parsingSourceId !== src.source_id"
-                    [class.state-message_loading]="parsingSourceId === src.source_id"
-                  >
-                    {{ parseFeedback }}
+                <div class="source-expanded__block">
+                  <h4>URL</h4>
+                  <p>
+                    <a [href]="src.url" target="_blank" rel="noopener noreferrer">{{ src.url }}</a>
+                  </p>
+                </div>
+                @if (src.rss_url) {
+                  <div class="source-expanded__block">
+                    <h4>RSS</h4>
+                    <p>
+                      <a [href]="src.rss_url" target="_blank" rel="noopener noreferrer">{{
+                        src.rss_url
+                      }}</a>
+                    </p>
                   </div>
                 }
+                <div class="source-expanded__grid">
+                  <div class="source-expanded__block">
+                    <h4>Тип документа</h4>
+                    <p>{{ src.document_type_name }} ({{ src.document_type_code }})</p>
+                  </div>
+                  <div class="source-expanded__block">
+                    <h4>Страна</h4>
+                    <p>{{ src.country_code || '—' }}</p>
+                  </div>
+                  <div class="source-expanded__block">
+                    <h4>Добавил</h4>
+                    <p>{{ src.added_by_username }}</p>
+                  </div>
+                  <div class="source-expanded__block">
+                    <h4>Идентификатор</h4>
+                    <p class="source-id">{{ src.source_id }}</p>
+                  </div>
+                </div>
+
+                <div class="source-parse">
+                  <h4>Разбор ленты</h4>
+                  <p class="source-parse__hint">
+                    Новые документы создаются с типом, заданным для источника. Глубина (1–30 дней,
+                    UTC): отсекаются материалы старше порога после извлечения текста. Без даты — по
+                    чекбоксу ниже.
+                  </p>
+                  <div class="source-parse__row">
+                    <label class="filter-item source-parse__days">
+                      <span>Дней назад</span>
+                      <input
+                        type="number"
+                        name="parseDays_{{ src.source_id }}"
+                        [(ngModel)]="parseDays"
+                        min="1"
+                        max="30"
+                        [disabled]="!src.is_active || parsingSourceId === src.source_id"
+                      />
+                    </label>
+                    <label class="filter-item source-parse__skip-undated">
+                      <input
+                        type="checkbox"
+                        name="parseSkipUndated_{{ src.source_id }}"
+                        [(ngModel)]="parseSkipUndated"
+                        [disabled]="!src.is_active || parsingSourceId === src.source_id"
+                      />
+                      <span>Не пропускать материалы без даты</span>
+                    </label>
+                    <button
+                      class="submit-btn source-parse__btn"
+                      type="button"
+                      [disabled]="!src.is_active || parsingSourceId === src.source_id"
+                      (click)="runParse(src)"
+                    >
+                      {{ parsingSourceId === src.source_id ? 'Разбор…' : 'Разобрать' }}
+                    </button>
+                  </div>
+                  <div class="source-parse__llm">
+                    <label class="source-parse__llm-main">
+                      <input
+                        type="checkbox"
+                        name="parsePostFullPipeline_{{ src.source_id }}"
+                        [(ngModel)]="parsePostFullPipeline"
+                        [disabled]="
+                          !src.is_active ||
+                          parsingSourceId === src.source_id ||
+                          parsePostHasAnyGranular()
+                        "
+                      />
+                      <span>После разбора — полный LLM-пайплайн (автоматические фазы A/B)</span>
+                    </label>
+                    <p class="source-parse__llm-hint">
+                      Если отмечено, отдельные шаги ниже игнорируются. Иначе: шаги без зависимости
+                      от перевода («Перевод» не считается) ставятся параллельно; тегирование по
+                      переводу, аннотация и категоризация совместно с «Перевод» ставятся только
+                      после успешного сохранения перевода.
+                    </p>
+
+                    <div class="source-parse__llm-granular">
+                      <span class="source-parse__llm-granular-title">Либо отдельные шаги</span>
+
+                      <div class="source-parse__llm-stage">
+                        <span class="source-parse__llm-stage-title"
+                          >По исходному тексту или без перевода</span
+                        >
+                        <div class="source-parse__llm-stage-grid">
+                          <label class="source-parse__llm-step">
+                            <input
+                              type="checkbox"
+                              name="parsePostTagOrig_{{ src.source_id }}"
+                              [(ngModel)]="parsePostLlmTagOriginal"
+                              [disabled]="
+                                !src.is_active ||
+                                parsingSourceId === src.source_id ||
+                                parsePostFullPipeline
+                              "
+                            />
+                            <span>Теги по оригиналу</span>
+                          </label>
+                          <label class="source-parse__llm-step">
+                            <input
+                              type="checkbox"
+                              name="parsePostTranslate_{{ src.source_id }}"
+                              [(ngModel)]="parsePostLlmTranslate"
+                              (ngModelChange)="parsePostOnTranslateToggled($event)"
+                              [disabled]="
+                                !src.is_active ||
+                                parsingSourceId === src.source_id ||
+                                parsePostFullPipeline
+                              "
+                            />
+                            <span>Перевод</span>
+                          </label>
+                          <label class="source-parse__llm-step">
+                            <input
+                              type="checkbox"
+                              name="parsePostExtractor_{{ src.source_id }}"
+                              [(ngModel)]="parsePostLlmExtractor"
+                              [disabled]="
+                                !src.is_active ||
+                                parsingSourceId === src.source_id ||
+                                parsePostFullPipeline
+                              "
+                            />
+                            <span>Сущности (extractor)</span>
+                          </label>
+                          <label class="source-parse__llm-step">
+                            <input
+                              type="checkbox"
+                              name="parsePostCategorize_{{ src.source_id }}"
+                              [(ngModel)]="parsePostLlmCategorize"
+                              [disabled]="
+                                !src.is_active ||
+                                parsingSourceId === src.source_id ||
+                                parsePostFullPipeline
+                              "
+                            />
+                            <span>Категоризация</span>
+                          </label>
+                        </div>
+                        <p class="source-parse__llm-microhint">
+                          Категоризация без «Перевода»: по текущему тексту в документе (есть перевод
+                          в базе — по нему, иначе по оригиналу). Если отмечены и «Перевод», и
+                          «Категоризация» — категоризация выполняется после успешного перевода и
+                          всегда по переводу.
+                        </p>
+                      </div>
+
+                      <div class="source-parse__llm-stage source-parse__llm-stage_after_translate">
+                        <span class="source-parse__llm-stage-title"
+                          >Только при наличии перевода</span
+                        >
+                        <div class="source-parse__llm-stage-grid">
+                          <label class="source-parse__llm-step">
+                            <input
+                              type="checkbox"
+                              name="parsePostTagTr_{{ src.source_id }}"
+                              [(ngModel)]="parsePostLlmTagTranslated"
+                              [disabled]="
+                                parsePostDependsOnTranslateDisabled(
+                                  src.is_active,
+                                  parsingSourceId === src.source_id
+                                )
+                              "
+                            />
+                            <span>Теги по переводу</span>
+                          </label>
+                          <label class="source-parse__llm-step">
+                            <input
+                              type="checkbox"
+                              name="parsePostAnnotate_{{ src.source_id }}"
+                              [(ngModel)]="parsePostLlmAnnotate"
+                              [disabled]="
+                                parsePostDependsOnTranslateDisabled(
+                                  src.is_active,
+                                  parsingSourceId === src.source_id
+                                )
+                              "
+                            />
+                            <span>Аннотация (по переводу)</span>
+                          </label>
+                        </div>
+                        <p class="source-parse__llm-microhint">
+                          Сначала отметьте «Перевод». Эти шаги запускаются автоматически после того,
+                          как перевод сохранён в документе (без гонки с очередью перевода).
+                        </p>
+                      </div>
+                    </div>
+
+                    @if (parsePostShowLangAndMaxTags()) {
+                      <div class="source-parse__llm-row">
+                        <label class="filter-item source-parse__llm-lang">
+                          <span>Язык перевода</span>
+                          <input
+                            type="text"
+                            name="parsePostTargetLang_{{ src.source_id }}"
+                            [(ngModel)]="parsePostTargetLang"
+                            maxlength="8"
+                            autocomplete="off"
+                            [disabled]="!src.is_active || parsingSourceId === src.source_id"
+                          />
+                        </label>
+                        <label class="filter-item source-parse__llm-maxtags">
+                          <span>Макс. тегов</span>
+                          <input
+                            type="number"
+                            name="parsePostMaxTags_{{ src.source_id }}"
+                            [(ngModel)]="parsePostMaxTags"
+                            min="1"
+                            max="100"
+                            [disabled]="!src.is_active || parsingSourceId === src.source_id"
+                          />
+                        </label>
+                      </div>
+                    }
+                  </div>
+                  @if (parseError && lastParsedSourceId === src.source_id) {
+                    <div class="state-message state-message_error source-parse__message">
+                      {{ parseError }}
+                    </div>
+                  } @else if (parseFeedback && lastParsedSourceId === src.source_id) {
+                    <div
+                      class="state-message source-parse__message"
+                      [class.state-message_ok]="parsingSourceId !== src.source_id"
+                      [class.state-message_loading]="parsingSourceId === src.source_id"
+                    >
+                      {{ parseFeedback }}
+                    </div>
+                  }
+                </div>
               </div>
-            </div>
-          }
-        </article>
-      }
+            </p-accordion-content>
+          </p-accordion-panel>
+        }
+      </p-accordion>
     </div>
   }
 </section>
