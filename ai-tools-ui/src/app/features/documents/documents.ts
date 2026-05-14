@@ -4,6 +4,7 @@ import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { ChipModule } from 'primeng/chip';
+import { MultiSelectModule } from 'primeng/multiselect';
 import { SourceListItem, SourcesApi } from '../sources/api/sources-api';
 import {
   DocumentCategoryItem,
@@ -17,7 +18,7 @@ import {
 @Component({
   selector: 'app-documents',
   standalone: true,
-  imports: [CommonModule, FormsModule, ChipModule],
+  imports: [CommonModule, FormsModule, ChipModule, MultiSelectModule],
   templateUrl: './documents.html',
   styleUrl: './documents.scss',
 })
@@ -29,7 +30,8 @@ export class Documents implements OnInit {
   loading = false;
   error = '';
 
-  selectedStatusCode = '';
+  /** Пусто — без фильтра по статусу (все документы). */
+  selectedStatusCodes: string[] = [];
   selectedDocumentTypeCode = '';
   selectedSourceId = '';
   dateFrom = '';
@@ -81,7 +83,7 @@ export class Documents implements OnInit {
 
     this.documentsApi
       .listDocuments({
-        statusCode: this.selectedStatusCode || undefined,
+        statusCodes: this.selectedStatusCodes.length ? [...this.selectedStatusCodes] : undefined,
         documentTypeCode: this.selectedDocumentTypeCode || undefined,
         sourceId: this.selectedSourceId || undefined,
         dateFrom: this.dateFrom || undefined,
@@ -109,7 +111,7 @@ export class Documents implements OnInit {
   }
 
   resetFilters(): void {
-    this.selectedStatusCode = '';
+    this.selectedStatusCodes = [];
     this.selectedDocumentTypeCode = '';
     this.selectedSourceId = '';
     this.dateFrom = '';

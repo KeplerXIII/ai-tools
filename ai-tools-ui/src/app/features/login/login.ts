@@ -31,7 +31,7 @@ export class Login implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     if (this.authService.isAuthenticated()) {
-      this.router.navigate(['/translate']);
+      this.router.navigate(['/documents']);
     }
   }
 
@@ -67,7 +67,7 @@ export class Login implements OnInit, OnDestroy {
   dismissCelebration(): void {
     this.clearCelebrationTimer();
     this.celebrationVisible = false;
-    void this.router.navigate(['/translate']);
+    void this.router.navigate(['/documents']);
   }
 
   logoutDuringCelebration(): void {

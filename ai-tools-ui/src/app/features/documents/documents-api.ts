@@ -192,7 +192,8 @@ export interface EnqueueFullLlmPipelineResponse {
 }
 
 export interface ListDocumentsFilters {
-  statusCode?: string;
+  /** Несколько кодов объединяются на сервере по ИЛИ (документ подходит, если есть любой из статусов). */
+  statusCodes?: string[];
   documentTypeCode?: string;
   sourceId?: string;
   dateFrom?: string;
@@ -210,8 +211,11 @@ export class DocumentsApi {
 
   listDocuments(filters: ListDocumentsFilters): Observable<DocumentListResponse> {
     let params = new HttpParams();
-    if (filters.statusCode) {
-      params = params.set('status_code', filters.statusCode);
+    for (const code of filters.statusCodes ?? []) {
+      const c = code?.trim();
+      if (c) {
+        params = params.append('status_code', c);
+      }
     }
     if (filters.documentTypeCode) {
       params = params.set('document_type_code', filters.documentTypeCode);

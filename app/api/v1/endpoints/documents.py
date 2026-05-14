@@ -5,11 +5,12 @@ import logging
 import time
 from datetime import datetime
 from decimal import Decimal
+from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
-from sqlalchemy import and_, delete, exists, func, select
+from sqlalchemy import and_, delete, exists, func, or_, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -261,7 +262,7 @@ async def _get_document_categories(
 
 @router.get("", response_model=DocumentListResponse)
 async def list_documents(
-    status_code: str | None = Query(default=None, min_length=1, max_length=64),
+    status_code: Annotated[list[str] | None, Query()] = None,
     document_type_code: str | None = Query(default=None, min_length=1, max_length=64),
     source_id: UUID | None = Query(default=None, description="Фильтр по источнику (RSS/URL); только свои источники"),
     date_from: datetime | None = Query(default=None),
@@ -272,7 +273,18 @@ async def list_documents(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    normalized_status = status_code.strip().lower() if status_code else None
+    normalized_statuses: list[str] = []
+    if status_code:
+        for raw in status_code:
+            if not raw:
+                continue
+            t = raw.strip().lower()
+            if not t:
+                continue
+            if len(t) > 64:
+                raise HTTPException(status_code=400, detail="Код статуса не должен быть длиннее 64 символов")
+            normalized_statuses.append(t)
+        normalized_statuses = list(dict.fromkeys(normalized_statuses))
     normalized_type = document_type_code.strip().lower() if document_type_code else None
     date_field = Document.published_at if use_published_date else Document.created_at
 
@@ -311,16 +323,18 @@ async def list_documents(
         filters.append(date_field >= date_from)
     if date_to:
         filters.append(date_field <= date_to)
-    if normalized_status:
-        filters.append(
+    if normalized_statuses:
+        exists_by_code = [
             select(DocumentStatusAssignment.document_id)
             .join(DocumentStatus, DocumentStatus.id == DocumentStatusAssignment.status_id)
             .where(
                 DocumentStatusAssignment.document_id == Document.id,
-                DocumentStatus.code == normalized_status,
+                DocumentStatus.code == code,
             )
             .exists()
-        )
+            for code in normalized_statuses
+        ]
+        filters.append(or_(*exists_by_code))
     if filters:
         stmt = stmt.where(and_(*filters))
 

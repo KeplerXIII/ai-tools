@@ -24,12 +24,22 @@
 }
 
 .filter-item select,
-.filter-item input {
+.filter-item input[type='date'] {
   border: 1px solid #d1d5db;
   border-radius: 8px;
   height: 40px;
   padding: 0 10px;
   background: #fff;
+}
+
+.filter-item--statuses {
+  flex: 1 1 280px;
+  min-width: min(100%, 320px);
+}
+
+:host ::ng-deep .documents-status-multiselect.p-multiselect {
+  width: 100%;
+  min-height: 40px;
 }
 
 .toggle-item {

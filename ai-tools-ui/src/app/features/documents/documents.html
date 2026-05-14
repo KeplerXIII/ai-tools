@@ -3,14 +3,25 @@
     <h1 class="documents-title">Документы</h1>
 
     <div class="documents-filters">
-      <label class="filter-item">
+      <label class="filter-item filter-item--statuses">
         <span>Статус</span>
-        <select [(ngModel)]="selectedStatusCode" (change)="onFiltersChanged()">
-          <option value="">Все</option>
-          @for (status of statuses; track status.code) {
-            <option [value]="status.code">{{ status.name_ru }}</option>
-          }
-        </select>
+        <p-multiSelect
+          inputId="documents-status-filter"
+          [options]="statuses"
+          [(ngModel)]="selectedStatusCodes"
+          optionLabel="name_ru"
+          optionValue="code"
+          placeholder="Все"
+          [filter]="true"
+          filterBy="name_ru,code"
+          filterMatchMode="contains"
+          [showToggleAll]="false"
+          [showHeader]="true"
+          scrollHeight="280px"
+          appendTo="body"
+          styleClass="documents-status-multiselect"
+          (onChange)="onFiltersChanged()"
+        />
       </label>
 
       <label class="filter-item">
