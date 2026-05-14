@@ -1,6 +1,6 @@
 <section class="documents-page">
   <header class="documents-header">
-    <h1 class="documents-title">Документы</h1>
+    <h1 class="documents-title">Материалы</h1>
 
     <div class="documents-filters">
       <label class="filter-item filter-item--statuses">
@@ -25,7 +25,7 @@
       </label>
 
       <label class="filter-item">
-        <span>Тип документа</span>
+        <span>Тип материала</span>
         <select [(ngModel)]="selectedDocumentTypeCode" (change)="onFiltersChanged()">
           <option value="">Все</option>
           @for (type of documentTypes; track type.code) {
@@ -74,11 +74,11 @@
   </header>
 
   @if (loading) {
-    <div class="state-message">Загрузка документов...</div>
+    <div class="state-message">Загрузка материалов...</div>
   } @else if (error) {
     <div class="state-message state-message_error">{{ error }}</div>
   } @else if (!documents.length) {
-    <div class="state-message">Документы не найдены</div>
+    <div class="state-message">Материалы не найдены</div>
   } @else {
     <div class="documents-list">
       @for (doc of documents; track doc.document_id) {
@@ -106,7 +106,7 @@
                 class="delete-doc-btn"
                 type="button"
                 (click)="openDeleteConfirm(doc, $event)"
-                aria-label="Удалить документ"
+                aria-label="Удалить материал"
               >
                 Удалить
               </button>
@@ -282,9 +282,9 @@
       (click)="onDeleteModalBackdropClick($event)"
     >
       <div class="delete-modal" (click)="$event.stopPropagation()">
-        <h2 id="delete-modal-title" class="delete-modal__title">Удалить документ?</h2>
+        <h2 id="delete-modal-title" class="delete-modal__title">Удалить материал?</h2>
         <p class="delete-modal__text">
-          Действие необратимо. Документ
+          Действие необратимо. Материал
           <strong class="delete-modal__doc-title">{{ documentListTitle(deleteConfirmDocument) }}</strong>
           будет удалён вместе со связанными данными.
         </p>

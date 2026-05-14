@@ -224,6 +224,12 @@ async def sync_document_statuses(
     if doc is None:
         return
 
+    # Phase B jobs (summary, categorize, tag-translated) run in parallel on separate workers.
+    # This session may have loaded the document earlier; identity-map ``get`` does not pull
+    # columns updated by other transactions. Flush local writes, then reload for checks.
+    await session.flush()
+    await session.refresh(doc)
+
     by_code = await _status_ids_by_code(
         session,
         required_codes=("new", "unprocessed", "processed"),

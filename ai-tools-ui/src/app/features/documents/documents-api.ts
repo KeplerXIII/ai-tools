@@ -192,7 +192,7 @@ export interface EnqueueFullLlmPipelineResponse {
 }
 
 export interface ListDocumentsFilters {
-  /** Несколько кодов объединяются на сервере по ИЛИ (документ подходит, если есть любой из статусов). */
+  /** Несколько кодов объединяются на сервере по ИЛИ (материал подходит, если есть любой из статусов). */
   statusCodes?: string[];
   documentTypeCode?: string;
   sourceId?: string;

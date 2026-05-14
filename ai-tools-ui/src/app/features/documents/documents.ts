@@ -30,7 +30,7 @@ export class Documents implements OnInit {
   loading = false;
   error = '';
 
-  /** Пусто — без фильтра по статусу (все документы). */
+  /** Пусто — без фильтра по статусу (все материалы). */
   selectedStatusCodes: string[] = [];
   selectedDocumentTypeCode = '';
   selectedSourceId = '';
@@ -41,7 +41,7 @@ export class Documents implements OnInit {
   dateSortOption: 'uploaded-desc' | 'uploaded-asc' | 'card-desc' | 'card-asc' = 'uploaded-desc';
   expandedDocumentId: string | null = null;
 
-  /** Документ, для которого открыто подтверждение удаления. */
+  /** Материал, для которого открыто подтверждение удаления. */
   deleteConfirmDocument: DocumentListItem | null = null;
   deleteSubmitting = false;
   deleteError = '';
@@ -96,7 +96,7 @@ export class Documents implements OnInit {
           this.loading = false;
         },
         error: () => {
-          this.error = 'Не удалось загрузить список документов';
+          this.error = 'Не удалось загрузить список материалов';
           this.loading = false;
         },
       });
@@ -300,8 +300,8 @@ export class Documents implements OnInit {
           typeof detail === 'string'
             ? detail
             : err.status === 403
-              ? 'Нет права удалить этот документ'
-              : 'Не удалось удалить документ';
+              ? 'Нет права удалить этот материал'
+              : 'Не удалось удалить материал';
       },
     });
   }
