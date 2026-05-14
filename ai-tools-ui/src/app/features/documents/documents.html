@@ -80,7 +80,7 @@
                 [class.document-row__title_link]="!!doc.source_url"
                 (click)="openInArticleParser(doc)"
               >
-                {{ doc.title }}
+                {{ documentListTitle(doc) }}
               </h3>
             </div>
             <div class="document-row-head__tools">
@@ -250,7 +250,7 @@
               <div class="document-expanded__image">
                 <h4>Фото</h4>
                 @if (doc.main_image) {
-                  <img [src]="doc.main_image" [alt]="doc.title" />
+                  <img [src]="doc.main_image" [alt]="documentListTitle(doc)" />
                 } @else {
                   <div class="image-empty">Фото отсутствует</div>
                 }
@@ -274,7 +274,7 @@
         <h2 id="delete-modal-title" class="delete-modal__title">Удалить документ?</h2>
         <p class="delete-modal__text">
           Действие необратимо. Документ
-          <strong class="delete-modal__doc-title">{{ deleteConfirmDocument.title }}</strong>
+          <strong class="delete-modal__doc-title">{{ documentListTitle(deleteConfirmDocument) }}</strong>
           будет удалён вместе со связанными данными.
         </p>
         @if (deleteError) {

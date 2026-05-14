@@ -39,6 +39,7 @@ export interface DocumentTagItem {
 export interface DocumentListItem {
   document_id: string;
   title: string;
+  translated_title?: string | null;
   source_url: string | null;
   document_type_code: string;
   document_type_name: string;

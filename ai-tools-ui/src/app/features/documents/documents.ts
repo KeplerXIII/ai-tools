@@ -131,6 +131,15 @@ export class Documents implements OnInit {
     }
   }
 
+  /** Заголовок для списка: перевод, иначе оригинал. */
+  documentListTitle(doc: DocumentListItem): string {
+    const tr = doc.translated_title?.trim();
+    if (tr) {
+      return tr;
+    }
+    return (doc.title ?? '').trim() || doc.title;
+  }
+
   toggleExpand(documentId: string): void {
     this.expandedDocumentId = this.expandedDocumentId === documentId ? null : documentId;
   }

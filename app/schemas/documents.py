@@ -160,6 +160,7 @@ class DocumentListTagItem(BaseModel):
 class DocumentListItem(BaseModel):
     document_id: uuid.UUID
     title: str
+    translated_title: str | None = None
     source_url: str | None = None
     document_type_code: str
     document_type_name: str

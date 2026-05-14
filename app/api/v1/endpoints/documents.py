@@ -280,6 +280,7 @@ async def list_documents(
         select(
             Document.id,
             Document.title,
+            Document.translated_title,
             Document.source_url,
             Document.original_language_id,
             Document.translated_language_id,
@@ -455,6 +456,7 @@ async def list_documents(
         DocumentListItem(
             document_id=row.id,
             title=row.title,
+            translated_title=row.translated_title,
             source_url=row.source_url,
             document_type_code=row.document_type_code,
             document_type_name=row.document_type_name,
