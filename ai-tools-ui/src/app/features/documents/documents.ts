@@ -4,7 +4,7 @@ import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { ChipModule } from 'primeng/chip';
-import { SourceListItem, SourcesApi } from '../sources/sources-api';
+import { SourceListItem, SourcesApi } from '../sources/api/sources-api';
 import {
   DocumentCategoryItem,
   DocumentEntityItem,
