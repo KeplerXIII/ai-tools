@@ -66,6 +66,7 @@ class DocumentExtractResponse(ExtractResponse):
     published_at: datetime | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
+    translated_title: str | None = None
     translated_content: str | None = None
     original_summary: str | None = None
     translated_summary: str | None = None
@@ -213,6 +214,7 @@ class DocumentImageUpdateItem(BaseModel):
 
 class DocumentMetadataUpdateRequest(BaseModel):
     title: str | None = Field(default=None, max_length=512)
+    translated_title: str | None = Field(default=None, max_length=512)
     author: str | None = Field(default=None, max_length=512)
     date: str | None = Field(default=None, max_length=128)
     source_url: HttpUrl | None = None
@@ -223,6 +225,7 @@ class DocumentMetadataUpdateRequest(BaseModel):
     def at_least_one_field(self) -> DocumentMetadataUpdateRequest:
         if (
             self.title is None
+            and self.translated_title is None
             and self.author is None
             and self.date is None
             and self.source_url is None
@@ -230,7 +233,7 @@ class DocumentMetadataUpdateRequest(BaseModel):
             and self.images is None
         ):
             raise ValueError(
-                "Укажите хотя бы одно поле: title, author, date, source_url, main_image или images",
+                "Укажите хотя бы одно поле: title, translated_title, author, date, source_url, main_image или images",
             )
         return self
 

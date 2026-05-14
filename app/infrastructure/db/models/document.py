@@ -35,6 +35,7 @@ class Document(Base):
         default=uuid.uuid4,
     )
     title: Mapped[str] = mapped_column(String(512), nullable=False)
+    translated_title: Mapped[str | None] = mapped_column(String(512), nullable=True)
     original_content: Mapped[str] = mapped_column(Text, nullable=False)
     original_language_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("languages.id"), nullable=False)
     original_summary: Mapped[str | None] = mapped_column(Text, nullable=True)

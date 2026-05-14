@@ -74,6 +74,7 @@ export class ArticleParserMetaComponent implements OnChanges {
         this.api
           .updateDocumentMetadata(docId, {
             title: doc.title ?? '',
+            translated_title: doc.translated_title ?? '',
             author: doc.author ?? '',
             date: doc.date ?? '',
             main_image: doc.main_image ?? '',

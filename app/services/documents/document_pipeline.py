@@ -326,6 +326,7 @@ def document_to_extract_response(
 
     return DocumentExtractResponse(
         title=doc.title or None,
+        translated_title=doc.translated_title,
         author=doc.extracted_author,
         date=doc.extracted_date,
         url=doc.source_url,
@@ -598,6 +599,9 @@ async def update_document_metadata(
 
     if body.title is not None:
         doc.title = body.title.strip()[:512] or doc.title
+    if body.translated_title is not None:
+        tt = body.translated_title.strip()
+        doc.translated_title = tt[:512] if tt else None
     if body.author is not None:
         author = body.author.strip()
         doc.extracted_author = author[:512] if author else None

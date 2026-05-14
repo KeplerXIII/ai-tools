@@ -69,6 +69,7 @@ export interface ExtractResponse {
   published_at?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
+  translated_title?: string | null;
   translated_content?: string | null;
   original_summary?: string | null;
   translated_summary?: string | null;
@@ -146,6 +147,7 @@ export interface DocumentUpdateRequest {
 
 export interface DocumentMetadataUpdateRequest {
   title?: string | null;
+  translated_title?: string | null;
   author?: string | null;
   date?: string | null;
   source_url?: string;

@@ -59,6 +59,22 @@
         <p-floatlabel variant="on" class="prime-field full-width">
           <input
             pInputText
+            id="article_translated_title"
+            name="article_translated_title"
+            [ngModel]="
+              isEditingMetaBlock
+                ? article.translated_title
+                : article.translated_title || 'Нет информации'
+            "
+            (ngModelChange)="isEditingMetaBlock && article && (article.translated_title = $event)"
+            [disabled]="!isEditingMetaBlock"
+          />
+          <label class="label-input" for="article_translated_title">Заголовок (перевод)</label>
+        </p-floatlabel>
+
+        <p-floatlabel variant="on" class="prime-field full-width">
+          <input
+            pInputText
             id="article_author"
             name="article_author"
             [ngModel]="isEditingMetaBlock ? article.author : article.author || 'Нет информации'"
