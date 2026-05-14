@@ -5,8 +5,9 @@
 .filter-item {
   display: flex;
   flex-direction: column;
+  justify-content: center;
+  align-items: center;
   gap: 6px;
-  min-width: 200px;
 }
 
 .submit-btn {
@@ -302,17 +303,6 @@
   }
 }
 
-.source-expanded h4 {
-  margin: 0 0 8px;
-  font-size: 14px;
-}
-
-.source-expanded p {
-  margin: 0;
-  color: #334155;
-  word-break: break-word;
-}
-
 .source-expanded a {
   color: #1d4ed8;
 }
@@ -324,15 +314,14 @@
 
 .source-parse {
   margin-top: 4px;
-  border-top: 1px solid #e2e8f0;
   padding-top: 14px;
 }
 
 .source-parse__hint {
-  margin: 0 0 10px;
   color: #64748b;
   font-size: 13px;
   line-height: 1.4;
+  margin-bottom: 20px;
 }
 
 .source-parse__row {
@@ -340,19 +329,23 @@
   flex-wrap: wrap;
   gap: 12px;
   align-items: end;
+  border: 1px solid var(--light-grey-text-color);
+  padding: 10px;
+  border-radius: 6px;
 }
 
 .source-parse__days {
   min-width: 120px;
 }
 
-.source-parse__days input {
+/* Корень p-inputnumber должен остаться inline-flex (не block), иначе ломается vertical layout. */
+.source-parse__days p-inputnumber {
+  align-self: flex-start;
+}
+
+.source-parse__days ::ng-deep .p-inputnumber-input {
   border: 1px solid #d1d5db;
-  border-radius: 8px;
-  height: 40px;
-  padding: 0 10px;
   background: #fff;
-  width: 100%;
 }
 
 .source-parse__skip-undated {
@@ -365,8 +358,8 @@
   cursor: pointer;
 }
 
-.source-parse__skip-undated input {
-  width: auto;
+.source-parse__skip-undated p-checkbox {
+  flex-shrink: 0;
   margin: 0;
   cursor: pointer;
 }
@@ -375,15 +368,10 @@
   margin-bottom: 0;
 }
 
-.source-parse__llm {
-  margin-top: 14px;
-  padding-top: 12px;
-  border-top: 1px dashed #e2e8f0;
-}
-
 .source-parse__llm-main {
   display: flex;
   align-items: flex-start;
+  align-items: center;
   gap: 8px;
   font-size: 14px;
   color: #334155;
@@ -391,8 +379,8 @@
   margin: 0;
 }
 
-.source-parse__llm-main input {
-  width: auto;
+.source-parse__llm-main p-checkbox {
+  flex-shrink: 0;
   margin-top: 2px;
   cursor: pointer;
 }
@@ -536,5 +524,28 @@
 }
 
 .source-parse__title {
-  font-size: var(--font-size-detail);
+  font-size: var(--font-size-medium);
+  color: var(--primary-text-color);
+  margin-bottom: 10px;
+}
+
+.new-source-form-label {
+  font-size: var(--font-size-small);
+  font-weight: var(--font-weight-light);
+  color: var(--primary-text-color);
+}
+
+.source-parse__skip-undated-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  width: 70%;
+  height: 100%;
+}
+
+:host ::ng-deep .source-parser__11m {
+  border-top: none !important;
+  margin-top: 0 !important;
+  padding-top: 0 !important;
 }

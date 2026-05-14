@@ -58,7 +58,11 @@
                   />
                 }
                 @if (src.rss_url) {
-                  <p-chip label="RSS" class="chip-item status-chip status-chip_rss" [removable]="false" />
+                  <p-chip
+                    label="RSS"
+                    class="chip-item status-chip status-chip_rss"
+                    [removable]="false"
+                  />
                 }
               </div>
             </div>
@@ -105,10 +109,7 @@
                   <p-knob
                     [ngModel]="src.last_parse_created_total"
                     [style.--p-knob-value-background]="
-                      sourceStatsKnobColor(
-                        src.last_parse_created_total,
-                        sourceStatsKnobMax(src)
-                      )
+                      sourceStatsKnobColor(src.last_parse_created_total, sourceStatsKnobMax(src))
                     "
                     [rangeColor]="'var(--super-light-grey-text-color)'"
                     [readonly]="true"
@@ -186,7 +187,13 @@
                     <td class="source-detail-table__field">{{ row.label }}</td>
                     <td class="source-detail-table__value" [class.source-id]="row.isMono">
                       @if (row.href) {
-                        <a class="source-row__title-link" [href]="row.href" target="_blank" rel="noopener noreferrer">{{ row.text }}</a>
+                        <a
+                          class="source-row__title-link"
+                          [href]="row.href"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          >{{ row.text }}</a
+                        >
                       } @else {
                         {{ row.text }}
                       }
@@ -205,54 +212,66 @@
               </p>
               <div class="source-parse__row">
                 <label class="filter-item source-parse__days">
-                  <span>Дней назад</span>
-                  <input
-                    type="number"
-                    name="parseDays_{{ src.source_id }}"
-                    [(ngModel)]="parseDays"
-                    min="1"
-                    max="30"
-                    [disabled]="!src.is_active || parsingSourceId === src.source_id"
-                  />
+                  <span class="new-source-form-label">Дней назад</span>
+                  <div>
+                    <p-inputnumber
+                      [(ngModel)]="parseDays"
+                      [name]="'parseDays_' + src.source_id"
+                      [inputId]="'parseDays_' + src.source_id"
+                      [showButtons]="true"
+                      buttonLayout="vertical"
+                      [min]="1"
+                      [max]="30"
+                      [step]="1"
+                      [format]="false"
+                      [useGrouping]="false"
+                      [disabled]="!src.is_active || parsingSourceId === src.source_id"
+                      [inputStyle]="{ width: '3rem' }"
+                      (onBlur)="clampParseDays()"
+                    >
+                      <ng-template pTemplate="incrementbuttonicon">
+                        <span class="pi pi-plus" aria-hidden="true"></span>
+                      </ng-template>
+                      <ng-template pTemplate="decrementbuttonicon">
+                        <span class="pi pi-minus" aria-hidden="true"></span>
+                      </ng-template>
+                    </p-inputnumber>
+                  </div>
                 </label>
-                <label class="filter-item source-parse__skip-undated">
-                  <input
-                    type="checkbox"
-                    name="parseSkipUndated_{{ src.source_id }}"
-                    [(ngModel)]="parseSkipUndated"
-                    [disabled]="!src.is_active || parsingSourceId === src.source_id"
-                  />
-                  <span>Не пропускать материалы без даты</span>
-                </label>
-                <button
-                  class="submit-btn source-parse__btn"
-                  type="button"
-                  [disabled]="!src.is_active || parsingSourceId === src.source_id"
-                  (click)="runParse(src)"
-                >
-                  {{ parsingSourceId === src.source_id ? 'Разбор…' : 'Разобрать' }}
-                </button>
-              </div>
-              <div class="source-parse__llm">
-                <label class="source-parse__llm-main">
-                  <input
-                    type="checkbox"
-                    name="parsePostFullPipeline_{{ src.source_id }}"
-                    [(ngModel)]="parsePostFullPipeline"
-                    [disabled]="
-                      !src.is_active ||
-                      parsingSourceId === src.source_id ||
-                      parsePostHasAnyGranular()
-                    "
-                  />
-                  <span>После разбора — полный LLM-пайплайн (автоматические фазы A/B)</span>
-                </label>
-                <p class="source-parse__llm-hint">
-                  Если отмечено, отдельные шаги ниже игнорируются. Иначе: шаги без зависимости от
-                  перевода («Перевод» не считается) ставятся параллельно; тегирование по переводу,
-                  аннотация и категоризация совместно с «Перевод» ставятся только после успешного
-                  сохранения перевода.
-                </p>
+                <div class="source-parse__skip-undated-wrapper">
+                  <label class="source-parse__skip-undated">
+                    <p-checkbox
+                      [(ngModel)]="parseSkipUndated"
+                      [binary]="true"
+                      [inputId]="'parseSkipUndated_' + src.source_id"
+                      [name]="'parseSkipUndated_' + src.source_id"
+                      [disabled]="!src.is_active || parsingSourceId === src.source_id"
+                    />
+                    <span>Не пропускать материалы без даты</span>
+                  </label>
+                  <div class="source-parse__llm">
+                    <label class="source-parse__llm-main">
+                      <p-checkbox
+                        [(ngModel)]="parsePostFullPipeline"
+                        [binary]="true"
+                        [inputId]="'parsePostFullPipeline_' + src.source_id"
+                        [name]="'parsePostFullPipeline_' + src.source_id"
+                        [disabled]="
+                          !src.is_active ||
+                          parsingSourceId === src.source_id ||
+                          parsePostHasAnyGranular()
+                        "
+                      />
+                      <span>После разбора — полный LLM-пайплайн (автоматические фазы A/B)</span>
+                    </label>
+                    <p class="source-parse__llm-hint">
+                      Если отмечено, отдельные шаги ниже игнорируются. Иначе: шаги без зависимости
+                      от перевода («Перевод» не считается) ставятся параллельно; тегирование по
+                      переводу, аннотация и категоризация совместно с «Перевод» ставятся только
+                      после успешного сохранения перевода.
+                    </p>
+                  </div>
+                </div>
 
                 <div class="source-parse__llm-granular">
                   <span class="source-parse__llm-granular-title">Либо отдельные шаги</span>
@@ -362,6 +381,14 @@
                     </p>
                   </div>
                 </div>
+                <button
+                  class="submit-btn source-parse__btn"
+                  type="button"
+                  [disabled]="!src.is_active || parsingSourceId === src.source_id"
+                  (click)="runParse(src)"
+                >
+                  {{ parsingSourceId === src.source_id ? 'Разбор…' : 'Разобрать' }}
+                </button>
 
                 @if (parsePostShowLangAndMaxTags()) {
                   <div class="source-parse__llm-row">

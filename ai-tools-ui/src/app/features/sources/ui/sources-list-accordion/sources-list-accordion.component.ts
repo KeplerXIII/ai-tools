@@ -12,7 +12,9 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { AccordionModule } from 'primeng/accordion';
+import { CheckboxModule } from 'primeng/checkbox';
 import { ChipModule } from 'primeng/chip';
+import { InputNumberModule } from 'primeng/inputnumber';
 import { KnobModule } from 'primeng/knob';
 import { TableModule } from 'primeng/table';
 import { TooltipModule } from 'primeng/tooltip';
@@ -40,7 +42,9 @@ interface SourceDetailRow {
     CommonModule,
     FormsModule,
     AccordionModule,
+    CheckboxModule,
     ChipModule,
+    InputNumberModule,
     KnobModule,
     TableModule,
     TooltipModule,
@@ -58,6 +62,7 @@ export class SourcesListAccordionComponent implements OnChanges, OnDestroy {
 
   expandedSourceId: string | undefined = undefined;
 
+  /** Глубина разбора в днях; допустимый диапазон 1–30 (см. `clampParseDays`). */
   parseDays = 3;
   /** Соответствует skip_undated в API: после извлечения не сохранять материалы без итоговой даты. */
   parseSkipUndated = true;
@@ -331,6 +336,11 @@ export class SourcesListAccordionComponent implements OnChanges, OnDestroy {
       });
   }
 
+  /** Целое число дней в диапазоне 1–30 для поля «Дней назад». */
+  clampParseDays(): void {
+    this.parseDays = Math.min(30, Math.max(1, Math.floor(Number(this.parseDays)) || 3));
+  }
+
   runParse(src: SourceListItem): void {
     if (!src.is_active) {
       return;
@@ -342,8 +352,8 @@ export class SourcesListAccordionComponent implements OnChanges, OnDestroy {
     this.parseFeedback = '';
     this.lastParsedSourceId = null;
     sessionStorage.removeItem(this.storageParseUiKey);
-    const days = Math.min(30, Math.max(1, Math.floor(Number(this.parseDays)) || 3));
-    this.parseDays = days;
+    this.clampParseDays();
+    const days = this.parseDays;
     this.parsingSourceId = src.source_id;
     this.parseStreamSub = this.sourcesApi
       .parseSource({
