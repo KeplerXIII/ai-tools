@@ -1,5 +1,5 @@
 <section class="document-page">
-  <div class="document-page__modes" role="tablist" aria-label="Способ создания">
+  <div class="document-page__modes" role="tablist" aria-label="Способ работы с документом">
     <button
       type="button"
       class="document-page__mode-btn"
@@ -37,11 +37,174 @@
       <app-article-parser [embedded]="true" [hideUrlForm]="creationMode === 'material'" />
     </div>
   } @else {
-    <div class="document-page__placeholder">
-      <p>
-        Режим «Создать» — заготовка для ручного ввода. Здесь появится форма и сценарий заполнения материала
-        без разбора по URL.
-      </p>
+    <div class="document-page__create-panel">
+      <label class="document-page__field">
+        <span class="document-page__label">Заголовок <span class="document-page__req">*</span></span>
+        <input
+          class="document-page__input"
+          type="text"
+          name="raw_document_title"
+          [(ngModel)]="formTitle"
+          maxlength="512"
+          [disabled]="createSubmitting"
+          placeholder="Название материала"
+          spellcheck="true"
+          autocomplete="off"
+        />
+      </label>
+
+      <label class="document-page__field">
+        <span class="document-page__label">Автор <span class="document-page__req">*</span></span>
+        <input
+          class="document-page__input"
+          type="text"
+          name="raw_document_author"
+          [(ngModel)]="formAuthor"
+          maxlength="512"
+          [disabled]="createSubmitting"
+          placeholder="ФИО или название источника"
+          spellcheck="true"
+          autocomplete="name"
+        />
+      </label>
+
+      <label class="document-page__field">
+        <span class="document-page__label">Дата публикации <span class="document-page__req">*</span></span>
+        <input
+          class="document-page__input document-page__input_date"
+          type="date"
+          name="raw_document_publication_date"
+          [(ngModel)]="formPublicationDate"
+          [disabled]="createSubmitting"
+        />
+      </label>
+
+      <label class="document-page__field">
+        <span class="document-page__label">Ссылка на источник</span>
+        <input
+          class="document-page__input"
+          type="url"
+          name="raw_document_source_url"
+          [(ngModel)]="formSourceUrl"
+          [disabled]="createSubmitting"
+          placeholder="https://… (необязательно)"
+          spellcheck="false"
+          autocomplete="off"
+        />
+      </label>
+
+      <label class="document-page__field">
+        <span class="document-page__label">Главное изображение</span>
+        <input
+          class="document-page__input"
+          type="url"
+          name="raw_document_main_image"
+          [(ngModel)]="formMainImageUrl"
+          [disabled]="createSubmitting"
+          placeholder="https://… изображение (необязательно)"
+          spellcheck="false"
+          autocomplete="off"
+        />
+      </label>
+
+      <label class="document-page__field">
+        <span class="document-page__label">Тип документа <span class="document-page__req">*</span></span>
+        <p-select
+          class="document-page__select"
+          [options]="createDocumentTypeSelectOptions"
+          [(ngModel)]="formDocumentTypeCode"
+          optionLabel="label"
+          optionValue="value"
+          placeholder="Выберите тип документа"
+          [disabled]="!documentTypesCatalog.length || createSubmitting"
+        />
+      </label>
+
+      <div class="document-page__submodes" role="tablist" aria-label="Режим ввода текста">
+        <span class="document-page__submodes-label">Текст:</span>
+        <button
+          type="button"
+          class="document-page__submode-btn"
+          role="tab"
+          [attr.aria-selected]="bodyTextMode === 'plain'"
+          [class.document-page__submode-btn_active]="bodyTextMode === 'plain'"
+          [disabled]="createSubmitting"
+          (click)="setBodyTextMode('plain')"
+        >
+          Сырой текст
+        </button>
+        <button
+          type="button"
+          class="document-page__submode-btn"
+          role="tab"
+          [attr.aria-selected]="bodyTextMode === 'markdown'"
+          [class.document-page__submode-btn_active]="bodyTextMode === 'markdown'"
+          [disabled]="createSubmitting"
+          (click)="setBodyTextMode('markdown')"
+        >
+          Markdown
+        </button>
+      </div>
+
+      <label class="document-page__field document-page__field_grow">
+        <span class="document-page__label">
+          Содержимое <span class="document-page__req">*</span>
+          @if (bodyTextMode === 'markdown') {
+            <span class="document-page__label-hint">редактор и предпросмотр</span>
+          }
+        </span>
+        @if (bodyTextMode === 'plain') {
+          <textarea
+            class="document-page__textarea"
+            name="raw_document_text"
+            [(ngModel)]="rawText"
+            rows="18"
+            [disabled]="createSubmitting"
+            placeholder="Вставьте сырой текст материала…"
+            spellcheck="true"
+          ></textarea>
+        } @else {
+          <div class="document-page__md-split">
+            <textarea
+              class="document-page__textarea document-page__textarea_md"
+              name="raw_document_text_md"
+              [(ngModel)]="rawText"
+              rows="18"
+              [disabled]="createSubmitting"
+              placeholder="Введите текст в формате Markdown…"
+              spellcheck="true"
+              aria-label="Текст в Markdown"
+            ></textarea>
+            <div class="document-page__md-preview-column">
+              <div class="document-page__md-preview-heading">Предпросмотр</div>
+              <div
+                class="document-page__md-preview"
+                role="region"
+                aria-label="Предпросмотр Markdown"
+                [innerHTML]="markdownPreviewHtml()"
+              ></div>
+            </div>
+          </div>
+        }
+      </label>
+
+      @if (documentTypesLoadError) {
+        <p class="document-page__message document-page__message_error">{{ documentTypesLoadError }}</p>
+      }
+      @if (createError) {
+        <p class="document-page__message document-page__message_error">{{ createError }}</p>
+      }
+
+      <div class="document-page__actions">
+        <app-primary-button
+          type="button"
+          [text]="createSubmitting ? 'Создание…' : 'Создать'"
+          [disabled]="createSubmitting"
+          size="super-large"
+          variant="rounded"
+          (clicked)="submitCreateFromRaw()"
+        />
+      </div>
     </div>
   }
 </section>

@@ -4,14 +4,14 @@ import asyncio
 import logging
 import uuid
 from contextlib import nullcontext
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from typing import Literal
 
 from sqlalchemy import delete, or_, select
-from sqlalchemy.orm import aliased
 from sqlalchemy.dialects.postgresql import insert
-from sqlalchemy.exc import ProgrammingError
+from sqlalchemy.exc import NoResultFound, ProgrammingError
+from sqlalchemy.orm import aliased
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -415,6 +415,74 @@ async def create_document_after_extract(
         extract_method=extract_method,
         extract_quality=extract_quality,
         extract_needs_review=extract_needs_review,
+        published_at=published_at,
+        created_by_id=created_by_id,
+        original_summary_stale=True,
+        translated_summary_stale=True,
+    )
+    session.add(doc)
+    await session.flush()
+    await _attach_default_new_unprocessed_statuses(
+        session,
+        document_id=doc.id,
+        assigned_by_id=created_by_id,
+    )
+    return doc
+
+
+async def create_document_from_raw_text(
+    session: AsyncSession,
+    *,
+    title: str,
+    author: str,
+    publication_date: date,
+    text: str,
+    created_by_id: uuid.UUID | None,
+    document_type_code: str = "undefined",
+    source_url: str | None = None,
+    main_image: str | None = None,
+) -> Document:
+    stripped = text.strip()
+    if not stripped:
+        raise ValidationError("Текст документа не может быть пустым")
+
+    title_clean = title.strip()
+    if not title_clean:
+        raise ValidationError("Заголовок не может быть пустым")
+
+    author_clean = author.strip()
+    if not author_clean:
+        raise ValidationError("Автор не может быть пустым")
+
+    code = document_type_code.strip()
+    if not code:
+        code = "undefined"
+    try:
+        dt_id = await document_type_id_by_code(session, code)
+    except NoResultFound as exc:
+        raise ValidationError(f"Неизвестный тип документа: {code!r}") from exc
+
+    lang_code = _map_lang_for_db(await asyncio.to_thread(detect_language, stripped))
+    ol_id = await language_id_by_code(session, lang_code)
+
+    published_at = datetime(publication_date.year, publication_date.month, publication_date.day, tzinfo=UTC)
+    extracted_date_str = publication_date.isoformat()[:128]
+
+    main_image_clean = (main_image.strip()[:8192] if main_image and main_image.strip() else None) or None
+
+    doc = Document(
+        title=title_clean[:512],
+        original_content=stripped,
+        original_language_id=ol_id,
+        document_type_id=dt_id,
+        source_url=source_url,
+        extracted_images=[],
+        extracted_main_image=main_image_clean,
+        extracted_author=author_clean[:512],
+        extracted_date=extracted_date_str,
+        extract_method="manual",
+        extract_quality="manual",
+        extract_needs_review=False,
         published_at=published_at,
         created_by_id=created_by_id,
         original_summary_stale=True,

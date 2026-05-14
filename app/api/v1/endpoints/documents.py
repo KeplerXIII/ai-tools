@@ -59,12 +59,14 @@ from app.schemas.documents import (
     DocumentTranslateTitleResponse,
     DocumentUpdateRequest,
     ExtractUrlPersistRequest,
+    CreateDocumentRawRequest,
     SummarySource,
 )
 from app.services.documents.db_refs import entity_type_id_by_code, language_id_by_code, prediction_source_id
 from app.services.documents.document_pipeline import (
     acquire_edit_lock,
     create_document_after_extract,
+    create_document_from_raw_text,
     document_to_extract_response,
     get_document_by_source_url,
     persist_document_refined_summary,
@@ -667,6 +669,50 @@ async def extract_url_persist(
                 categories=categories,
             )
         raise
+
+    created_doc = await db.get(Document, doc_id)
+    if created_doc is None:
+        raise HTTPException(status_code=500, detail="Не удалось загрузить созданный документ")
+    statuses_new = await _get_document_status_items(db, doc_id)
+    return document_to_extract_response(
+        created_doc,
+        from_cache=False,
+        statuses=statuses_new,
+        original_tags=[],
+        translated_tags=[],
+        entities_military_equipment=[],
+        entities_manufacturers=[],
+        entities_contracts=[],
+        categories=[],
+    )
+
+
+@router.post("/from-raw", response_model=DocumentExtractResponse)
+async def create_document_from_raw(
+    payload: CreateDocumentRawRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User | None = Depends(get_current_user_optional),
+):
+    """Создать документ из сырого текста: статусы new + unprocessed, как после извлечения по URL."""
+    created_by_id = user.id if user else None
+    await _prepare_write_session(db)
+    try:
+        async with db.begin():
+            doc = await create_document_from_raw_text(
+                db,
+                title=payload.title,
+                author=payload.author,
+                publication_date=payload.publication_date,
+                text=payload.text,
+                created_by_id=created_by_id,
+                document_type_code=payload.document_type_code,
+                source_url=normalize_source_url(str(payload.source_url)) if payload.source_url else None,
+                main_image=str(payload.main_image).strip()[:8192] if payload.main_image else None,
+            )
+            doc_id = doc.id
+    except ValidationError as exc:
+        await db.rollback()
+        _handle(exc)
 
     created_doc = await db.get(Document, doc_id)
     if created_doc is None:

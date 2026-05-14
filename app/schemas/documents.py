@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from enum import Enum
 from typing import Literal
 
-from pydantic import BaseModel, Field, HttpUrl, model_validator
+from pydantic import BaseModel, Field, HttpUrl, field_validator, model_validator
 
 from app.schemas.extract import ExtractResponse, RefineSummaryMode
 
@@ -227,6 +227,15 @@ class DocumentMetadataUpdateRequest(BaseModel):
     main_image: str | None = None
     images: list[DocumentImageUpdateItem] | None = None
 
+    @field_validator("source_url", mode="before")
+    @classmethod
+    def optional_metadata_source_url(cls, v: object) -> object:
+        if v is None:
+            return None
+        if isinstance(v, str) and not v.strip():
+            return None
+        return v
+
     @model_validator(mode="after")
     def at_least_one_field(self) -> DocumentMetadataUpdateRequest:
         if (
@@ -269,3 +278,40 @@ class DocumentUpdateRequest(BaseModel):
 class ExtractUrlPersistRequest(BaseModel):
     url: HttpUrl
     document_type_code: str = "undefined"
+
+
+class CreateDocumentRawRequest(BaseModel):
+    """Создание документа из сырого текста (без URL и извлечения по сети)."""
+
+    title: str = Field(..., min_length=1, max_length=512)
+    author: str = Field(..., min_length=1, max_length=512)
+    publication_date: date
+    text: str = Field(..., min_length=1)
+    document_type_code: str = Field(default="undefined", min_length=1, max_length=64)
+    source_url: HttpUrl | None = None
+    main_image: HttpUrl | None = None
+
+    @field_validator("source_url", "main_image", mode="before")
+    @classmethod
+    def optional_create_urls(cls, v: object) -> object:
+        if v is None:
+            return None
+        if isinstance(v, str) and not v.strip():
+            return None
+        return v
+
+    @field_validator("title")
+    @classmethod
+    def title_stripped_nonempty(cls, v: str) -> str:
+        s = v.strip()
+        if not s:
+            raise ValueError("Заголовок не может быть пустым")
+        return s[:512]
+
+    @field_validator("author")
+    @classmethod
+    def author_stripped_nonempty(cls, v: str) -> str:
+        s = v.strip()
+        if not s:
+            raise ValueError("Автор не может быть пустым")
+        return s[:512]

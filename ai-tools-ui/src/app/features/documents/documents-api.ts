@@ -2,6 +2,8 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 
+import type { ExtractResponse } from '../article-parser/api/article-parser-api';
+
 export interface DocumentStatusItem {
   code: string;
   name_ru: string;
@@ -255,6 +257,19 @@ export class DocumentsApi {
 
   deleteDocument(documentId: string): Observable<{ ok: boolean; document_id: string }> {
     return this.http.delete<{ ok: boolean; document_id: string }>(`/api/v1/documents/${documentId}`);
+  }
+
+  /** Создание документа из сырого текста (те же статусы, что после extract-url). */
+  createDocumentFromRaw(payload: {
+    title: string;
+    author: string;
+    publication_date: string;
+    text: string;
+    document_type_code: string;
+    source_url?: string;
+    main_image?: string;
+  }): Observable<ExtractResponse> {
+    return this.http.post<ExtractResponse>('/api/v1/documents/from-raw', payload);
   }
 
   enqueueTranslateDocuments(payload: {
