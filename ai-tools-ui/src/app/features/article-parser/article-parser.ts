@@ -1,8 +1,9 @@
 import { ChangeDetectorRef, Component, DestroyRef, Input, NgZone, OnInit, ViewChild, booleanAttribute } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { InputTextModule } from 'primeng/inputtext';
+import { FloatLabelModule } from 'primeng/floatlabel';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -25,7 +26,11 @@ import { scrollToElement } from './lib/scroll-to-element';
 import { HttpErrorResponse } from '@angular/common/http';
 import { DocumentsApi } from '../documents/documents-api';
 import { PanelModule } from 'primeng/panel';
-import { OutlineButtonComponent } from '../../shared/ui/outline-button/outline-button.component';
+import {
+  ButtonVariant,
+  OutlineButtonComponent,
+} from '../../shared/ui/outline-button/outline-button.component';
+import { PrimaryButtonComponent } from '../../shared/ui/primary-button/primary-button.component';
 
 @Component({
   selector: 'app-article-parser',
@@ -36,6 +41,7 @@ import { OutlineButtonComponent } from '../../shared/ui/outline-button/outline-b
     MatFormFieldModule,
     MatInputModule,
     InputTextModule,
+    FloatLabelModule,
     ArticleParserUrlFormComponent,
     ArticleParserStatusComponent,
     ArticleParserMetaComponent,
@@ -46,16 +52,21 @@ import { OutlineButtonComponent } from '../../shared/ui/outline-button/outline-b
     ArticleParserAnnotationComponent,
     ArticleParserArticleLoadingComponent,
     OutlineButtonComponent,
+    PrimaryButtonComponent,
   ],
   templateUrl: './article-parser.html',
   styleUrl: './article-parser.scss',
 })
 export class ArticleParser implements OnInit {
+  readonly ButtonVariant = ButtonVariant;
+
   /** Скрыть заголовок и подзаголовок страницы (вложенный режим в «Документ»). */
   @Input({ transform: booleanAttribute }) embedded = false;
-  /** Скрыть блок ввода URL (режим «Материал» на странице «Документ»). */
+  /** Скрыть блок ввода URL (режим «Документ» на странице «Документ»). */
   @Input({ transform: booleanAttribute }) hideUrlForm = false;
 
+  /** Черновик id для формы «открыть по id» (синхронизируется с query). */
+  documentIdDraft = '';
   @ViewChild(ArticleParserOriginalTextComponent)
   originalTextComponent?: ArticleParserOriginalTextComponent;
   @ViewChild(ArticleParserTranslationComponent)
@@ -72,6 +83,8 @@ export class ArticleParser implements OnInit {
   loadingFullPipeline = false;
   fullPipelineMessage = '';
   fullPipelineError = '';
+  /** Панель LLM-пайплайна по умолчанию свёрнута. */
+  fullLlmPipelinePanelCollapsed = true;
   articleError = '';
   originalTagsError = '';
   translationError = '';
@@ -94,6 +107,7 @@ export class ArticleParser implements OnInit {
     private cdr: ChangeDetectorRef,
     private ngZone: NgZone,
     private route: ActivatedRoute,
+    private router: Router,
     private destroyRef: DestroyRef,
   ) {}
 
@@ -105,6 +119,7 @@ export class ArticleParser implements OnInit {
     this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
       const id = params.get('id')?.trim() ?? '';
       const mode = params.get('mode')?.trim().toLowerCase() ?? '';
+      this.documentIdDraft = id;
 
       if (id && mode !== 'url' && mode !== 'template') {
         if (id === this.lastLoadedDocId) {
@@ -135,6 +150,35 @@ export class ArticleParser implements OnInit {
 
       this.lastAutoloadKey = url;
       this.extractArticle();
+    });
+  }
+
+  submitDocumentById(): void {
+    const id = this.documentIdDraft.trim();
+    if (!id) {
+      return;
+    }
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: {
+        id,
+        mode: 'material',
+        from: null,
+        url: null,
+        autoload: null,
+      },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
+  }
+
+  clearDocumentById(): void {
+    this.clear();
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { id: null, from: null, url: null, autoload: null },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
     });
   }
 
@@ -187,6 +231,7 @@ export class ArticleParser implements OnInit {
     this.loadingOriginalTags = false;
     this.loadingTranslatedTags = false;
     this.loadingFullPipeline = false;
+    this.fullLlmPipelinePanelCollapsed = true;
     this.state.article = null;
     this.state.entities = null;
     this.state.categories = null;
@@ -357,6 +402,7 @@ export class ArticleParser implements OnInit {
     this.translatedTitleError = '';
     this.fullPipelineMessage = '';
     this.fullPipelineError = '';
+    this.fullLlmPipelinePanelCollapsed = true;
   }
 
   enqueueFullLlmPipeline(): void {
@@ -490,5 +536,15 @@ export class ArticleParser implements OnInit {
 
   get isDisabled(): boolean {
     return this.isLoading;
+  }
+
+  /** Форма «по id» на вкладке «Документ». */
+  get showDocumentIdForm(): boolean {
+    return this.embedded && this.hideUrlForm;
+  }
+
+  /** Кнопка «Очистить»: неактивна, если нечего сбрасывать (как у строки URL). */
+  get documentIdClearDisabled(): boolean {
+    return this.isDisabled || (!this.documentIdDraft.trim() && !this.state.article);
   }
 }

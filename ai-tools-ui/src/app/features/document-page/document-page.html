@@ -1,11 +1,4 @@
 <section class="document-page">
-  <header class="document-page__header">
-    <h1 class="document-page__title">Документ</h1>
-    <p class="document-page__subtitle">
-      Создание материала по ссылке (разбор страницы) или заполнение пустого шаблона вручную.
-    </p>
-  </header>
-
   <div class="document-page__modes" role="tablist" aria-label="Способ создания">
     <button
       type="button"
@@ -15,7 +8,7 @@
       [class.document-page__mode-btn_active]="creationMode === 'material'"
       (click)="setMode('material')"
     >
-      Материал
+      Документ
     </button>
     <button
       type="button"
@@ -25,7 +18,7 @@
       [class.document-page__mode-btn_active]="creationMode === 'url'"
       (click)="setMode('url')"
     >
-      По ссылке
+      Парсинг по URL
     </button>
     <button
       type="button"
@@ -35,7 +28,7 @@
       [class.document-page__mode-btn_active]="creationMode === 'template'"
       (click)="setMode('template')"
     >
-      Пустой шаблон
+      Создать
     </button>
   </div>
 
@@ -46,7 +39,7 @@
   } @else {
     <div class="document-page__placeholder">
       <p>
-        Режим «Пустой шаблон» — заготовка для ручного ввода. Здесь появится форма и сценарий заполнения материала
+        Режим «Создать» — заготовка для ручного ввода. Здесь появится форма и сценарий заполнения материала
         без разбора по URL.
       </p>
     </div>

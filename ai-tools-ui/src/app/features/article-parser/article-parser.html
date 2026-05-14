@@ -15,6 +15,41 @@
     />
   }
 
+  @if (showDocumentIdForm) {
+    <form class="url-row document-id-row" (ngSubmit)="submitDocumentById()">
+      <div class="input-wrapper">
+        <p-floatlabel variant="on" class="url-field document-id-field">
+          <input
+            pInputText
+            id="document_by_id"
+            name="documentIdDraft"
+            [(ngModel)]="documentIdDraft"
+            autocomplete="off"
+            placeholder="Введите document_id"
+          />
+          <label for="document_by_id">ID документа</label>
+        </p-floatlabel>
+      </div>
+
+      <div class="parser_btn-wrapper">
+        <app-primary-button
+          type="submit"
+          text="Получить документ"
+          [disabled]="isDisabled || !documentIdDraft.trim()"
+          size="extra-large"
+          variant="rounded"
+        />
+        <app-outline-button
+          text="Очистить"
+          size="large"
+          [variant]="ButtonVariant.Rounded"
+          [disabled]="documentIdClearDisabled"
+          (clicked)="clearDocumentById()"
+        />
+      </div>
+    </form>
+  }
+
   @if (articleError) {
     <div class="field-error">{{ articleError }}</div>
   }
@@ -24,7 +59,11 @@
   }
 
   @if (state.article) {
-    <p-panel header="Автоматизированный LLM-пайплайн" [toggleable]="true">
+    <p-panel
+      header="Автоматизированный LLM-пайплайн"
+      [toggleable]="true"
+      [(collapsed)]="fullLlmPipelinePanelCollapsed"
+    >
       <div class="full-pipeline-bar">
         <app-outline-button
           [disabled]="isDisabled"

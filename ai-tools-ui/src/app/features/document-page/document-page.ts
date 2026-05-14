@@ -49,7 +49,7 @@ export class DocumentPage implements OnInit {
     if (mode === 'template') {
       void this.router.navigate([], {
         relativeTo: this.route,
-        queryParams: { id: null, url: null, autoload: null, mode: 'template' },
+        queryParams: { id: null, url: null, autoload: null, from: null, mode: 'template' },
         queryParamsHandling: 'merge',
         replaceUrl: true,
       });
@@ -59,7 +59,7 @@ export class DocumentPage implements OnInit {
     if (mode === 'url') {
       void this.router.navigate([], {
         relativeTo: this.route,
-        queryParams: { id: null, url: null, autoload: null, mode: 'url' },
+        queryParams: { id: null, url: null, autoload: null, from: null, mode: 'url' },
         queryParamsHandling: 'merge',
         replaceUrl: true,
       });
@@ -72,6 +72,7 @@ export class DocumentPage implements OnInit {
         mode: 'material',
         url: null,
         autoload: null,
+        from: null,
         ...(currentId ? { id: currentId } : { id: null }),
       },
       queryParamsHandling: 'merge',
