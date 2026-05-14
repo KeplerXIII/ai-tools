@@ -5,7 +5,7 @@
 
 .source-create {
   margin-bottom: 24px;
-  background: var(--select-color-light);
+  background: var(--background-color-light);
   padding: 12px 16px 14px;
   border-radius: 6px;
   border: 1px solid var(--primary-text-color);
@@ -46,6 +46,52 @@
   width: 100%;
 }
 
+/* Селект языка в форме создания: фиксированная ширина. */
+:host ::ng-deep .source-create__form p-select.source-create__language-select.p-select {
+  display: block;
+  width: 180px !important;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+/* Селект страны: фиксированная ширина; max-width — чтобы на узких экранах не вылезал из вьюпорта. */
+:host ::ng-deep .source-create__form p-select.source-create__country-select.p-select {
+  display: block;
+  width: 270px !important;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.source-create__country-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.source-create__country-flag {
+  flex-shrink: 0;
+  object-fit: cover;
+  border-radius: 2px;
+}
+
+.source-create__country-option-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Тип документа: широкая колонка — селект на всю ширину (перебивает глобальный fit-content у .p-select). */
+:host ::ng-deep .source-create__form p-select.source-create__document-type-select.p-select {
+  display: block;
+  width: 100% !important;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
 .sources-filters__reset {
   align-self: end;
   flex-shrink: 0;
@@ -70,20 +116,20 @@
 }
 
 .source-create-accordion {
-  background: var(--select-color-light);
+  background: var(--background-color-light);
 }
 
 /* Тема PrimeNG задаёт фон на вложенных обёртках контента — без этого внутри остаётся «белая подложка». */
 :host ::ng-deep .source-create-accordion .p-accordionpanel {
   border: none;
-  background: var(--select-color-light);
+  background: transparent;
 }
 
 :host ::ng-deep .source-create-accordion .p-accordioncontent,
 :host ::ng-deep .source-create-accordion .p-accordioncontent-wrapper,
 :host ::ng-deep .source-create-accordion .p-accordioncontent-content,
 :host ::ng-deep .source-create-accordion .p-accordioncontent .p-motion {
-  background: var(--select-color-light);
+  background: transparent;
 }
 
 :host ::ng-deep .source-create-accordion .p-accordionheader {
@@ -91,14 +137,14 @@
   border-radius: 8px;
   padding: 6px 4px;
   /* Тема PrimeNG перебивает transparent — иначе заголовок остаётся белым на фоне панели */
-  background: var(--select-color-light) !important;
-  background-color: var(--select-color-light) !important;
+  background: transparent !important;
+  background-color: transparent !important;
 }
 
 :host ::ng-deep .source-create-accordion .p-accordionheader:not(.p-disabled):hover,
 :host ::ng-deep .source-create-accordion .p-accordionheader.p-focus {
-  background: var(--select-color-light) !important;
-  background-color: var(--select-color-light) !important;
+  background: transparent !important;
+  background-color: transparent !important;
 }
 
 .source-create__heading {
@@ -149,6 +195,17 @@
   flex-wrap: wrap;
   gap: 12px;
   align-items: end;
+}
+
+/* Разрыв строки во flex-форме: всё после — со следующей строки (тип документа + URL RSS). */
+.source-create__form > .source-create__form-break {
+  flex-basis: 100%;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  padding: 0;
+  margin: 0;
+  border: 0;
 }
 
 /* Не задавать display: block — у Prime .p-inputgroup это flex-row; block ломает строку. */

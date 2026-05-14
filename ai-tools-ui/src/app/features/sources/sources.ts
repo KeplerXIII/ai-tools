@@ -2,12 +2,14 @@ import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { PrimeTemplate } from 'primeng/api';
 import { SelectModule } from 'primeng/select';
 import { AccordionModule } from 'primeng/accordion';
 import { InputGroupModule } from 'primeng/inputgroup';
 import { InputGroupAddonModule } from 'primeng/inputgroupaddon';
 import { InputTextModule } from 'primeng/inputtext';
-import { OutlineButtonComponent } from '../../shared/ui/outline-button/outline-button.component';
+import { OutlineButtonComponent, ButtonVariant } from '../../shared/ui/outline-button/outline-button.component';
+import { PrimaryButtonComponent } from '../../shared/ui/primary-button/primary-button.component';
 import { finalize, switchMap, tap } from 'rxjs/operators';
 import { Subscription } from 'rxjs';
 import { DocumentTypeCatalogItem, DocumentsApi } from '../documents/documents-api';
@@ -32,15 +34,19 @@ type SortMode = 'created_desc' | 'created_asc' | 'user_asc';
     FormsModule,
     SelectModule,
     OutlineButtonComponent,
+    PrimaryButtonComponent,
     AccordionModule,
     InputGroupModule,
     InputGroupAddonModule,
     InputTextModule,
+    PrimeTemplate,
   ],
   templateUrl: './sources.html',
   styleUrl: './sources.scss',
 })
 export class Sources implements OnInit, OnDestroy {
+  readonly ButtonVariant = ButtonVariant;
+
   items: SourceListItem[] = [];
   canFilterByAllUsers = false;
   listLoading = false;
@@ -172,10 +178,12 @@ export class Sources implements OnInit, OnDestroy {
   }
 
   private ensureCountrySelection(): void {
-    if (!this.formCountryCode.trim()) {
+    const raw = this.formCountryCode == null ? '' : String(this.formCountryCode);
+    if (!raw.trim()) {
+      this.formCountryCode = '';
       return;
     }
-    const upper = this.formCountryCode.trim().toUpperCase();
+    const upper = raw.trim().toUpperCase();
     const match = this.countriesCatalog.find((c) => c.code.toUpperCase() === upper);
     if (match) {
       this.formCountryCode = match.code;
@@ -631,6 +639,43 @@ export class Sources implements OnInit, OnDestroy {
       { label: 'Все', value: '' },
       ...this.contributorOptions.map((o) => ({ label: o.label, value: o.userId })),
     ];
+  }
+
+  /** Опции p-select «Язык» в форме создания: подпись как у нативного select — «Название (код)». */
+  get createLanguageSelectOptions(): { label: string; value: string }[] {
+    return this.languagesCatalog.map((l) => ({
+      value: l.code,
+      label: `${l.name} (${l.code})`,
+    }));
+  }
+
+  /** Опции p-select «Страна» в форме создания. */
+  get createCountrySelectOptions(): { label: string; value: string }[] {
+    return this.countriesCatalog.map((c) => ({
+      value: c.code,
+      label: `${c.name} (${c.code})`,
+    }));
+  }
+
+  /** Опции p-select «Тип документа при разборе» в форме создания. */
+  get createDocumentTypeSelectOptions(): { label: string; value: string }[] {
+    return this.documentTypesCatalog.map((dt) => ({
+      value: dt.code,
+      label: `${dt.name} (${dt.code})`,
+    }));
+  }
+
+  onFormCountryCodeChange(value: string | null | undefined): void {
+    this.formCountryCode = value == null ? '' : value;
+  }
+
+  /** PNG флага по ISO 3166-1 alpha-2 из каталога (внешний CDN; в API только code/name). */
+  countryFlagUrl(code: string | null | undefined): string {
+    const c = (code ?? '').trim().toLowerCase();
+    if (!c) {
+      return '';
+    }
+    return `https://flagcdn.com/w20/${c}.png`;
   }
 
   get contributorOptions(): { userId: string; label: string }[] {
