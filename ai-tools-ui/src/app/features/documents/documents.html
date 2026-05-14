@@ -87,9 +87,13 @@
             <div class="document-row-head__title-block">
               <span class="document-row__meta document-row__meta_type">{{ doc.document_type_name }}</span>
               <h3
-                class="document-row__title"
-                [class.document-row__title_link]="!!doc.source_url"
-                (click)="openInArticleParser(doc)"
+                class="document-row__title document-row__title_link"
+                role="link"
+                tabindex="0"
+                title="Открыть в разделе «Документ»"
+                (click)="openDocumentInEditor(doc)"
+                (keydown.enter)="openDocumentInEditor(doc)"
+                (keydown.space)="$event.preventDefault(); openDocumentInEditor(doc)"
               >
                 {{ documentListTitle(doc) }}
               </h3>

@@ -1,15 +1,19 @@
-<div class="tool-card">
-  <div class="parser_header">
-    <h1 class="parser_title">Парсер статьи</h1>
-    <p class="parser_subtitle">Извлечение текста статьи, сущностей, перевода, тегов и аннотации.</p>
-  </div>
+<div class="tool-card" [class.tool-card_embedded]="embedded">
+  @if (!embedded) {
+    <div class="parser_header">
+      <h1 class="parser_title">Парсер статьи</h1>
+      <p class="parser_subtitle">Извлечение текста статьи, сущностей, перевода, тегов и аннотации.</p>
+    </div>
+  }
 
-  <app-article-parser-url-form
-    [(url)]="state.url"
-    [loading]="isDisabled"
-    (submitUrl)="extractArticle()"
-    (clearClicked)="clear()"
-  />
+  @if (!hideUrlForm) {
+    <app-article-parser-url-form
+      [(url)]="state.url"
+      [loading]="isDisabled"
+      (submitUrl)="extractArticle()"
+      (clearClicked)="clear()"
+    />
+  }
 
   @if (articleError) {
     <div class="field-error">{{ articleError }}</div>

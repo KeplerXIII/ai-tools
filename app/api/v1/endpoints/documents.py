@@ -263,6 +263,7 @@ async def _get_document_categories(
 @router.get("", response_model=DocumentListResponse)
 async def list_documents(
     status_code: Annotated[list[str] | None, Query()] = None,
+    document_id: UUID | None = Query(default=None, description="Один документ по id (как в списке)"),
     document_type_code: str | None = Query(default=None, min_length=1, max_length=64),
     source_id: UUID | None = Query(default=None, description="Фильтр по источнику (RSS/URL); только свои источники"),
     date_from: datetime | None = Query(default=None),
@@ -317,6 +318,8 @@ async def list_documents(
         if not user.is_admin and src.user_id != user.id:
             raise HTTPException(status_code=403, detail="Нет доступа к источнику")
         filters.append(Document.source_id == source_id)
+    if document_id is not None:
+        filters.append(Document.id == document_id)
     if normalized_type:
         filters.append(DocumentType.code == normalized_type)
     if date_from:
@@ -538,6 +541,40 @@ async def delete_document(
             await db.execute(delete(Entity).where(Entity.id.in_(entity_ids), ~still_linked_ent))
 
     return {"ok": True, "document_id": str(document_id)}
+
+
+@router.get("/{document_id}/editor", response_model=DocumentExtractResponse)
+async def get_document_editor_snapshot(
+    document_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Снимок документа для экрана редактирования (как после extract-url)."""
+    user_id = user.id
+    user_is_admin = user.is_admin
+    doc = await db.get(Document, document_id)
+    if doc is None:
+        raise HTTPException(status_code=404, detail="Документ не найден")
+    if not user_is_admin and doc.created_by_id != user_id:
+        raise HTTPException(status_code=403, detail="Нет доступа к документу")
+
+    statuses = await _get_document_status_items(db, document_id)
+    original_tags, translated_tags = await _get_document_tags(db, doc)
+    entities_military_equipment, entities_manufacturers, entities_contracts = await _get_document_entities(
+        db, document_id
+    )
+    categories = await _get_document_categories(db, document_id)
+    return document_to_extract_response(
+        doc,
+        from_cache=True,
+        statuses=statuses,
+        original_tags=original_tags,
+        translated_tags=translated_tags,
+        entities_military_equipment=entities_military_equipment,
+        entities_manufacturers=entities_manufacturers,
+        entities_contracts=entities_contracts,
+        categories=categories,
+    )
 
 
 @router.post("/extract-url", response_model=DocumentExtractResponse)

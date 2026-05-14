@@ -70,6 +70,10 @@
   font-family: var(--font-family-base);
 }
 
+.tool-card_embedded {
+  max-width: none;
+}
+
 .full-pipeline-bar {
   display: flex;
   flex-wrap: wrap;

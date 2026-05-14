@@ -179,6 +179,11 @@ export class ArticleParserApi {
     };
   }
 
+  /** Снимок сохранённого документа для экрана редактирования (как после extract-url). */
+  getEditorSnapshot(documentId: string) {
+    return this.http.get<ExtractResponse>(`/api/v1/documents/${documentId}/editor`);
+  }
+
   extractByUrl(url: string) {
     return this.http.post<ExtractResponse>('/api/v1/documents/extract-url', {
       url,

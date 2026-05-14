@@ -1,4 +1,4 @@
-import { ChangeDetectorRef, Component, DestroyRef, NgZone, OnInit, ViewChild } from '@angular/core';
+import { ChangeDetectorRef, Component, DestroyRef, Input, NgZone, OnInit, ViewChild, booleanAttribute } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -18,6 +18,7 @@ import { ArticleParserArticleLoadingComponent } from './ui/article-parser-articl
 import {
   ArticleParserApi,
   DocumentTagsResponse,
+  ExtractResponse,
 } from './api/article-parser-api';
 import { ArticleParserState } from './model/article-parser-state';
 import { scrollToElement } from './lib/scroll-to-element';
@@ -50,6 +51,11 @@ import { OutlineButtonComponent } from '../../shared/ui/outline-button/outline-b
   styleUrl: './article-parser.scss',
 })
 export class ArticleParser implements OnInit {
+  /** Скрыть заголовок и подзаголовок страницы (вложенный режим в «Документ»). */
+  @Input({ transform: booleanAttribute }) embedded = false;
+  /** Скрыть блок ввода URL (режим «Материал» на странице «Документ»). */
+  @Input({ transform: booleanAttribute }) hideUrlForm = false;
+
   @ViewChild(ArticleParserOriginalTextComponent)
   originalTextComponent?: ArticleParserOriginalTextComponent;
   @ViewChild(ArticleParserTranslationComponent)
@@ -76,6 +82,10 @@ export class ArticleParser implements OnInit {
 
   private buffer = '';
   private lastAutoloadKey = '';
+  /** Последний успешно подгруженный `id` из query — чтобы не дёргать API повторно при том же параметре. */
+  private lastLoadedDocId = '';
+  /** Инкремент при новой загрузке (по ссылке или по id), чтобы отбросить устаревший ответ. */
+  private loadOpGeneration = 0;
 
   constructor(
     private api: ArticleParserApi,
@@ -93,6 +103,23 @@ export class ArticleParser implements OnInit {
 
   ngOnInit(): void {
     this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
+      const id = params.get('id')?.trim() ?? '';
+      const mode = params.get('mode')?.trim().toLowerCase() ?? '';
+
+      if (id && mode !== 'url' && mode !== 'template') {
+        if (id === this.lastLoadedDocId) {
+          return;
+        }
+        this.loadDocumentById(id);
+        return;
+      }
+
+      this.lastLoadedDocId = '';
+
+      if (mode === 'template' || mode === 'material') {
+        return;
+      }
+
       const url = params.get('url')?.trim() || '';
       const autoload = params.get('autoload') === '1';
 
@@ -115,6 +142,34 @@ export class ArticleParser implements OnInit {
     const value = this.state.url.trim();
     if (!value) return;
 
+    const gen = ++this.loadOpGeneration;
+
+    this.prepareForNewArticle();
+
+    this.loadingArticle = true;
+
+    this.api.extractByUrl(value).subscribe({
+      next: (response) => {
+        if (gen !== this.loadOpGeneration) {
+          return;
+        }
+        this.applyExtractResponse(response);
+        this.loadingArticle = false;
+        this.lastLoadedDocId = '';
+        this.cdr.markForCheck();
+      },
+      error: () => {
+        if (gen !== this.loadOpGeneration) {
+          return;
+        }
+        this.articleError = 'Ошибка при извлечении статьи';
+        this.loadingArticle = false;
+        this.cdr.markForCheck();
+      },
+    });
+  }
+
+  private prepareForNewArticle(): void {
     this.articleError = '';
     this.state.error = '';
     this.originalTagsError = '';
@@ -140,31 +195,52 @@ export class ArticleParser implements OnInit {
     this.state.originalTags = [];
     this.state.translatedTags = [];
     this.resetBlockEditors();
+  }
 
+  private applyExtractResponse(response: ExtractResponse): void {
+    this.state.article = response;
+    this.state.url = (response.url ?? '').trim();
+    this.state.translatedText = response.translated_content?.trim() || '';
+    this.state.annotation = (
+      response.translated_summary ||
+      response.original_summary ||
+      ''
+    ).trim();
+    this.state.originalTags = response.original_tags || [];
+    this.state.translatedTags = response.translated_tags || [];
+    this.state.entities = {
+      military_equipment: response.entities_military_equipment || [],
+      manufacturers: response.entities_manufacturers || [],
+      contracts: response.entities_contracts || [],
+    };
+    this.state.categories = response.categories ?? [];
+  }
+
+  private loadDocumentById(id: string): void {
+    const gen = ++this.loadOpGeneration;
+    this.prepareForNewArticle();
     this.loadingArticle = true;
 
-    this.api.extractByUrl(value).subscribe({
+    this.api.getEditorSnapshot(id).subscribe({
       next: (response) => {
-        this.state.article = response;
-        this.state.translatedText = response.translated_content?.trim() || '';
-        this.state.annotation = (
-          response.translated_summary ||
-          response.original_summary ||
-          ''
-        ).trim();
-        this.state.originalTags = response.original_tags || [];
-        this.state.translatedTags = response.translated_tags || [];
-        this.state.entities = {
-          military_equipment: response.entities_military_equipment || [],
-          manufacturers: response.entities_manufacturers || [],
-          contracts: response.entities_contracts || [],
-        };
-        this.state.categories = response.categories ?? [];
+        if (gen !== this.loadOpGeneration) {
+          return;
+        }
+        this.applyExtractResponse(response);
         this.loadingArticle = false;
+        this.lastLoadedDocId = id;
+        this.cdr.markForCheck();
       },
-      error: () => {
-        this.articleError = 'Ошибка при извлечении статьи';
+      error: (err: HttpErrorResponse) => {
+        if (gen !== this.loadOpGeneration) {
+          return;
+        }
+        const detail = err.error?.detail;
+        this.articleError =
+          typeof detail === 'string' ? detail : 'Не удалось загрузить материал';
         this.loadingArticle = false;
+        this.lastLoadedDocId = '';
+        this.cdr.markForCheck();
       },
     });
   }
@@ -260,6 +336,9 @@ export class ArticleParser implements OnInit {
     });
   }
   clear(): void {
+    this.loadOpGeneration += 1;
+    this.lastAutoloadKey = '';
+    this.lastLoadedDocId = '';
     this.resetBlockEditors();
     this.loadingEntitiesSection = false;
     this.loadingCategories = false;

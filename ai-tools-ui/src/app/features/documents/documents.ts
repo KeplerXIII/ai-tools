@@ -150,16 +150,10 @@ export class Documents implements OnInit {
     return this.expandedDocumentId === documentId;
   }
 
-  openInArticleParser(doc: DocumentListItem): void {
-    if (!doc.source_url?.trim()) {
-      return;
-    }
-
-    void this.router.navigate(['/article-parser'], {
-      queryParams: {
-        url: doc.source_url,
-        autoload: '1',
-      },
+  /** Открыть материал в экране «Документ» (редактор / разбор). */
+  openDocumentInEditor(doc: DocumentListItem): void {
+    void this.router.navigate(['/document'], {
+      queryParams: { id: doc.document_id, mode: 'material' },
     });
   }
 

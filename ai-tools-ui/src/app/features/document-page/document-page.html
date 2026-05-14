@@ -1,0 +1,54 @@
+<section class="document-page">
+  <header class="document-page__header">
+    <h1 class="document-page__title">Документ</h1>
+    <p class="document-page__subtitle">
+      Создание материала по ссылке (разбор страницы) или заполнение пустого шаблона вручную.
+    </p>
+  </header>
+
+  <div class="document-page__modes" role="tablist" aria-label="Способ создания">
+    <button
+      type="button"
+      class="document-page__mode-btn"
+      role="tab"
+      [attr.aria-selected]="creationMode === 'material'"
+      [class.document-page__mode-btn_active]="creationMode === 'material'"
+      (click)="setMode('material')"
+    >
+      Материал
+    </button>
+    <button
+      type="button"
+      class="document-page__mode-btn"
+      role="tab"
+      [attr.aria-selected]="creationMode === 'url'"
+      [class.document-page__mode-btn_active]="creationMode === 'url'"
+      (click)="setMode('url')"
+    >
+      По ссылке
+    </button>
+    <button
+      type="button"
+      class="document-page__mode-btn"
+      role="tab"
+      [attr.aria-selected]="creationMode === 'template'"
+      [class.document-page__mode-btn_active]="creationMode === 'template'"
+      (click)="setMode('template')"
+    >
+      Пустой шаблон
+    </button>
+  </div>
+
+  @if (creationMode === 'url' || creationMode === 'material') {
+    <div class="document-page__panel">
+      <app-article-parser [embedded]="true" [hideUrlForm]="creationMode === 'material'" />
+    </div>
+  } @else {
+    <div class="document-page__placeholder">
+      <p>
+        Режим «Пустой шаблон» — заготовка для ручного ввода. Здесь появится форма и сценарий заполнения материала
+        без разбора по URL.
+      </p>
+    </div>
+  }
+</section>

@@ -194,6 +194,8 @@ export interface EnqueueFullLlmPipelineResponse {
 export interface ListDocumentsFilters {
   /** Несколько кодов объединяются на сервере по ИЛИ (материал подходит, если есть любой из статусов). */
   statusCodes?: string[];
+  /** Один материал по id (ответ как у списка). */
+  documentId?: string;
   documentTypeCode?: string;
   sourceId?: string;
   dateFrom?: string;
@@ -216,6 +218,9 @@ export class DocumentsApi {
       if (c) {
         params = params.append('status_code', c);
       }
+    }
+    if (filters.documentId?.trim()) {
+      params = params.set('document_id', filters.documentId.trim());
     }
     if (filters.documentTypeCode) {
       params = params.set('document_type_code', filters.documentTypeCode);
