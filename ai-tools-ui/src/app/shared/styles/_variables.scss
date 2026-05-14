@@ -4,9 +4,11 @@
   --default-chips-color: #d6d6d6;
   --light-grey-text-color: #bebebe;
   --super-light-grey-text-color: #f1f1f1;
+  --select-focus-color: #e0e0e0;
   --table-row-color: #fcfcfc;
   --hover-select-color: #f3f3f3;
   --select-color-light: #f6f6f6;
+  --background-color-light: rgba(0, 0, 0, 0.02);
   --grey-text-color: #737373;
   --placeholder-dark-color: #252b42;
   --primary-text-color: #2d4051;
@@ -21,6 +23,7 @@
   --error-text-color: rgb(224 124 124);
   --danger-color: rgb(242, 5, 5);
   --accent-color-success: rgb(92 161 93);
+
   --shadow-color: rgb(0 0 0 / 15%);
   --light-shadow-color: rgb(0 0 0 / 5%);
   --font-family-base: 'Roboto', sans-serif;
@@ -41,6 +44,7 @@
   --font-size-xxl: 24px;
   --font-size-large-title: 40px;
   --bg-light-grey: #dae6f0;
+  --bg-super-light-grey: #fafffa;
   --bg-gradient-base: linear-gradient(to right, #1f2c38 0%, #1f2c38 30%, #5986a3 100%);
   --bg-gradient-base-light: linear-gradient(to right, #2a3a47 0%, #2a3a47 30%, #6fa1c3 70%);
   --bg-gradient-base-red: linear-gradient(to right, #000 0%, #000 30%, #ff1a1a 100%);

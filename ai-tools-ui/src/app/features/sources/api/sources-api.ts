@@ -2,7 +2,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 
-import { AuthService } from '../../core/auth/auth.service';
+import { AuthService } from '../../../core/auth/auth.service';
 
 export interface SourceListItem {
   source_id: string;
@@ -152,7 +152,9 @@ export class SourcesApi {
   }
 
   getParseRun(parseRunId: string): Observable<ParseSourceRunResponse> {
-    return this.http.get<ParseSourceRunResponse>(`/api/v1/parsing/sources/parse-runs/${parseRunId}`);
+    return this.http.get<ParseSourceRunResponse>(
+      `/api/v1/parsing/sources/parse-runs/${parseRunId}`,
+    );
   }
 
   /** Незавершённые разборы по БД (pending/running), чтобы восстановить SSE после навигации. */
@@ -203,7 +205,8 @@ export class SourcesApi {
             }
             const looksLikeSnapshot =
               payloadText.includes('"snapshot_at"') && payloadText.includes('"parse_run_id"');
-            const isSnapshot = eventName === 'snapshot' || (eventName === 'message' && looksLikeSnapshot);
+            const isSnapshot =
+              eventName === 'snapshot' || (eventName === 'message' && looksLikeSnapshot);
             if (!isSnapshot) {
               eventName = 'message';
               dataLines = [];

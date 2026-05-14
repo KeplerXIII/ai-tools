@@ -1,3 +1,42 @@
+<ng-template #metaGalleriaItemBody>
+  @if (activeSlide; as slide) {
+    <div
+      class="meta-galleria-item-viewport meta-galleria-item-viewport--open-fs"
+      role="button"
+      tabindex="0"
+      [attr.aria-label]="'Открыть изображение на весь экран'"
+      (click)="openLightbox($event)"
+      (keydown.enter)="openLightbox($event)"
+      (keydown.space)="$event.preventDefault(); openLightbox($event)"
+    >
+      <img
+        [src]="slide.itemImageSrc"
+        [attr.alt]="slide.alt || 'Изображение статьи'"
+        class="meta-galleria-item-img"
+        (error)="onItemImageError($event)"
+      />
+    </div>
+  }
+</ng-template>
+
+<ng-template #metaGalleriaThumbnailBody let-item>
+  <div
+    class="meta-galleria-thumb-wrap meta-galleria-thumb-wrap--open-fs"
+    role="button"
+    tabindex="0"
+    [attr.aria-label]="'Открыть изображение на весь экран'"
+    (click)="openLightboxFromThumbnail(item, $event)"
+    (keydown.enter)="openLightboxFromThumbnail(item, $event)"
+    (keydown.space)="$event.preventDefault(); openLightboxFromThumbnail(item, $event)"
+  >
+    <img
+      [src]="item.thumbnailImageSrc"
+      [attr.alt]="item.alt || ''"
+      class="meta-galleria-thumb-img"
+    />
+  </div>
+</ng-template>
+
 <div class="meta-galleria-card">
   <p-galleria
     [value]="items"
@@ -10,44 +49,35 @@
     [showItemNavigatorsOnHover]="true"
     [circular]="true"
     class="meta-article-galleria"
-    [class.meta-galleria--caption-visible]="showCaptionForActiveSlide"
   >
     <ng-template pTemplate="item">
-      @if (activeSlide; as slide) {
-        <div class="meta-galleria-item-viewport">
-          <img
-            [src]="slide.itemImageSrc"
-            [attr.alt]="slide.alt || 'Изображение статьи'"
-            class="meta-galleria-item-img"
-            (error)="onItemImageError($event)"
-          />
-        </div>
-      }
+      <ng-container *ngTemplateOutlet="metaGalleriaItemBody" />
     </ng-template>
     <ng-template pTemplate="thumbnail" let-item>
-      <div class="meta-galleria-thumb-wrap">
-        <img
-          [src]="item.thumbnailImageSrc"
-          [attr.alt]="item.alt || ''"
-          class="meta-galleria-thumb-img"
-        />
-      </div>
+      <ng-container *ngTemplateOutlet="metaGalleriaThumbnailBody; context: { $implicit: item }" />
     </ng-template>
-    @if (hasAnyCaptionContent) {
-      <ng-template pTemplate="caption">
-        @if (activeSlide; as cap) {
-          @if (slideHasCaption(cap)) {
-            <div class="meta-galleria-caption">
-              @if ((cap.title || '').trim()) {
-                <div class="meta-galleria-caption-title">{{ cap.title }}</div>
-              }
-              @if ((cap.alt || '').trim()) {
-                <p class="meta-galleria-caption-alt">{{ cap.alt }}</p>
-              }
-            </div>
-          }
-        }
-      </ng-template>
-    }
   </p-galleria>
 </div>
+
+<p-galleria
+  [value]="items"
+  [(activeIndex)]="galleriaActiveIndex"
+  [fullScreen]="true"
+  [(visible)]="lightboxVisible"
+  [responsiveOptions]="responsiveLightboxOptions"
+  [containerStyle]="lightboxContainerStyle"
+  [numVisible]="8"
+  [showThumbnails]="true"
+  [showItemNavigators]="true"
+  [showItemNavigatorsOnHover]="false"
+  [circular]="true"
+  [baseZIndex]="1200"
+  class="meta-article-galleria meta-galleria-fullscreen"
+>
+  <ng-template pTemplate="item">
+    <ng-container *ngTemplateOutlet="metaGalleriaItemBody" />
+  </ng-template>
+  <ng-template pTemplate="thumbnail" let-item>
+    <ng-container *ngTemplateOutlet="metaGalleriaThumbnailBody; context: { $implicit: item }" />
+  </ng-template>
+</p-galleria>

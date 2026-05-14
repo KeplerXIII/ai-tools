@@ -1,0 +1,174 @@
+<div class="source-create__panel">
+  <p class="source-create__hint">
+    Обязателен только <b>URL сайта</b>. Язык, тип документа (для материалов при разборе) и страна — из справочников;
+    страна необязательна.
+  </p>
+  <form class="source-create__form" (ngSubmit)="submitCreate()">
+    <div class="filter-item source-create__field source-create__field_wide">
+      <label class="filter-item source-create__field">
+        <span class="new-source-form-label">URL сайта <span class="req">*</span></span>
+        <p-inputgroup>
+          <p-inputgroup-addon>www</p-inputgroup-addon>
+          <input
+            pInputText
+            class="source-create__placeholder-hint"
+            type="url"
+            name="url"
+            [(ngModel)]="formUrl"
+            placeholder="https://example.com/news"
+            required
+            aria-label="URL сайта, обязательное поле"
+          />
+        </p-inputgroup>
+      </label>
+    </div>
+
+    <label class="filter-item source-create__field">
+      <span class="new-source-form-label">Название</span>
+      <input
+        type="text"
+        name="name"
+        pInputText
+        class="source-create__placeholder-hint"
+        [(ngModel)]="formName"
+        maxlength="255"
+        placeholder="Краткое имя (необязательно)"
+      />
+    </label>
+
+    <label class="filter-item source-create__field">
+      <span class="new-source-form-label">Язык</span>
+      <p-select
+        name="language_code"
+        class="sources-filter-select source-create__language-select"
+        [options]="createLanguageSelectOptions"
+        [(ngModel)]="formLanguageCode"
+        optionLabel="label"
+        optionValue="value"
+        placeholder="Выберите язык"
+        [disabled]="!languagesCatalog.length || createSubmitting"
+      />
+    </label>
+
+    <label class="filter-item source-create__field">
+      <span class="new-source-form-label">Страна</span>
+      <p-select
+        name="country_code"
+        class="sources-filter-select source-create__country-select"
+        [options]="createCountrySelectOptions"
+        [(ngModel)]="formCountryCode"
+        (ngModelChange)="onFormCountryCodeChange($event)"
+        optionLabel="label"
+        optionValue="value"
+        [filter]="true"
+        filterBy="label"
+        [showClear]="true"
+        placeholder="Не указано"
+        filterPlaceholder="Поиск по названию или коду"
+        [disabled]="!countriesCatalog.length || createSubmitting"
+      >
+        <ng-template pTemplate="item" let-item>
+          <span class="source-create__country-option">
+            <img
+              class="source-create__country-flag"
+              [src]="countryFlagUrl(item.value)"
+              width="20"
+              height="15"
+              alt=""
+              loading="lazy"
+              decoding="async"
+            />
+            <span class="source-create__country-option-label">{{ item.label }}</span>
+          </span>
+        </ng-template>
+        <ng-template pTemplate="selectedItem" let-selected>
+          @if (selected) {
+            <span class="source-create__country-option">
+              <img
+                class="source-create__country-flag"
+                [src]="countryFlagUrl(selected.value)"
+                width="20"
+                height="15"
+                alt=""
+                loading="lazy"
+                decoding="async"
+              />
+              <span class="source-create__country-option-label">{{ selected.label }}</span>
+            </span>
+          }
+        </ng-template>
+      </p-select>
+    </label>
+
+    <div class="source-create__form-break" aria-hidden="true"></div>
+
+    <label class="filter-item source-create__field source-create__field_wide">
+      <span class="new-source-form-label">Тип документа при разборе <span class="req">*</span></span>
+      <p-select
+        name="document_type_code"
+        class="sources-filter-select source-create__document-type-select"
+        [options]="createDocumentTypeSelectOptions"
+        [(ngModel)]="formDocumentTypeCode"
+        optionLabel="label"
+        optionValue="value"
+        placeholder="Выберите тип документа"
+        [disabled]="!documentTypesCatalog.length || createSubmitting"
+      />
+    </label>
+
+    <label class="filter-item source-create__field source-create__field_wide">
+      <span class="new-source-form-label">URL RSS</span>
+      <p-inputgroup>
+        <p-inputgroup-addon>www</p-inputgroup-addon>
+        <input
+          pInputText
+          class="source-create__placeholder-hint"
+          type="url"
+          name="rss_url"
+          [(ngModel)]="formRssUrl"
+          placeholder="https://example.com/feed.xml"
+          aria-label="URL RSS"
+        />
+      </p-inputgroup>
+    </label>
+
+    <div class="source-create__actions">
+      <app-primary-button
+        type="submit"
+        [text]="createSubmitting ? 'Сохранение…' : 'Добавить источник'"
+        [disabled]="createSubmitting"
+        size="super-large"
+        variant="rounded"
+      />
+      <app-outline-button
+        text="Очистить форму"
+        size="large"
+        [variant]="ButtonVariant.Rounded"
+        [disabled]="createSubmitting"
+        (clicked)="resetCreateForm()"
+      />
+    </div>
+  </form>
+</div>
+
+@if (languagesLoadError) {
+  <div class="state-message state-message_error source-create__message">
+    {{ languagesLoadError }}
+  </div>
+}
+@if (countriesLoadError) {
+  <div class="state-message state-message_error source-create__message">
+    {{ countriesLoadError }}
+  </div>
+}
+@if (documentTypesLoadError) {
+  <div class="state-message state-message_error source-create__message">
+    {{ documentTypesLoadError }}
+  </div>
+}
+@if (createError) {
+  <div class="state-message state-message_error source-create__message">{{ createError }}</div>
+}
+@if (createSuccess) {
+  <div class="state-message state-message_ok source-create__message">{{ createSuccess }}</div>
+}

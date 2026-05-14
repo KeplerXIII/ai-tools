@@ -1,0 +1,77 @@
+:host {
+  display: block;
+}
+
+.source-create {
+  margin-bottom: 24px;
+  background: #f8fafc;
+  padding: 12px 16px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--primary-text-color);
+}
+
+.source-create_collapsed {
+  padding-bottom: 12px;
+}
+
+.source-create-accordion {
+  background: var(--background-color-light);
+}
+
+:host ::ng-deep .source-create-accordion .p-accordionpanel {
+  border: none;
+  background: transparent;
+}
+
+:host ::ng-deep .source-create-accordion .p-accordioncontent,
+:host ::ng-deep .source-create-accordion .p-accordioncontent-wrapper,
+:host ::ng-deep .source-create-accordion .p-accordioncontent-content,
+:host ::ng-deep .source-create-accordion .p-accordioncontent .p-motion {
+  background: transparent;
+}
+
+:host ::ng-deep .source-create-accordion .p-accordionheader {
+  border: none;
+  border-radius: 8px;
+  padding: 6px 4px;
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+:host ::ng-deep .source-create-accordion .p-accordionheader:not(.p-disabled):hover,
+:host ::ng-deep .source-create-accordion .p-accordionheader.p-focus {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+.source-create__heading {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.source-create__toggle-hint {
+  font-size: 13px;
+  color: #64748b;
+}
+
+.source-create__accordion-header-inner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+}
+
+.source-create__accordion-header-inner .source-create__heading {
+  flex: 1 1 auto;
+}
+
+.source-create__accordion-header-inner .source-create__toggle-hint {
+  flex-shrink: 0;
+}
+
+.source-create__accordion-toggle-icon {
+  font-size: 14px;
+  color: #475569;
+}

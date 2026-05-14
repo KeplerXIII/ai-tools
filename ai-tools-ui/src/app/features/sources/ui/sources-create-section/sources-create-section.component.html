@@ -1,0 +1,29 @@
+<section
+  class="source-create"
+  [class.source-create_collapsed]="sourceCreateAccordionValue !== 'create'"
+  aria-label="Новый источник"
+>
+  <p-accordion
+    class="source-create-accordion"
+    [(value)]="sourceCreateAccordionValue"
+    [multiple]="false"
+  >
+    <p-accordion-panel value="create">
+      <p-accordion-header>
+        <ng-template #toggleicon let-active="active">
+          <i
+            class="p-accordionheader-toggle-icon pi source-create__accordion-toggle-icon"
+            [ngClass]="active ? 'pi-minus' : 'pi-plus'"
+            aria-hidden="true"
+          ></i>
+        </ng-template>
+        <span class="source-create__accordion-header-inner">
+          <span class="source-create__heading" id="source-create-title">Новый источник</span>
+        </span>
+      </p-accordion-header>
+      <p-accordion-content>
+        <app-sources-create-form (sourceCreated)="sourceCreated.emit()" />
+      </p-accordion-content>
+    </p-accordion-panel>
+  </p-accordion>
+</section>

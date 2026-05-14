@@ -414,7 +414,7 @@ export class ArticleParserCategoriesComponent implements OnChanges, OnDestroy {
     if (value <= 60) {
       return '#f97316';
     }
-    if (value <= 90) {
+    if (value <= 89) {
       return '#eab308';
     }
     return '#22c55e';

@@ -112,8 +112,13 @@
 
   @if (showImagePreview()) {
     <div class="prew-image-block">
+      @if (printPrimaryImageUrl) {
+        <div class="meta-print-main-image" aria-hidden="true">
+          <img [src]="printPrimaryImageUrl" alt="Главное изображение статьи" />
+        </div>
+      }
       @if (hasGalleryImages()) {
-        <div class="image-prew-title-wrapper">
+        <div class="image-prew-title-wrapper no-print-field">
           <p class="image-prew-title">Предпросмотр изображений:</p>
           <div class="image-prew-title-actions">
             <button
@@ -149,7 +154,7 @@
           [galleriaItems]="galleriaItems"
         />
       } @else {
-        <p class="image-prew-title">Предпросмотр изображения:</p>
+        <p class="image-prew-title no-print-field">Предпросмотр изображения:</p>
         <p-image
           [src]="mainImageUrl"
           alt="Главное изображение статьи"

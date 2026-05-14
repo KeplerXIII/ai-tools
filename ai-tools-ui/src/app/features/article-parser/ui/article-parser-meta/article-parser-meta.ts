@@ -91,11 +91,31 @@ export class ArticleParserMetaComponent implements OnChanges {
   }
 
   hasGalleryImages(): boolean {
-    return (this.article?.images?.length ?? 0) > 0;
+    const images = this.article?.images ?? [];
+    if (images.length === 0) {
+      return false;
+    }
+    if (images.length === 1) {
+      const url = images[0]?.url?.trim() ?? '';
+      const main = this.article?.main_image?.trim() ?? '';
+      if (url === main) {
+        return false;
+      }
+    }
+    return true;
   }
 
   get mainImageUrl(): string {
     return this.article?.main_image?.trim() || '';
+  }
+
+  /** Для печати: главное изображение; если в метаданных пусто — первое из галереи. */
+  get printPrimaryImageUrl(): string {
+    const main = this.mainImageUrl;
+    if (main) {
+      return main;
+    }
+    return this.galleriaItems[0]?.itemImageSrc?.trim() ?? '';
   }
 
   showImagePreview(): boolean {

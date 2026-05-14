@@ -183,6 +183,25 @@ body {
     display: none !important;
   }
 
+  /* Печать: только главное фото — интерактивная галерея и p-image скрыты, показывается .meta-print-main-image */
+  .prew-image-block app-article-parser-meta-galleria,
+  .prew-image-block app-article-parser-meta-images-delete-dialog,
+  .prew-image-block app-article-parser-meta-main-image-pick-dialog,
+  .prew-image-block p-image {
+    display: none !important;
+  }
+
+  .prew-image-block .meta-print-main-image {
+    display: block !important;
+  }
+
+  .prew-image-block .meta-print-main-image img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    page-break-inside: avoid;
+  }
+
   textarea,
   .p-inputtext,
   .p-inputtextarea,

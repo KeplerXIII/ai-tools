@@ -566,3 +566,24 @@
   .p-radiobutton-icon {
   background: var(--light-text-color) !important;
 }
+
+.sources-filter-select {
+  display: inline-flex !important;
+  height: 40px !important;
+}
+
+.p-select-option.p-select-option-selected {
+  background-color: var(--select-focus-color) !important;
+}
+
+.p-select-option:not(.p-select-option-selected):not(.p-disabled).p-focus {
+  background-color: var(--select-color-light) !important;
+}
+
+.p-inputgroupaddon {
+  background: transparent !important;
+}
+
+.p-select .p-select-label {
+  font-size: var(--font-size-table) !important;
+}
