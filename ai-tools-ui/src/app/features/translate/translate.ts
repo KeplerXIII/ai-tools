@@ -1,4 +1,4 @@
-import { ChangeDetectorRef, Component } from '@angular/core';
+import { ChangeDetectorRef, Component, Input, booleanAttribute } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { FloatLabelModule } from 'primeng/floatlabel';
 import { TextareaModule } from 'primeng/textarea';
@@ -18,6 +18,7 @@ import { UpperCasePipe } from '@angular/common';
 
 @Component({
   selector: 'app-translate',
+  standalone: true,
   imports: [
     FormsModule,
     MatButtonModule,
@@ -36,6 +37,9 @@ import { UpperCasePipe } from '@angular/common';
   styleUrl: './translate.scss',
 })
 export class Translate {
+  /** Вложенный режим (страница «Инструменты») — без дублирующего заголовка. */
+  @Input({ transform: booleanAttribute }) embedded = false;
+
   text = '';
   result = '';
   sourceLang = '';

@@ -1,0 +1,54 @@
+<section class="tools-page">
+  <div class="tools-page__modes" role="tablist" aria-label="Инструменты">
+    <button
+      type="button"
+      class="tools-page__mode-btn"
+      role="tab"
+      [attr.aria-selected]="activeTab === 'translate'"
+      [class.tools-page__mode-btn_active]="activeTab === 'translate'"
+      (click)="setTab('translate')"
+    >
+      Переводчик
+    </button>
+    <button
+      type="button"
+      class="tools-page__mode-btn"
+      role="tab"
+      [attr.aria-selected]="activeTab === 'translation_analysis'"
+      [class.tools-page__mode-btn_active]="activeTab === 'translation_analysis'"
+      (click)="setTab('translation_analysis')"
+    >
+      Анализ перевода
+    </button>
+    <button
+      type="button"
+      class="tools-page__mode-btn"
+      role="tab"
+      [attr.aria-selected]="activeTab === 'orthopunct'"
+      [class.tools-page__mode-btn_active]="activeTab === 'orthopunct'"
+      (click)="setTab('orthopunct')"
+    >
+      Орфопунктомантика
+    </button>
+  </div>
+
+  @if (activeTab === 'translate') {
+    <div class="tools-page__panel">
+      <app-translate [embedded]="true" />
+    </div>
+  } @else if (activeTab === 'translation_analysis') {
+    <div class="tools-page__placeholder">
+      <p>
+        Проверка перевода будет выполняться при передаче исходного текста (источника) и готового перевода —
+        сравнение, замечания по качеству и полноте. Инструмент в разработке.
+      </p>
+    </div>
+  } @else {
+    <div class="tools-page__placeholder">
+      <p>
+        Орфопунктомантика будет анализировать текст на предмет его улучшения, а также орфографии и пунктуации.
+        Инструмент в разработке.
+      </p>
+    </div>
+  }
+</section>

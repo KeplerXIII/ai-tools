@@ -30,4 +30,10 @@ export class SidebarComponent {
     const path = this.router.url.split('?')[0] ?? '';
     return path === '/document' || path === '/article-parser';
   }
+
+  /** Раздел «Инструменты» и закладка `/translate`. */
+  toolsSectionActive(): boolean {
+    const path = this.router.url.split('?')[0] ?? '';
+    return path === '/tools' || path === '/translate';
+  }
 }

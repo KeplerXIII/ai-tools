@@ -1,8 +1,10 @@
-<div class="tool-card">
-  <div class="translater_header">
-    <h1 class="translater_title">Переводчик</h1>
-    <p class="translater_subtitle">Автоопределение входного языка, перевод на русский язык</p>
-  </div>
+<div class="tool-card" [class.tool-card_embedded]="embedded">
+  @if (!embedded) {
+    <div class="translater_header">
+      <h1 class="translater_title">Переводчик</h1>
+      <p class="translater_subtitle">Автоопределение входного языка, перевод на русский язык</p>
+    </div>
+  }
 
   <div class="translate-grid">
     <section class="panel">

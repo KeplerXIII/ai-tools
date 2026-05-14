@@ -72,6 +72,10 @@
   font-family: var(--font-family-base);
 }
 
+.tool-card_embedded {
+  max-width: none;
+}
+
 .translate-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

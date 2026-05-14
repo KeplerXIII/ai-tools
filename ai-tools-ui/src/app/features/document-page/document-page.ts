@@ -14,7 +14,7 @@ export type DocumentCreationMode = 'material' | 'url' | 'template';
   styleUrl: './document-page.scss',
 })
 export class DocumentPage implements OnInit {
-  creationMode: DocumentCreationMode = 'url';
+  creationMode: DocumentCreationMode = 'material';
 
   constructor(
     private readonly route: ActivatedRoute,
@@ -26,12 +26,13 @@ export class DocumentPage implements OnInit {
     this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((q) => {
       const id = q.get('id')?.trim() ?? '';
       const mode = q.get('mode')?.trim().toLowerCase() ?? '';
+      const urlParam = q.get('url')?.trim() ?? '';
 
       if (mode === 'template') {
         this.creationMode = 'template';
         return;
       }
-      if (mode === 'url') {
+      if (mode === 'url' || urlParam) {
         this.creationMode = 'url';
         return;
       }
@@ -39,7 +40,7 @@ export class DocumentPage implements OnInit {
         this.creationMode = 'material';
         return;
       }
-      this.creationMode = 'url';
+      this.creationMode = 'material';
     });
   }
 

@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { Translate } from './features/translate/translate';
+import { Tools } from './features/tools/tools';
 import { DocumentPage } from './features/document-page/document-page';
 import { Documents } from './features/documents/documents';
 import { Sources } from './features/sources/sources';
@@ -18,8 +18,13 @@ export const routes: Routes = [
     component: Login,
   },
   {
+    path: 'tools',
+    component: Tools,
+    canActivate: [authGuard],
+  },
+  {
     path: 'translate',
-    component: Translate,
+    component: Tools,
     canActivate: [authGuard],
   },
   {
