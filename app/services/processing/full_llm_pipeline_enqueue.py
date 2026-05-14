@@ -67,13 +67,13 @@ async def enqueue_full_llm_pipeline_core(
         ):
             skipped_blocked += 1
             continue
-        phase_a = p.need_translate or p.need_tag_original or p.need_extractor
+        phase_a = p.need_translate or p.need_translate_title or p.need_tag_original or p.need_extractor
         if not phase_a and not p.need_phase_b:
             skipped_already_complete += 1
             continue
         work_documents.append((document_id, p))
 
-    n_tr = sum(1 for _, p in work_documents if p.need_translate)
+    n_tr = sum(1 for _, p in work_documents if p.need_translate or p.need_translate_title)
     n_tag = sum(1 for _, p in work_documents if p.need_tag_original)
     n_ext = sum(1 for _, p in work_documents if p.need_extractor)
 
@@ -97,7 +97,7 @@ async def enqueue_full_llm_pipeline_core(
     started_by = str(started_by_id) if started_by_id else None
     try:
         for document_id, p in work_documents:
-            phase_a = p.need_translate or p.need_tag_original or p.need_extractor
+            phase_a = p.need_translate or p.need_translate_title or p.need_tag_original or p.need_extractor
             if not phase_a and p.need_phase_b:
                 if await schedule_post_translate_pipeline_jobs(
                     document_id=document_id,
@@ -109,7 +109,7 @@ async def enqueue_full_llm_pipeline_core(
                 continue
 
             acquired_locks: list[str] = []
-            if p.need_translate:
+            if p.need_translate or p.need_translate_title:
                 if not await try_acquire_enqueue_lock(
                     "translate",
                     document_id,
@@ -160,7 +160,7 @@ async def enqueue_full_llm_pipeline_core(
                     started_by_id=started_by_id,
                 )
                 db.add(tag_pj)
-            if p.need_translate:
+            if p.need_translate or p.need_translate_title:
                 tr_key = f"translate:{translate_batch_id}:{document_id}"
                 tr_pj = ProcessingJob(
                     document_id=UUID(document_id),
@@ -206,7 +206,7 @@ async def enqueue_full_llm_pipeline_core(
                     processing_job_id=str(tag_pj.id),
                     timeout=settings.saq_tagger_job_timeout_sec,
                 )
-            if p.need_translate and tr_pj is not None:
+            if (p.need_translate or p.need_translate_title) and tr_pj is not None:
                 tr_job = await translate_queue.enqueue(
                     "translate_document_job",
                     key=tr_key,
@@ -231,7 +231,7 @@ async def enqueue_full_llm_pipeline_core(
                 )
 
             want_tag = p.need_tag_original
-            want_tr = p.need_translate
+            want_tr = p.need_translate or p.need_translate_title
             want_ex = p.need_extractor
             saq_ok = True
             if want_tag:
@@ -273,7 +273,7 @@ async def enqueue_full_llm_pipeline_core(
                 await inc_processing_batch("extractor", extractor_batch_id, "enqueued")
             enqueued += 1
 
-            if p.need_phase_b and not p.need_translate:
+            if p.need_phase_b and not p.need_translate and not p.need_translate_title:
                 await schedule_post_translate_pipeline_jobs(
                     document_id=document_id,
                     correlation_id=correlation_id,

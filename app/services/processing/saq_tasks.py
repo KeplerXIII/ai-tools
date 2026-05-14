@@ -8,17 +8,19 @@ from time import perf_counter
 from collections.abc import Mapping
 
 from app.core.config import settings
-from app.domain.errors import ValidationError
-from app.infrastructure.db.models import ProcessingJob, SourceParseRun
+from app.domain.errors import NotFoundError, ValidationError
+from app.infrastructure.db.models import Document, ProcessingJob, SourceParseRun
 from app.infrastructure.db.session import AsyncSessionLocal
 from app.schemas.documents import SummarySource
 from app.services.processing.post_parse_llm_dispatch import dispatch_post_parse_llm_jobs
+from app.services.documents.db_refs import language_id_by_code
 from app.services.documents.document_pipeline import (
     run_categorize_document,
     run_entity_extract_document,
     run_summary_document,
     run_tag_document,
     run_translate_document,
+    run_translate_document_title,
 )
 from app.services.parsing.parse_source_runner import execute_parse_source
 from app.services.processing.jobs import JobStatus
@@ -52,13 +54,31 @@ async def translate_document_job(
     pipeline_followup_categorize: bool = True,
 ) -> dict[str, str]:
     async def work(session, doc_id, started_by, pj):
-        await run_translate_document(
-            session,
-            document_id=doc_id,
-            target_lang=target_lang,
-            started_by_id=started_by,
-            track_job=pj is None,
+        tl_id = await language_id_by_code(session, target_lang)
+        doc = await session.get(Document, doc_id)
+        if doc is None:
+            raise NotFoundError("Документ не найден")
+        has_body_for_target = (
+            bool((doc.translated_content or "").strip())
+            and doc.translated_language_id is not None
+            and doc.translated_language_id == tl_id
         )
+        if has_body_for_target:
+            await run_translate_document_title(
+                session,
+                document_id=doc_id,
+                target_lang=target_lang,
+                started_by_id=started_by,
+                track_job=pj is None,
+            )
+        else:
+            await run_translate_document(
+                session,
+                document_id=doc_id,
+                target_lang=target_lang,
+                started_by_id=started_by,
+                track_job=pj is None,
+            )
 
     result = await run_tracked_document_job(
         document_id=document_id,

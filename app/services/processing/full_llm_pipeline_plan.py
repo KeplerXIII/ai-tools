@@ -14,7 +14,10 @@ from app.services.documents.db_refs import language_id_by_code
 
 @dataclass(frozen=True, slots=True)
 class FullLlmPipelinePlanEntry:
+    # need_translate: тело ещё не на target_lang
     need_translate: bool
+    # need_translate_title: тело уже на target_lang, заголовок не переведён
+    need_translate_title: bool
     need_tag_original: bool
     need_extractor: bool
     need_phase_b: bool
@@ -29,7 +32,7 @@ def is_pipeline_document_blocked_for_phase_a(
     extractor_free: set[str],
 ) -> bool:
     """Если для нужного шага фазы A уже есть активный джоб — документ в этот проход не берём (целиком)."""
-    if plan.need_translate and document_id not in translate_free:
+    if (plan.need_translate or plan.need_translate_title) and document_id not in translate_free:
         return True
     if plan.need_tag_original and document_id not in tag_original_free:
         return True
@@ -96,6 +99,11 @@ async def map_document_pipeline_plans(
             and doc.translated_language_id == target_lang_id
         )
         need_translate = bool(orig_text) and not has_target_translation
+        need_translate_title = (
+            has_target_translation
+            and bool((doc.title or "").strip())
+            and not bool((doc.translated_title or "").strip())
+        )
         need_tag_original = bool(orig_text) and did not in with_orig_tags
         need_extractor = bool(orig_text) and did not in with_entities
 
@@ -107,6 +115,7 @@ async def map_document_pipeline_plans(
 
         out[did] = FullLlmPipelinePlanEntry(
             need_translate=need_translate,
+            need_translate_title=need_translate_title,
             need_tag_original=need_tag_original,
             need_extractor=need_extractor,
             need_phase_b=need_phase_b,

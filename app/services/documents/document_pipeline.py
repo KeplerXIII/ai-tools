@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import uuid
 from contextlib import nullcontext
 from datetime import UTC, datetime, timedelta
@@ -54,6 +55,8 @@ from app.services.llm.summarizer import refine_summary, summarize_text
 from app.services.llm.tagger import tag_text
 from app.services.llm.translator import detect_language, translate_text
 from app.services.processing.jobs import JobStatus, JobType, processing_job
+
+logger = logging.getLogger(__name__)
 
 NOT_FOUND_ENTITY_NAME = "не обнаружено"
 FALLBACK_CATEGORY_CODE = "other_domain"
@@ -666,6 +669,26 @@ async def _get_or_create_entity(
     return ent.id
 
 
+async def _fill_translated_title_after_body_translation(doc: Document, *, target_lang: str) -> None:
+    """После успешного перевода текста — перевод заголовка на тот же target_lang. Ошибки LLM не откатывают перевод тела."""
+    raw = (doc.title or "").strip()
+    if not raw:
+        return
+    try:
+        out = await translate_text(raw, target_lang=target_lang, stream=False)
+    except Exception:
+        logger.warning(
+            "translate_title_after_body_failed",
+            exc_info=True,
+            extra={"document_id": str(doc.id)},
+        )
+        return
+    if not isinstance(out, str):
+        return
+    st = out.strip()
+    doc.translated_title = st[:512] if st else None
+
+
 async def persist_document_translation(
     session: AsyncSession,
     *,
@@ -698,6 +721,7 @@ async def persist_document_translation(
         doc.translated_content = translated_text
         doc.translated_language_id = tl_id
         doc.translated_summary_stale = True
+    await _fill_translated_title_after_body_translation(doc, target_lang=target_lang)
     await sync_document_statuses(
         session,
         document_id=document_id,
