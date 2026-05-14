@@ -44,7 +44,13 @@
 
     <div class="article-grid">
       <app-article-parser-status [article]="state.article" />
-      <app-article-parser-meta [article]="state.article" />
+      <app-article-parser-meta
+        [article]="state.article"
+        [buttonsDisabled]="isDisabled"
+        [translatedTitleError]="translatedTitleError"
+        [loadingTranslatedTitle]="loadingTranslatedTitle"
+        (translateTitle)="translateDocumentTitle()"
+      />
       <app-article-parser-categories
         [article]="state.article"
         [buttonsDisabled]="isDisabled"

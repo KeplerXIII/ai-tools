@@ -72,6 +72,24 @@
           <label class="label-input" for="article_translated_title">Заголовок (перевод)</label>
         </p-floatlabel>
 
+        @if (article.document_id) {
+          <div class="meta-translate-title-bar no-print-field">
+            <div class="meta-translate-title-btn">
+              <app-outline-button
+                [text]="loadingTranslatedTitle ? 'Перевод заголовка…' : 'Перевести заголовок'"
+                size="large"
+                [variant]="ButtonVariant.Rounded"
+                [disabled]="buttonsDisabled || loadingTranslatedTitle"
+                (clicked)="translateTitle.emit()"
+              />
+
+              @if (translatedTitleError) {
+                <div class="field-error">{{ translatedTitleError }}</div>
+              }
+            </div>
+          </div>
+        }
+
         <p-floatlabel variant="on" class="prime-field full-width">
           <input
             pInputText

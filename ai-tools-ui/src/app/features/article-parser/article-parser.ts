@@ -71,6 +71,8 @@ export class ArticleParser implements OnInit {
   translationError = '';
   translatedTagsError = '';
   summaryError = '';
+  translatedTitleError = '';
+  loadingTranslatedTitle = false;
 
   private buffer = '';
   private lastAutoloadKey = '';
@@ -119,12 +121,14 @@ export class ArticleParser implements OnInit {
     this.translationError = '';
     this.translatedTagsError = '';
     this.summaryError = '';
+    this.translatedTitleError = '';
     this.fullPipelineMessage = '';
     this.fullPipelineError = '';
     this.loadingCategories = false;
     this.loadingEntitiesSection = false;
     this.loadingTranslation = false;
     this.loadingSummary = false;
+    this.loadingTranslatedTitle = false;
     this.loadingOriginalTags = false;
     this.loadingTranslatedTags = false;
     this.loadingFullPipeline = false;
@@ -170,6 +174,7 @@ export class ArticleParser implements OnInit {
 
     this.loadingTranslation = true;
     this.translationError = '';
+    this.translatedTitleError = '';
     this.state.error = '';
     this.state.translatedText = '';
     this.state.annotation = '';
@@ -193,6 +198,34 @@ export class ArticleParser implements OnInit {
         this.ngZone.run(() => {
           this.loadingTranslation = false;
         });
+      },
+    });
+  }
+
+  translateDocumentTitle(): void {
+    const art = this.state.article;
+    const documentId = art?.document_id;
+    if (!documentId || !art) {
+      return;
+    }
+
+    this.loadingTranslatedTitle = true;
+    this.translatedTitleError = '';
+    this.state.error = '';
+
+    this.api.translateDocumentTitle(documentId, 'ru').subscribe({
+      next: (res) => {
+        const t = res.translated_title?.trim();
+        art.translated_title = t ? t : null;
+        this.loadingTranslatedTitle = false;
+        this.cdr.markForCheck();
+      },
+      error: (err: HttpErrorResponse) => {
+        this.loadingTranslatedTitle = false;
+        const detail = err.error?.detail;
+        this.translatedTitleError =
+          typeof detail === 'string' ? detail : 'Ошибка при переводе заголовка';
+        this.cdr.markForCheck();
       },
     });
   }
@@ -232,6 +265,7 @@ export class ArticleParser implements OnInit {
     this.loadingCategories = false;
     this.loadingTranslation = false;
     this.loadingSummary = false;
+    this.loadingTranslatedTitle = false;
     this.loadingOriginalTags = false;
     this.loadingTranslatedTags = false;
     this.loadingFullPipeline = false;
@@ -241,6 +275,7 @@ export class ArticleParser implements OnInit {
     this.translationError = '';
     this.translatedTagsError = '';
     this.summaryError = '';
+    this.translatedTitleError = '';
     this.fullPipelineMessage = '';
     this.fullPipelineError = '';
   }
@@ -367,6 +402,7 @@ export class ArticleParser implements OnInit {
       this.loadingCategories ||
       this.loadingTranslation ||
       this.loadingSummary ||
+      this.loadingTranslatedTitle ||
       this.loadingOriginalTags ||
       this.loadingTranslatedTags ||
       this.loadingFullPipeline

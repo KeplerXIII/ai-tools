@@ -16,6 +16,7 @@ class JobType:
     PARSE_SOURCE = "parse_source"
     EXTRACT = "extract"
     TRANSLATE = "translate"
+    TRANSLATE_TITLE = "translate_title"
     SUMMARY = "summary"
     SUMMARY_REFINE = "summary_refine"
     TAG = "tag"

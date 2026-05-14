@@ -731,6 +731,49 @@ async def run_translate_document(
     )
 
 
+async def run_translate_document_title(
+    session: AsyncSession,
+    *,
+    document_id: uuid.UUID,
+    target_lang: str,
+    started_by_id: uuid.UUID | None,
+    track_job: bool = True,
+) -> Document:
+    doc = await session.get(Document, document_id)
+    if doc is None:
+        raise NotFoundError("Документ не найден")
+    raw_title = (doc.title or "").strip()
+    if not raw_title:
+        raise ValidationError("Пустой заголовок для перевода")
+
+    translated = await translate_text(raw_title, target_lang=target_lang, stream=False)
+    if not isinstance(translated, str):
+        raise ValidationError("Ожидалась строка перевода заголовка")
+    tt = translated.strip()[:512] if translated.strip() else None
+
+    if track_job:
+        async with processing_job(
+            session,
+            document_id=document_id,
+            job_type=JobType.TRANSLATE_TITLE,
+            model_name=settings.model_translation,
+            provider=None,
+            started_by_id=started_by_id,
+            llm_task_for_provider=LLMTask.TRANSLATION,
+        ):
+            doc.translated_title = tt
+    else:
+        doc.translated_title = tt
+
+    doc.updated_at = datetime.now(UTC)
+    await sync_document_statuses(
+        session,
+        document_id=document_id,
+        assigned_by_id=started_by_id,
+    )
+    return doc
+
+
 async def run_tag_document(
     session: AsyncSession,
     *,

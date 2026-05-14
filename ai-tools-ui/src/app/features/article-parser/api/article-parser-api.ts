@@ -51,6 +51,11 @@ export interface DocumentCategorizeResponse {
   categories: DocumentCategoryRef[];
 }
 
+export interface DocumentTranslateTitleResponse {
+  document_id: string;
+  translated_title: string;
+}
+
 export interface ExtractResponse {
   title: string | null;
   author: string | null;
@@ -199,6 +204,13 @@ export class ArticleParserApi {
     return this.http.patch<{ ok?: boolean; document_id?: string }>(
       `/api/v1/documents/${documentId}/metadata`,
       payload,
+    );
+  }
+
+  translateDocumentTitle(documentId: string, targetLang: string = 'ru') {
+    return this.http.post<DocumentTranslateTitleResponse>(
+      `/api/v1/documents/${documentId}/translate-title`,
+      { target_lang: targetLang },
     );
   }
 

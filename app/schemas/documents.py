@@ -85,6 +85,11 @@ class DocumentTranslateRequest(BaseModel):
     target_lang: str = Field(default="ru", min_length=2, max_length=8)
 
 
+class DocumentTranslateTitleResponse(BaseModel):
+    document_id: uuid.UUID
+    translated_title: str
+
+
 class DocumentTagRequest(BaseModel):
     max_tags: int = Field(default=12, ge=1, le=50)
     use_translation: bool = False

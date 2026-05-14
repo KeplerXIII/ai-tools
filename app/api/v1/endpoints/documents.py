@@ -55,6 +55,7 @@ from app.schemas.documents import (
     DocumentTagsResponse,
     DocumentTypeCatalogItem,
     DocumentTranslateRequest,
+    DocumentTranslateTitleResponse,
     DocumentUpdateRequest,
     ExtractUrlPersistRequest,
     SummarySource,
@@ -75,6 +76,7 @@ from app.services.documents.document_pipeline import (
     run_summary_document,
     run_tag_document,
     run_translate_document,
+    run_translate_document_title,
     save_document_after_edit,
     sync_document_statuses,
     update_document_metadata,
@@ -858,6 +860,32 @@ async def document_translate(
     except AppError as exc:
         _handle(exc)
     return {"ok": True, "document_id": str(document_id)}
+
+
+@router.post("/{document_id}/translate-title", response_model=DocumentTranslateTitleResponse)
+async def document_translate_title(
+    document_id: UUID,
+    payload: DocumentTranslateRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User | None = Depends(get_current_user_optional),
+):
+    """Перевод заголовка документа (синхронно, без очереди). Короткая операция — как POST /translate без стрима."""
+    started_by_id = user.id if user else None
+    try:
+        await _prepare_write_session(db)
+        async with db.begin():
+            doc = await run_translate_document_title(
+                db,
+                document_id=document_id,
+                target_lang=payload.target_lang,
+                started_by_id=started_by_id,
+            )
+    except AppError as exc:
+        _handle(exc)
+    return DocumentTranslateTitleResponse(
+        document_id=document_id,
+        translated_title=(doc.translated_title or "").strip(),
+    )
 
 
 @router.get("/{document_id}/tags/catalog", response_model=list[DocumentTagItem])

@@ -1,4 +1,4 @@
-import { ChangeDetectorRef, Component, Input, OnChanges, SimpleChanges } from '@angular/core';
+import { ChangeDetectorRef, Component, EventEmitter, Input, OnChanges, Output, SimpleChanges } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { FloatLabelModule } from 'primeng/floatlabel';
 import { InputTextModule } from 'primeng/inputtext';
@@ -6,6 +6,10 @@ import { ChipModule } from 'primeng/chip';
 import { ImageModule } from 'primeng/image';
 import { ArticleParserApi, ExtractResponse } from '../../api/article-parser-api';
 import { ArticleParserState } from '../../model/article-parser-state';
+import {
+  ButtonVariant,
+  OutlineButtonComponent,
+} from '../../../../shared/ui/outline-button/outline-button.component';
 import {
   ArticleMetaGalleriaItem,
   ArticleParserMetaGalleriaComponent,
@@ -22,6 +26,7 @@ import { ArticleParserMetaMainImagePickDialogComponent } from './article-parser-
     InputTextModule,
     ChipModule,
     ImageModule,
+    OutlineButtonComponent,
     ArticleParserMetaGalleriaComponent,
     ArticleParserMetaImagesDeleteDialogComponent,
     ArticleParserMetaMainImagePickDialogComponent,
@@ -31,6 +36,13 @@ import { ArticleParserMetaMainImagePickDialogComponent } from './article-parser-
 })
 export class ArticleParserMetaComponent implements OnChanges {
   @Input({ required: true }) article!: ExtractResponse;
+  @Input({ required: true }) buttonsDisabled!: boolean;
+  @Input() translatedTitleError = '';
+  @Input() loadingTranslatedTitle = false;
+
+  @Output() translateTitle = new EventEmitter<void>();
+
+  readonly ButtonVariant = ButtonVariant;
 
   isEditingMetaBlock = false;
 
