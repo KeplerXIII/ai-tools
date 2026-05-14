@@ -1,4 +1,7 @@
 :root {
+  /* Единая высота полосы «тулбар сайдбара + шапка» — иначе border-bottom у header даёт смещение ~1px. */
+  --app-shell-header-height: 100px;
+
   --dark-text-color: #000;
   --light-text-color: #fff;
   --default-chips-color: #d6d6d6;
