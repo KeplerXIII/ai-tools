@@ -14,6 +14,7 @@ import { FormsModule } from '@angular/forms';
 import { AccordionModule } from 'primeng/accordion';
 import { ChipModule } from 'primeng/chip';
 import { KnobModule } from 'primeng/knob';
+import { TableModule } from 'primeng/table';
 import { TooltipModule } from 'primeng/tooltip';
 import { finalize, switchMap, tap } from 'rxjs/operators';
 import { Subscription } from 'rxjs';
@@ -25,10 +26,25 @@ import {
   SourcesApi,
 } from '../../api/sources-api';
 
+interface SourceDetailRow {
+  label: string;
+  text: string;
+  href?: string;
+  isMono?: boolean;
+}
+
 @Component({
   selector: 'app-sources-list-accordion',
   standalone: true,
-  imports: [CommonModule, FormsModule, AccordionModule, ChipModule, KnobModule, TooltipModule],
+  imports: [
+    CommonModule,
+    FormsModule,
+    AccordionModule,
+    ChipModule,
+    KnobModule,
+    TableModule,
+    TooltipModule,
+  ],
   templateUrl: './sources-list-accordion.component.html',
   styleUrl: './sources-list-accordion.component.scss',
 })
@@ -468,5 +484,25 @@ export class SourcesListAccordionComponent implements OnChanges, OnDestroy {
       return '';
     }
     return `Последний разбор: ${this.formatDate(src.last_parse_at)}`;
+  }
+
+  /** Строки таблицы «поле — значение» в развёрнутом блоке источника. */
+  sourceDetailRows(src: SourceListItem): SourceDetailRow[] {
+    const rows: SourceDetailRow[] = [{ label: 'URL', text: src.url, href: src.url }];
+    const rss = (src.rss_url ?? '').trim();
+    if (rss) {
+      rows.push({ label: 'RSS', text: rss, href: rss });
+    }
+    const country = (src.country_code ?? '').trim();
+    rows.push(
+      {
+        label: 'Тип документа',
+        text: `${src.document_type_name} (${src.document_type_code})`,
+      },
+      { label: 'Страна', text: country ? country : '—' },
+      { label: 'Добавил', text: src.added_by_username },
+      { label: 'Идентификатор', text: src.source_id, isMono: true },
+    );
+    return rows;
   }
 }

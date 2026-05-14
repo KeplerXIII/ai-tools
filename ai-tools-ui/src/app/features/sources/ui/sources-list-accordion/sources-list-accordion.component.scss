@@ -139,7 +139,7 @@
 .source-row__meta-language {
   font-weight: var(--font-weight-medium);
   padding: 5px;
-  background: var(--accent-color-success);
+  background: var(--primary-text-color-light);
   border-radius: 50%;
   color: var(--light-text-color);
   margin-right: 10px;
@@ -211,7 +211,7 @@
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 10px 16px;
   padding: 12px;
-  background: var(--bg-super-light-grey);
+  background: #f8fafc;
   border: 1px solid #e2e8f0;
   border-radius: 10px;
 }
@@ -259,10 +259,47 @@
   gap: 12px;
 }
 
-.source-expanded__grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 12px;
+.source-detail-table-wrapper {
+  width: 100%;
+}
+
+:host ::ng-deep .source-detail-table {
+  .p-datatable-table {
+    width: 100%;
+  }
+
+  th,
+  td {
+    padding: 10px 12px;
+    vertical-align: top;
+    border-bottom: 1px solid #e2e8f0;
+    font-size: 14px;
+    color: #334155;
+    word-break: break-word;
+  }
+
+  thead th {
+    font-weight: 600;
+    color: #64748b;
+    background: #f8fafc;
+    text-align: left;
+  }
+
+  tbody .source-detail-table__field {
+    width: 200px;
+    max-width: 36%;
+    font-weight: 600;
+    color: #64748b;
+    background: #f8fafc;
+  }
+
+  tbody tr:last-child td {
+    border-bottom: none;
+  }
+
+  a {
+    color: #1d4ed8;
+  }
 }
 
 .source-expanded h4 {
@@ -484,4 +521,20 @@
 
 .state-message_loading {
   color: #1d4ed8;
+}
+
+.source-row__title-link {
+  color: var(--primary-text-color) !important;
+  transition: color 0.5s ease;
+  &:hover {
+    color: var(--primary-text-color-light-hover) !important;
+  }
+}
+
+.source-expanded {
+  gap: 20px !important;
+}
+
+.source-parse__title {
+  font-size: var(--font-size-detail);
 }
