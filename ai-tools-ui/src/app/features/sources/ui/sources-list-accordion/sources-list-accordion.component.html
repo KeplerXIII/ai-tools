@@ -1,4 +1,9 @@
 <div class="sources-list">
+  @if (languagesLoadError) {
+    <div class="state-message state-message_error source-parse__languages-error">
+      {{ languagesLoadError }}
+    </div>
+  }
   <p-accordion
     class="sources-list-accordion"
     [(value)]="expandedSourceId"
@@ -212,14 +217,15 @@
               </p>
               <div class="source-parse__row">
                 <label class="filter-item source-parse__days">
-                  <span class="new-source-form-label">Дней назад</span>
-                  <div>
+                  <div class="source-parse__days-control">
+                    <span class="new-source-form-label">Дней назад</span>
+
                     <p-inputnumber
                       [(ngModel)]="parseDays"
                       [name]="'parseDays_' + src.source_id"
                       [inputId]="'parseDays_' + src.source_id"
                       [showButtons]="true"
-                      buttonLayout="vertical"
+                      buttonLayout="horizontal"
                       [min]="1"
                       [max]="30"
                       [step]="1"
@@ -227,13 +233,15 @@
                       [useGrouping]="false"
                       [disabled]="!src.is_active || parsingSourceId === src.source_id"
                       [inputStyle]="{ width: '3rem' }"
+                      (onInput)="clampParseDays()"
                       (onBlur)="clampParseDays()"
+                      (onKeyDown)="onParseDaysKeyDown($event)"
                     >
-                      <ng-template pTemplate="incrementbuttonicon">
-                        <span class="pi pi-plus" aria-hidden="true"></span>
-                      </ng-template>
                       <ng-template pTemplate="decrementbuttonicon">
                         <span class="pi pi-minus" aria-hidden="true"></span>
+                      </ng-template>
+                      <ng-template pTemplate="incrementbuttonicon">
+                        <span class="pi pi-plus" aria-hidden="true"></span>
                       </ng-template>
                     </p-inputnumber>
                   </div>
@@ -261,6 +269,7 @@
                           parsingSourceId === src.source_id ||
                           parsePostHasAnyGranular()
                         "
+                        (onChange)="onParsePostFullPipelineChange($event.checked)"
                       />
                       <span>После разбора — полный LLM-пайплайн (автоматические фазы A/B)</span>
                     </label>
@@ -273,149 +282,196 @@
                   </div>
                 </div>
 
-                <div class="source-parse__llm-granular">
-                  <span class="source-parse__llm-granular-title">Либо отдельные шаги</span>
+                @if (!parsePostFullPipeline) {
+                  <div
+                    class="source-parse__llm-granular"
+                    animate.enter="source-parse-panel-enter"
+                    animate.leave="source-parse-panel-leave"
+                  >
+                    <span class="source-parse__llm-granular-title">Либо отдельные шаги:</span>
 
-                  <div class="source-parse__llm-stage">
-                    <span class="source-parse__llm-stage-title"
-                      >По исходному тексту или без перевода</span
-                    >
-                    <div class="source-parse__llm-stage-grid">
-                      <label class="source-parse__llm-step">
-                        <input
-                          type="checkbox"
-                          name="parsePostTagOrig_{{ src.source_id }}"
-                          [(ngModel)]="parsePostLlmTagOriginal"
-                          [disabled]="
-                            !src.is_active ||
-                            parsingSourceId === src.source_id ||
-                            parsePostFullPipeline
-                          "
-                        />
-                        <span>Теги по оригиналу</span>
-                      </label>
-                      <label class="source-parse__llm-step">
-                        <input
-                          type="checkbox"
-                          name="parsePostTranslate_{{ src.source_id }}"
-                          [(ngModel)]="parsePostLlmTranslate"
-                          (ngModelChange)="parsePostOnTranslateToggled($event)"
-                          [disabled]="
-                            !src.is_active ||
-                            parsingSourceId === src.source_id ||
-                            parsePostFullPipeline
-                          "
-                        />
-                        <span>Перевод</span>
-                      </label>
-                      <label class="source-parse__llm-step">
-                        <input
-                          type="checkbox"
-                          name="parsePostExtractor_{{ src.source_id }}"
-                          [(ngModel)]="parsePostLlmExtractor"
-                          [disabled]="
-                            !src.is_active ||
-                            parsingSourceId === src.source_id ||
-                            parsePostFullPipeline
-                          "
-                        />
-                        <span>Сущности (extractor)</span>
-                      </label>
-                      <label class="source-parse__llm-step">
-                        <input
-                          type="checkbox"
-                          name="parsePostCategorize_{{ src.source_id }}"
-                          [(ngModel)]="parsePostLlmCategorize"
-                          [disabled]="
-                            !src.is_active ||
-                            parsingSourceId === src.source_id ||
-                            parsePostFullPipeline
-                          "
-                        />
-                        <span>Категоризация</span>
-                      </label>
+                    <div class="source-parse__llm-stage">
+                      <span class="source-parse__llm-stage-title"
+                        >По исходному тексту или без перевода</span
+                      >
+                      <div class="source-parse__llm-stage-grid">
+                        <label class="source-parse__llm-step">
+                          <p-checkbox
+                            [(ngModel)]="parsePostLlmTagOriginal"
+                            [binary]="true"
+                            [inputId]="'parsePostTagOrig_' + src.source_id"
+                            [name]="'parsePostTagOrig_' + src.source_id"
+                            [disabled]="
+                              !src.is_active ||
+                              parsingSourceId === src.source_id ||
+                              parsePostFullPipeline
+                            "
+                          />
+                          <span class="new-source-form-label">Теги по оригиналу</span>
+                        </label>
+                        <label class="source-parse__llm-step">
+                          <p-checkbox
+                            [(ngModel)]="parsePostLlmTranslate"
+                            [binary]="true"
+                            [inputId]="'parsePostTranslate_' + src.source_id"
+                            [name]="'parsePostTranslate_' + src.source_id"
+                            [disabled]="
+                              !src.is_active ||
+                              parsingSourceId === src.source_id ||
+                              parsePostFullPipeline
+                            "
+                            (onChange)="parsePostOnTranslateToggled($event.checked)"
+                          />
+                          <span class="new-source-form-label">Перевод</span>
+                        </label>
+                        <label class="source-parse__llm-step">
+                          <p-checkbox
+                            [(ngModel)]="parsePostLlmExtractor"
+                            [binary]="true"
+                            [inputId]="'parsePostExtractor_' + src.source_id"
+                            [name]="'parsePostExtractor_' + src.source_id"
+                            [disabled]="
+                              !src.is_active ||
+                              parsingSourceId === src.source_id ||
+                              parsePostFullPipeline
+                            "
+                          />
+                          <span class="new-source-form-label">Сущности (extractor)</span>
+                        </label>
+                        <label class="source-parse__llm-step">
+                          <p-checkbox
+                            [(ngModel)]="parsePostLlmCategorize"
+                            [binary]="true"
+                            [inputId]="'parsePostCategorize_' + src.source_id"
+                            [name]="'parsePostCategorize_' + src.source_id"
+                            [disabled]="
+                              !src.is_active ||
+                              parsingSourceId === src.source_id ||
+                              parsePostFullPipeline
+                            "
+                          />
+                          <span class="new-source-form-label">Категоризация</span>
+                        </label>
+                      </div>
+                      <p class="source-parse__llm-microhint">
+                        Категоризация без «Перевода»: по текущему тексту в документе (есть перевод в
+                        базе — по нему, иначе по оригиналу). Если отмечены и «Перевод», и
+                        «Категоризация» — категоризация выполняется после успешного перевода и
+                        всегда по переводу.
+                      </p>
                     </div>
-                    <p class="source-parse__llm-microhint">
-                      Категоризация без «Перевода»: по текущему тексту в документе (есть перевод в
-                      базе — по нему, иначе по оригиналу). Если отмечены и «Перевод», и
-                      «Категоризация» — категоризация выполняется после успешного перевода и всегда
-                      по переводу.
-                    </p>
-                  </div>
 
-                  <div class="source-parse__llm-stage source-parse__llm-stage_after_translate">
-                    <span class="source-parse__llm-stage-title">Только при наличии перевода</span>
-                    <div class="source-parse__llm-stage-grid">
-                      <label class="source-parse__llm-step">
-                        <input
-                          type="checkbox"
-                          name="parsePostTagTr_{{ src.source_id }}"
-                          [(ngModel)]="parsePostLlmTagTranslated"
-                          [disabled]="
-                            parsePostDependsOnTranslateDisabled(
-                              src.is_active,
-                              parsingSourceId === src.source_id
-                            )
-                          "
-                        />
-                        <span>Теги по переводу</span>
-                      </label>
-                      <label class="source-parse__llm-step">
-                        <input
-                          type="checkbox"
-                          name="parsePostAnnotate_{{ src.source_id }}"
-                          [(ngModel)]="parsePostLlmAnnotate"
-                          [disabled]="
-                            parsePostDependsOnTranslateDisabled(
-                              src.is_active,
-                              parsingSourceId === src.source_id
-                            )
-                          "
-                        />
-                        <span>Аннотация (по переводу)</span>
-                      </label>
+                    <div class="source-parse__llm-stage">
+                      <span class="source-parse__llm-stage-title">Только при наличии перевода</span>
+                      <div class="source-parse__llm-stage-grid">
+                        <label class="source-parse__llm-step">
+                          <p-checkbox
+                            [(ngModel)]="parsePostLlmTagTranslated"
+                            [binary]="true"
+                            [inputId]="'parsePostTagTr_' + src.source_id"
+                            [name]="'parsePostTagTr_' + src.source_id"
+                            [disabled]="
+                              parsePostDependsOnTranslateDisabled(
+                                src.is_active,
+                                parsingSourceId === src.source_id
+                              )
+                            "
+                          />
+                          <span class="new-source-form-label">Теги по переводу</span>
+                        </label>
+                        <label class="source-parse__llm-step">
+                          <p-checkbox
+                            [(ngModel)]="parsePostLlmAnnotate"
+                            [binary]="true"
+                            [inputId]="'parsePostAnnotate_' + src.source_id"
+                            [name]="'parsePostAnnotate_' + src.source_id"
+                            [disabled]="
+                              parsePostDependsOnTranslateDisabled(
+                                src.is_active,
+                                parsingSourceId === src.source_id
+                              )
+                            "
+                          />
+                          <span class="new-source-form-label">Аннотация (по переводу)</span>
+                        </label>
+                      </div>
+                      <p class="source-parse__llm-microhint">
+                        Сначала отметьте «Перевод». Эти шаги запускаются автоматически после того,
+                        как перевод сохранён в документе (без гонки с очередью перевода).
+                      </p>
                     </div>
-                    <p class="source-parse__llm-microhint">
-                      Сначала отметьте «Перевод». Эти шаги запускаются автоматически после того, как
-                      перевод сохранён в документе (без гонки с очередью перевода).
-                    </p>
                   </div>
-                </div>
-                <button
-                  class="submit-btn source-parse__btn"
-                  type="button"
-                  [disabled]="!src.is_active || parsingSourceId === src.source_id"
-                  (click)="runParse(src)"
-                >
-                  {{ parsingSourceId === src.source_id ? 'Разбор…' : 'Разобрать' }}
-                </button>
-
+                }
                 @if (parsePostShowLangAndMaxTags()) {
-                  <div class="source-parse__llm-row">
+                  <div
+                    class="source-parse__llm-row"
+                    [class.source-parse__llm-row--full-pipeline]="parsePostFullPipeline"
+                    animate.enter="source-parse-panel-enter"
+                    animate.leave="source-parse-panel-leave"
+                  >
                     <label class="filter-item source-parse__llm-lang">
-                      <span>Язык перевода</span>
-                      <input
-                        type="text"
-                        name="parsePostTargetLang_{{ src.source_id }}"
+                      <span class="new-source-form-label">Язык перевода</span>
+                      <p-select
+                        [name]="'parsePostTargetLang_' + src.source_id"
+                        class="sources-filter-select source-parse__language-select"
+                        [options]="parsePostTargetLangSelectOptions"
                         [(ngModel)]="parsePostTargetLang"
-                        maxlength="8"
-                        autocomplete="off"
-                        [disabled]="!src.is_active || parsingSourceId === src.source_id"
+                        optionLabel="label"
+                        optionValue="value"
+                        placeholder="Выберите язык"
+                        [disabled]="
+                          !src.is_active ||
+                          parsingSourceId === src.source_id ||
+                          !languagesCatalog.length
+                        "
                       />
                     </label>
                     <label class="filter-item source-parse__llm-maxtags">
-                      <span>Макс. тегов</span>
-                      <input
-                        type="number"
-                        name="parsePostMaxTags_{{ src.source_id }}"
-                        [(ngModel)]="parsePostMaxTags"
-                        min="1"
-                        max="100"
-                        [disabled]="!src.is_active || parsingSourceId === src.source_id"
-                      />
+                      <div class="source-parse__maxtags-control">
+                        <span class="new-source-form-label">Макс. тегов</span>
+                        <p-inputnumber
+                          [(ngModel)]="parsePostMaxTags"
+                          [name]="'parsePostMaxTags_' + src.source_id"
+                          [inputId]="'parsePostMaxTags_' + src.source_id"
+                          [showButtons]="true"
+                          buttonLayout="horizontal"
+                          [min]="1"
+                          [max]="12"
+                          [step]="1"
+                          [format]="false"
+                          [useGrouping]="false"
+                          [disabled]="!src.is_active || parsingSourceId === src.source_id"
+                          [inputStyle]="{ width: '3rem' }"
+                          (onInput)="clampParseMaxTags()"
+                          (onBlur)="clampParseMaxTags()"
+                          (onKeyDown)="onParseMaxTagsKeyDown($event)"
+                        >
+                          <ng-template pTemplate="decrementbuttonicon">
+                            <span class="pi pi-minus" aria-hidden="true"></span>
+                          </ng-template>
+                          <ng-template pTemplate="incrementbuttonicon">
+                            <span class="pi pi-plus" aria-hidden="true"></span>
+                          </ng-template>
+                        </p-inputnumber>
+                      </div>
                     </label>
                   </div>
                 }
+                <div
+                  class="source-parse__btn-wrap"
+                  [class.source-parse__btn-wrap--offset]="!parsePostFullPipeline"
+                >
+                  <app-primary-button
+                    class="source-parse__btn"
+                    type="button"
+                    [text]="parsingSourceId === src.source_id ? 'Разбор…' : 'Разобрать'"
+                    [disabled]="!src.is_active || parsingSourceId === src.source_id"
+                    size="large"
+                    variant="rounded"
+                    font="light"
+                    (clicked)="runParse(src)"
+                  />
+                </div>
               </div>
               @if (parseError && lastParsedSourceId === src.source_id) {
                 <div class="state-message state-message_error source-parse__message">

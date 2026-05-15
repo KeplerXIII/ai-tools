@@ -7,6 +7,7 @@ import {
   Input,
   OnChanges,
   OnDestroy,
+  OnInit,
   Output,
   SimpleChanges,
 } from '@angular/core';
@@ -16,11 +17,14 @@ import { CheckboxModule } from 'primeng/checkbox';
 import { ChipModule } from 'primeng/chip';
 import { InputNumberModule } from 'primeng/inputnumber';
 import { KnobModule } from 'primeng/knob';
+import { SelectModule } from 'primeng/select';
 import { TableModule } from 'primeng/table';
 import { TooltipModule } from 'primeng/tooltip';
+import { PrimaryButtonComponent } from '../../../../shared/ui/primary-button/primary-button.component';
 import { finalize, switchMap, tap } from 'rxjs/operators';
 import { Subscription } from 'rxjs';
 import {
+  LanguageCatalogItem,
   ParseSourceRunResponse,
   ParseSourceRunSnapshotPayload,
   PostParseProcessingOptions,
@@ -46,13 +50,15 @@ interface SourceDetailRow {
     ChipModule,
     InputNumberModule,
     KnobModule,
+    SelectModule,
     TableModule,
     TooltipModule,
+    PrimaryButtonComponent,
   ],
   templateUrl: './sources-list-accordion.component.html',
   styleUrl: './sources-list-accordion.component.scss',
 })
-export class SourcesListAccordionComponent implements OnChanges, OnDestroy {
+export class SourcesListAccordionComponent implements OnInit, OnChanges, OnDestroy {
   /** Цвет дуги для p-knob без числового значения (центр «—»). */
   readonly sourceStatsKnobNullStroke = '#94a3b8';
 
@@ -67,7 +73,7 @@ export class SourcesListAccordionComponent implements OnChanges, OnDestroy {
   /** Соответствует skip_undated в API: после извлечения не сохранять материалы без итоговой даты. */
   parseSkipUndated = true;
 
-  parsePostFullPipeline = false;
+  parsePostFullPipeline = true;
   parsePostLlmTagOriginal = false;
   parsePostLlmTranslate = false;
   parsePostLlmExtractor = false;
@@ -76,6 +82,8 @@ export class SourcesListAccordionComponent implements OnChanges, OnDestroy {
   parsePostLlmCategorize = false;
   parsePostTargetLang = 'ru';
   parsePostMaxTags = 12;
+  languagesCatalog: LanguageCatalogItem[] = [];
+  languagesLoadError = '';
 
   parsingSourceId: string | null = null;
   lastParsedSourceId: string | null = null;
@@ -91,6 +99,17 @@ export class SourcesListAccordionComponent implements OnChanges, OnDestroy {
     private readonly sourcesApi: SourcesApi,
     private readonly cdr: ChangeDetectorRef,
   ) {}
+
+  ngOnInit(): void {
+    this.loadLanguagesCatalog();
+  }
+
+  get parsePostTargetLangSelectOptions(): { label: string; value: string }[] {
+    return this.languagesCatalog.map((l) => ({
+      value: l.code,
+      label: `${l.name} (${l.code})`,
+    }));
+  }
 
   ngOnChanges(changes: SimpleChanges): void {
     const allCh = changes['allItems'];
@@ -162,6 +181,35 @@ export class SourcesListAccordionComponent implements OnChanges, OnDestroy {
     );
   }
 
+  loadLanguagesCatalog(): void {
+    this.languagesLoadError = '';
+    this.sourcesApi.getLanguagesCatalog().subscribe({
+      next: (items) => {
+        this.languagesCatalog = items;
+        this.ensureParsePostTargetLangSelection();
+        this.cdr.markForCheck();
+      },
+      error: () => {
+        this.languagesLoadError = 'Не удалось загрузить список языков';
+        this.cdr.markForCheck();
+      },
+    });
+  }
+
+  private ensureParsePostTargetLangSelection(): void {
+    if (!this.languagesCatalog.length) {
+      return;
+    }
+    const lower = this.parsePostTargetLang.trim().toLowerCase();
+    const match = this.languagesCatalog.find((l) => l.code.toLowerCase() === lower);
+    if (match) {
+      this.parsePostTargetLang = match.code;
+      return;
+    }
+    const ru = this.languagesCatalog.find((l) => l.code.toLowerCase() === 'ru');
+    this.parsePostTargetLang = ru ? ru.code : this.languagesCatalog[0].code;
+  }
+
   parsePostHasAnyGranular(): boolean {
     return (
       this.parsePostLlmTagOriginal ||
@@ -188,9 +236,21 @@ export class SourcesListAccordionComponent implements OnChanges, OnDestroy {
     }
   }
 
+  /** После выключения полного пайплайна — плавный скролл к низу страницы (после анимации блоков). */
+  onParsePostFullPipelineChange(checked: boolean): void {
+    if (checked) {
+      return;
+    }
+    this.cdr.markForCheck();
+    window.setTimeout(() => {
+      const top = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
+      window.scrollTo({ top, behavior: 'smooth' });
+    }, 320);
+  }
+
   private buildPostParsePayload(): PostParseProcessingOptions | undefined {
     const target_lang = (this.parsePostTargetLang || 'ru').trim().slice(0, 8) || 'ru';
-    const max_tags = Math.min(100, Math.max(1, Math.floor(Number(this.parsePostMaxTags)) || 12));
+    const max_tags = Math.min(12, Math.max(1, Math.floor(Number(this.parsePostMaxTags)) || 12));
     if (this.parsePostFullPipeline) {
       return { full_llm_pipeline: true, target_lang, max_tags };
     }
@@ -336,9 +396,90 @@ export class SourcesListAccordionComponent implements OnChanges, OnDestroy {
       });
   }
 
+  private static readonly parseDaysMin = 1;
+  private static readonly parseDaysMax = 30;
+  private static readonly parseMaxTagsMin = 1;
+  private static readonly parseMaxTagsMax = 12;
+
   /** Целое число дней в диапазоне 1–30 для поля «Дней назад». */
   clampParseDays(): void {
-    this.parseDays = Math.min(30, Math.max(1, Math.floor(Number(this.parseDays)) || 3));
+    const raw = Number(this.parseDays);
+    if (!Number.isFinite(raw)) {
+      this.parseDays = 3;
+      return;
+    }
+    this.parseDays = Math.min(
+      SourcesListAccordionComponent.parseDaysMax,
+      Math.max(SourcesListAccordionComponent.parseDaysMin, Math.floor(raw)),
+    );
+  }
+
+  /** Не даёт ввести в поле «Дней назад» значение вне 1–30 (клавиатура и вставка). */
+  onParseDaysKeyDown(event: KeyboardEvent): void {
+    this.onBoundedIntegerKeyDown(
+      event,
+      SourcesListAccordionComponent.parseDaysMin,
+      SourcesListAccordionComponent.parseDaysMax,
+    );
+  }
+
+  /** Целое число тегов в диапазоне 1–12 для поля «Макс. тегов». */
+  clampParseMaxTags(): void {
+    const raw = Number(this.parsePostMaxTags);
+    if (!Number.isFinite(raw)) {
+      this.parsePostMaxTags = 12;
+      return;
+    }
+    this.parsePostMaxTags = Math.min(
+      SourcesListAccordionComponent.parseMaxTagsMax,
+      Math.max(SourcesListAccordionComponent.parseMaxTagsMin, Math.floor(raw)),
+    );
+  }
+
+  /** Не даёт ввести в поле «Макс. тегов» значение вне 1–12 (клавиатура и вставка). */
+  onParseMaxTagsKeyDown(event: KeyboardEvent): void {
+    this.onBoundedIntegerKeyDown(
+      event,
+      SourcesListAccordionComponent.parseMaxTagsMin,
+      SourcesListAccordionComponent.parseMaxTagsMax,
+    );
+  }
+
+  private onBoundedIntegerKeyDown(event: KeyboardEvent, min: number, max: number): void {
+    const controlKeys = [
+      'Backspace',
+      'Delete',
+      'Tab',
+      'Escape',
+      'Enter',
+      'ArrowLeft',
+      'ArrowRight',
+      'ArrowUp',
+      'ArrowDown',
+      'Home',
+      'End',
+    ];
+    if (controlKeys.includes(event.key) || event.ctrlKey || event.metaKey) {
+      return;
+    }
+    if (!/^\d$/.test(event.key)) {
+      event.preventDefault();
+      return;
+    }
+    const input = event.target;
+    if (!(input instanceof HTMLInputElement)) {
+      return;
+    }
+    const start = input.selectionStart ?? 0;
+    const end = input.selectionEnd ?? 0;
+    const next = `${input.value.slice(0, start)}${event.key}${input.value.slice(end)}`;
+    if (next === '') {
+      return;
+    }
+    const n = Number.parseInt(next, 10);
+    if (!Number.isFinite(n) || n < min || n > max) {
+      event.preventDefault();
+    }
   }
 
   runParse(src: SourceListItem): void {
@@ -353,6 +494,7 @@ export class SourcesListAccordionComponent implements OnChanges, OnDestroy {
     this.lastParsedSourceId = null;
     sessionStorage.removeItem(this.storageParseUiKey);
     this.clampParseDays();
+    this.clampParseMaxTags();
     const days = this.parseDays;
     this.parsingSourceId = src.source_id;
     this.parseStreamSub = this.sourcesApi

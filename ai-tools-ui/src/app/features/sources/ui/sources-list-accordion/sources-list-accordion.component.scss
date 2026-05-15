@@ -6,8 +6,8 @@
   display: flex;
   flex-direction: column;
   justify-content: center;
-  align-items: center;
-  gap: 6px;
+  align-items: flex-start;
+  gap: 10px;
 }
 
 .submit-btn {
@@ -330,17 +330,39 @@
   gap: 12px;
   align-items: end;
   border: 1px solid var(--light-grey-text-color);
-  padding: 10px;
+  padding: 20px 0;
   border-radius: 6px;
 }
 
 .source-parse__days {
-  min-width: 120px;
+  padding-right: 20px;
+  padding-left: 20px;
 }
 
-/* Корень p-inputnumber должен остаться inline-flex (не block), иначе ломается vertical layout. */
-.source-parse__days p-inputnumber {
+/* Горизонтальный layout: в разметке Prime сначала поле, затем +, затем −; order даёт [−][поле][+]. */
+.source-parse__days ::ng-deep p-inputnumber.p-inputnumber-horizontal {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: stretch;
   align-self: flex-start;
+}
+
+.source-parse__days
+  ::ng-deep
+  p-inputnumber.p-inputnumber-horizontal
+  .p-inputnumber-decrement-button {
+  order: 1;
+}
+
+.source-parse__days ::ng-deep p-inputnumber.p-inputnumber-horizontal .p-inputnumber-input {
+  order: 2;
+}
+
+.source-parse__days
+  ::ng-deep
+  p-inputnumber.p-inputnumber-horizontal
+  .p-inputnumber-increment-button {
+  order: 3;
 }
 
 .source-parse__days ::ng-deep .p-inputnumber-input {
@@ -362,6 +384,18 @@
   flex-shrink: 0;
   margin: 0;
   cursor: pointer;
+}
+
+.source-parse__btn-wrap {
+  display: flex;
+  justify-content: flex-end;
+  align-items: flex-end;
+  margin-top: 8px;
+  transition: padding-left 0.28s ease;
+}
+
+.source-parse__btn-wrap--offset {
+  padding-left: 20px;
 }
 
 .source-parse__btn {
@@ -387,49 +421,44 @@
 
 .source-parse__llm-hint {
   margin: 6px 0 0 24px;
-  color: #64748b;
-  font-size: 12px;
+  color: var(--primary-text-color-light);
+  font-size: var(--font-size-small);
   line-height: 1.4;
 }
 
 .source-parse__llm-granular {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 15px;
   margin: 12px 0 0;
-  padding: 10px 12px;
   margin-left: 24px;
-  background: #f8fafc;
   border-radius: 8px;
-  border: 1px solid #e2e8f0;
 }
 
 .source-parse__llm-granular-title {
-  font-size: 12px;
-  font-weight: 600;
-  color: #475569;
+  font-size: var(--font-size-medium);
+  font-weight: var(--font-weight-medium);
+  color: var(--primary-text-color);
 }
 
 .source-parse__llm-stage {
   padding: 8px 10px;
   border-radius: 6px;
-  background: #fff;
-  border: 1px solid #e2e8f0;
-}
-
-.source-parse__llm-stage_after_translate {
-  border-color: #c7d2fe;
-  background: linear-gradient(#fff, #f5f7ff);
+  background: #f8fafc;
+  border: 1px solid var(--super-light-grey-text-color);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.04),
+    0 4px 12px rgba(15, 23, 42, 0.06);
 }
 
 .source-parse__llm-stage-title {
   display: block;
-  font-size: 11px;
-  font-weight: 600;
+  font-size: var(--font-size-table);
+  font-weight: var(--font-weight-medium);
   letter-spacing: 0.02em;
   text-transform: uppercase;
-  color: #64748b;
-  margin-bottom: 8px;
+  color: var(--primary-text-color-light);
+  margin-bottom: 10px;
 }
 
 .source-parse__llm-stage-grid {
@@ -442,21 +471,21 @@
   margin: 8px 0 0;
   font-size: 11px;
   line-height: 1.45;
-  color: #64748b;
+  color: var(--primary-text-color-light);
+  font-size: var(--font-size-small);
 }
 
 .source-parse__llm-step {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 6px;
   font-size: 13px;
-  color: #334155;
   cursor: pointer;
   margin: 0;
 }
 
-.source-parse__llm-step input {
-  width: auto;
+.source-parse__llm-step p-checkbox {
+  flex-shrink: 0;
   margin-top: 3px;
   cursor: pointer;
 }
@@ -467,26 +496,111 @@
   gap: 12px;
   align-items: end;
   margin-top: 10px;
-  margin-left: 24px;
+  padding-left: 24px;
+  transition:
+    margin-left 0.28s ease,
+    padding-left 0.28s ease;
 }
 
-.source-parse__llm-lang input,
-.source-parse__llm-maxtags input {
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-  height: 36px;
-  padding: 0 10px;
-  background: #fff;
+.source-parse__llm-row--full-pipeline {
+  margin-left: 24px;
+  padding-left: 160px;
+}
+
+@keyframes source-parse-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes source-parse-panel-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+}
+
+.source-parse-panel-enter {
+  animation: source-parse-panel-in 0.3s ease-out forwards;
+}
+
+.source-parse-panel-leave {
+  animation: source-parse-panel-out 0.22s ease-in forwards;
+  overflow: hidden;
+}
+
+.source-parse__llm-lang .sources-filter-select {
+  display: block;
   width: 100%;
 }
 
+:host ::ng-deep .source-parse__llm-lang p-select.source-parse__language-select.p-select {
+  display: block;
+  width: 180px !important;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
 .source-parse__llm-lang {
-  min-width: 100px;
+  min-width: 180px;
+}
+
+.source-parse__languages-error {
+  padding: 0 0 12px;
+  margin: 0;
 }
 
 .source-parse__llm-maxtags {
-  min-width: 90px;
-  max-width: 110px;
+  min-width: 120px;
+}
+
+.source-parse__maxtags-control {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: stretch;
+}
+
+.source-parse__llm-maxtags ::ng-deep p-inputnumber.p-inputnumber-horizontal {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: stretch;
+  align-self: flex-start;
+}
+
+.source-parse__llm-maxtags
+  ::ng-deep
+  p-inputnumber.p-inputnumber-horizontal
+  .p-inputnumber-decrement-button {
+  order: 1;
+}
+
+.source-parse__llm-maxtags ::ng-deep p-inputnumber.p-inputnumber-horizontal .p-inputnumber-input {
+  order: 2;
+}
+
+.source-parse__llm-maxtags
+  ::ng-deep
+  p-inputnumber.p-inputnumber-horizontal
+  .p-inputnumber-increment-button {
+  order: 3;
+}
+
+.source-parse__llm-maxtags ::ng-deep .p-inputnumber-input {
+  border: 1px solid #d1d5db;
+  background: #fff;
 }
 
 .source-parse__message {
@@ -529,12 +643,6 @@
   margin-bottom: 10px;
 }
 
-.new-source-form-label {
-  font-size: var(--font-size-small);
-  font-weight: var(--font-weight-light);
-  color: var(--primary-text-color);
-}
-
 .source-parse__skip-undated-wrapper {
   display: flex;
   flex-direction: column;
@@ -544,8 +652,22 @@
   height: 100%;
 }
 
-:host ::ng-deep .source-parser__11m {
-  border-top: none !important;
-  margin-top: 0 !important;
-  padding-top: 0 !important;
+.source-parse__days-control {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.new-source-form-label {
+  color: var(--primary-text-color);
+  font-size: var(--font-size-table);
+  font-weight: var(--font-weight-light);
+}
+
+.new-source-form-label {
+  font-size: var(--font-size-small);
+  font-weight: var(--font-weight-light);
+  color: var(--grey-text-color);
 }
