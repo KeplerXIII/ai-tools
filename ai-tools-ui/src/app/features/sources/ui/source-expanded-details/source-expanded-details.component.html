@@ -1,0 +1,126 @@
+<div class="source-stats" aria-label="Статистика по документам источника">
+  <div class="source-stats__item">
+    <span class="source-stats__label">Всего документов в базе</span>
+    @if (hasStatNumber(src.documents_total)) {
+      <p-knob
+        [ngModel]="src.documents_total"
+        [style.--p-knob-value-background]="knobColor(src.documents_total, knobMax(src))"
+        [rangeColor]="'var(--super-light-grey-text-color)'"
+        [readonly]="true"
+        [size]="65"
+        [strokeWidth]="8"
+        [showValue]="true"
+        [min]="0"
+        [max]="knobMax(src)"
+        valueTemplate="{value}"
+      />
+    } @else {
+      <p-knob
+        [ngModel]="0"
+        [style.--p-knob-value-background]="knobNullStroke"
+        [rangeColor]="'var(--super-light-grey-text-color)'"
+        [readonly]="true"
+        [size]="65"
+        [strokeWidth]="8"
+        [showValue]="true"
+        [min]="0"
+        [max]="knobMax(src)"
+        valueTemplate="—"
+      />
+    }
+  </div>
+  <div class="source-stats__item">
+    <span class="source-stats__label">Создано при последнем разборе</span>
+    @if (hasStatNumber(src.last_parse_created_total)) {
+      <p-knob
+        [ngModel]="src.last_parse_created_total"
+        [style.--p-knob-value-background]="knobColor(src.last_parse_created_total, knobMax(src))"
+        [rangeColor]="'var(--super-light-grey-text-color)'"
+        [readonly]="true"
+        [size]="65"
+        [strokeWidth]="8"
+        [showValue]="true"
+        [min]="0"
+        [max]="knobMax(src)"
+        valueTemplate="{value}"
+      />
+    } @else {
+      <p-knob
+        [ngModel]="0"
+        [style.--p-knob-value-background]="knobNullStroke"
+        [rangeColor]="'var(--super-light-grey-text-color)'"
+        [readonly]="true"
+        [size]="65"
+        [strokeWidth]="8"
+        [showValue]="true"
+        [min]="0"
+        [max]="knobMax(src)"
+        valueTemplate="—"
+      />
+    }
+  </div>
+  <div class="source-stats__item">
+    <span class="source-stats__label">Необработанных</span>
+    @if (hasStatNumber(src.documents_unprocessed)) {
+      <span
+        class="source-stats__knob-tooltip-target"
+        [pTooltip]="parseAtTooltip(src)"
+        [tooltipDisabled]="!src.last_parse_at"
+        tooltipPosition="top"
+        [appendTo]="'body'"
+      >
+        <p-knob
+          [ngModel]="src.documents_unprocessed"
+          [style.--p-knob-value-background]="knobColor(src.documents_unprocessed, knobMax(src))"
+          [rangeColor]="'var(--super-light-grey-text-color)'"
+          [readonly]="true"
+          [size]="65"
+          [strokeWidth]="8"
+          [showValue]="true"
+          [min]="0"
+          [max]="knobMax(src)"
+          valueTemplate="{value}"
+        />
+      </span>
+    } @else {
+      <p-knob
+        [ngModel]="0"
+        [style.--p-knob-value-background]="knobNullStroke"
+        [rangeColor]="'var(--super-light-grey-text-color)'"
+        [readonly]="true"
+        [size]="65"
+        [strokeWidth]="8"
+        [showValue]="true"
+        [min]="0"
+        [max]="knobMax(src)"
+        valueTemplate="—"
+      />
+    }
+  </div>
+</div>
+<div class="source-detail-table-wrapper">
+  <p-table
+    [value]="detailRows(src)"
+    styleClass="source-detail-table"
+    [tableStyle]="{ 'min-width': '100%', width: '100%' }"
+  >
+    <ng-template pTemplate="body" let-row>
+      <tr>
+        <td class="source-detail-table__field">{{ row.label }}</td>
+        <td class="source-detail-table__value" [class.source-id]="row.isMono">
+          @if (row.href) {
+            <a
+              class="source-row__title-link"
+              [href]="row.href"
+              target="_blank"
+              rel="noopener noreferrer"
+              >{{ row.text }}</a
+            >
+          } @else {
+            {{ row.text }}
+          }
+        </td>
+      </tr>
+    </ng-template>
+  </p-table>
+</div>

@@ -1,6 +1,7 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { Observable } from 'rxjs';
+import { Observable, throwError } from 'rxjs';
+import { catchError, shareReplay } from 'rxjs/operators';
 
 import { AuthService } from '../../../core/auth/auth.service';
 
@@ -129,13 +130,27 @@ export interface CountryCatalogItem {
   providedIn: 'root',
 })
 export class SourcesApi {
+  private languagesCatalog$?: Observable<LanguageCatalogItem[]>;
+
   constructor(
     private readonly http: HttpClient,
     private readonly auth: AuthService,
   ) {}
 
+  /** Каталог языков кэшируется в памяти до перезагрузки приложения. */
   getLanguagesCatalog(): Observable<LanguageCatalogItem[]> {
-    return this.http.get<LanguageCatalogItem[]>('/api/v1/parsing/languages/catalog');
+    if (!this.languagesCatalog$) {
+      this.languagesCatalog$ = this.http
+        .get<LanguageCatalogItem[]>('/api/v1/parsing/languages/catalog')
+        .pipe(
+          shareReplay({ bufferSize: 1, refCount: false }),
+          catchError((err) => {
+            this.languagesCatalog$ = undefined;
+            return throwError(() => err);
+          }),
+        );
+    }
+    return this.languagesCatalog$;
   }
 
   getCountriesCatalog(): Observable<CountryCatalogItem[]> {

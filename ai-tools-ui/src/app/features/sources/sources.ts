@@ -1,9 +1,11 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit } from '@angular/core';
+import { Component, DestroyRef, inject, OnInit } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { SelectModule } from 'primeng/select';
 import { OutlineButtonComponent } from '../../shared/ui/outline-button/outline-button.component';
 import { SourceListItem, SourcesApi } from './api/sources-api';
+import { SourceParseRunService } from './services/source-parse-run.service';
 import { SourcesCreateSectionComponent } from './ui/sources-create-section/sources-create-section.component';
 import { SourcesListAccordionComponent } from './ui/sources-list-accordion/sources-list-accordion.component';
 
@@ -20,11 +22,14 @@ type SortMode = 'created_desc' | 'created_asc' | 'user_asc';
     SourcesCreateSectionComponent,
     SourcesListAccordionComponent,
   ],
+  providers: [SourceParseRunService],
   templateUrl: './sources.html',
   styleUrl: './sources.scss',
 })
 export class Sources implements OnInit {
   items: SourceListItem[] = [];
+  /** Полный список для выпадающего фильтра по пользователю (без серверного фильтра). */
+  contributorItems: SourceListItem[] = [];
   canFilterByAllUsers = false;
   listLoading = false;
   listError = '';
@@ -37,29 +42,41 @@ export class Sources implements OnInit {
     { label: 'По пользователю (А–Я)', value: 'user_asc' },
   ];
 
-  constructor(private readonly sourcesApi: SourcesApi) {}
+  private readonly sourcesApi = inject(SourcesApi);
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly parseRun = inject(SourceParseRunService);
 
   ngOnInit(): void {
+    this.parseRun.sourcesReloadRequested$
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((options) => this.loadSources(options));
     this.loadSources();
   }
 
   loadSources(options?: { silent?: boolean }): void {
     const silent = options?.silent ?? false;
+    const addedByUserId = this.selectedUserId || undefined;
     if (!silent) {
       this.listLoading = true;
     }
     this.listError = '';
-    this.sourcesApi.listSources().subscribe({
-      next: (response) => {
-        this.items = response.items;
-        this.canFilterByAllUsers = response.can_filter_by_all_users;
-        this.listLoading = false;
-      },
-      error: () => {
-        this.listError = 'Не удалось загрузить список источников';
-        this.listLoading = false;
-      },
-    });
+    this.sourcesApi
+      .listSources(addedByUserId)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (response) => {
+          this.items = response.items;
+          this.canFilterByAllUsers = response.can_filter_by_all_users;
+          if (!addedByUserId || !this.canFilterByAllUsers) {
+            this.contributorItems = response.items;
+          }
+          this.listLoading = false;
+        },
+        error: () => {
+          this.listError = 'Не удалось загрузить список источников';
+          this.listLoading = false;
+        },
+      });
   }
 
   get userFilterSelectOptions(): { label: string; value: string }[] {
@@ -71,7 +88,8 @@ export class Sources implements OnInit {
 
   get contributorOptions(): { userId: string; label: string }[] {
     const map = new Map<string, string>();
-    for (const item of this.items) {
+    const source = this.canFilterByAllUsers ? this.contributorItems : this.items;
+    for (const item of source) {
       if (!map.has(item.added_by_user_id)) {
         map.set(item.added_by_user_id, item.added_by_username);
       }
@@ -81,12 +99,8 @@ export class Sources implements OnInit {
       .sort((a, b) => a.label.localeCompare(b.label, 'ru'));
   }
 
-  get filteredAndSortedItems(): SourceListItem[] {
-    let list = this.items;
-    if (this.selectedUserId) {
-      list = list.filter((s) => s.added_by_user_id === this.selectedUserId);
-    }
-    const out = [...list];
+  get sortedItems(): SourceListItem[] {
+    const out = [...this.items];
     if (this.sortMode === 'created_desc') {
       out.sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
     } else if (this.sortMode === 'created_asc') {
@@ -101,12 +115,17 @@ export class Sources implements OnInit {
     return out;
   }
 
-  onFiltersChanged(): void {
-    /* сортировка и фильтр вычисляются в геттере */
+  get listEmpty(): boolean {
+    return !this.listLoading && !this.listError && this.sortedItems.length === 0;
+  }
+
+  onUserFilterChange(): void {
+    this.loadSources();
   }
 
   resetFilters(): void {
     this.selectedUserId = '';
     this.sortMode = 'created_desc';
+    this.loadSources();
   }
 }
