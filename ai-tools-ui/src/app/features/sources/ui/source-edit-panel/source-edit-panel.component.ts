@@ -20,6 +20,8 @@ import {
   OutlineButtonComponent,
 } from '../../../../shared/ui/outline-button/outline-button.component';
 import { PrimaryButtonComponent } from '../../../../shared/ui/primary-button/primary-button.component';
+import { StringListInputComponent } from '../../../../shared/ui/string-list-input/string-list-input.component';
+import { normalizeStringList, stringListForForm } from '../../../../shared/utils/string-list.util';
 import { DocumentTypeCatalogItem, DocumentsApi } from '../../../documents/documents-api';
 import {
   CountryCatalogItem,
@@ -41,6 +43,7 @@ import {
     InputTextModule,
     OutlineButtonComponent,
     PrimaryButtonComponent,
+    StringListInputComponent,
   ],
   templateUrl: './source-edit-panel.component.html',
   styleUrl: './source-edit-panel.component.scss',
@@ -56,8 +59,8 @@ export class SourceEditPanelComponent implements OnChanges {
   formName = '';
   formLanguageCode = 'en';
   formCountryCode = '';
-  formRssUrls = '';
-  formDiscoveryPaths = '';
+  formRssUrls: string[] = [''];
+  formDiscoveryPaths: string[] = [''];
   formDocumentTypeCode = 'news';
 
   languagesCatalog: LanguageCatalogItem[] = [];
@@ -151,7 +154,7 @@ export class SourceEditPanelComponent implements OnChanges {
       url,
       language_code: languageCode,
       document_type_code: docTypeLower,
-      discovery_paths: this.parseLineListInput(this.formDiscoveryPaths),
+      discovery_paths: normalizeStringList(this.formDiscoveryPaths),
     };
 
     const name = this.formName.trim();
@@ -170,7 +173,7 @@ export class SourceEditPanelComponent implements OnChanges {
       body.country_code = null;
     }
 
-    body.rss_urls = this.parseLineListInput(this.formRssUrls);
+    body.rss_urls = normalizeStringList(this.formRssUrls);
 
     this.sourcesApi
       .updateSource(this.src.source_id, body)
@@ -199,8 +202,8 @@ export class SourceEditPanelComponent implements OnChanges {
       : this.src.rss_url
         ? [this.src.rss_url]
         : [];
-    this.formRssUrls = feeds.join('\n');
-    this.formDiscoveryPaths = (this.src.discovery_paths ?? []).join('\n');
+    this.formRssUrls = stringListForForm(feeds);
+    this.formDiscoveryPaths = stringListForForm(this.src.discovery_paths);
     this.formDocumentTypeCode = this.src.document_type_code;
   }
 
@@ -244,20 +247,6 @@ export class SourceEditPanelComponent implements OnChanges {
           this.documentTypesLoadError = 'Не удалось загрузить типы документов';
         },
       });
-  }
-
-  private parseLineListInput(raw: string): string[] {
-    const seen = new Set<string>();
-    const out: string[] = [];
-    for (const part of raw.split(/[\n,]+/)) {
-      const p = part.trim();
-      if (!p || seen.has(p)) {
-        continue;
-      }
-      seen.add(p);
-      out.push(p);
-    }
-    return out;
   }
 
   private formatApiError(err: HttpErrorResponse): string {

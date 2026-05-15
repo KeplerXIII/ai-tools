@@ -13,6 +13,8 @@ import {
   OutlineButtonComponent,
 } from '../../../../shared/ui/outline-button/outline-button.component';
 import { PrimaryButtonComponent } from '../../../../shared/ui/primary-button/primary-button.component';
+import { StringListInputComponent } from '../../../../shared/ui/string-list-input/string-list-input.component';
+import { normalizeStringList } from '../../../../shared/utils/string-list.util';
 import { DocumentTypeCatalogItem, DocumentsApi } from '../../../documents/documents-api';
 import {
   CountryCatalogItem,
@@ -34,6 +36,7 @@ import {
     InputTextModule,
     OutlineButtonComponent,
     PrimaryButtonComponent,
+    StringListInputComponent,
   ],
   templateUrl: './sources-create-form.component.html',
   styleUrl: './sources-create-form.component.scss',
@@ -47,10 +50,8 @@ export class SourcesCreateFormComponent implements OnInit {
   formName = '';
   formLanguageCode = 'en';
   formCountryCode = '';
-  /** По одному URL RSS на строку */
-  formRssUrls = '';
-  /** По одному пути на строку, от корня сайта: /news */
-  formDiscoveryPaths = '';
+  formRssUrls: string[] = [''];
+  formDiscoveryPaths: string[] = [''];
   formDocumentTypeCode = 'news';
   languagesCatalog: LanguageCatalogItem[] = [];
   languagesLoadError = '';
@@ -218,11 +219,11 @@ export class SourcesCreateFormComponent implements OnInit {
       }
       body.country_code = countryUpper.slice(0, 8);
     }
-    const rssUrls = this.parseLineListInput(this.formRssUrls);
+    const rssUrls = normalizeStringList(this.formRssUrls);
     if (rssUrls.length) {
       body.rss_urls = rssUrls;
     }
-    const discoveryPaths = this.parseLineListInput(this.formDiscoveryPaths);
+    const discoveryPaths = normalizeStringList(this.formDiscoveryPaths);
     if (discoveryPaths.length) {
       body.discovery_paths = discoveryPaths;
     }
@@ -249,8 +250,8 @@ export class SourcesCreateFormComponent implements OnInit {
     this.formName = '';
     this.formLanguageCode = 'en';
     this.formCountryCode = '';
-    this.formRssUrls = '';
-    this.formDiscoveryPaths = '';
+    this.formRssUrls = [''];
+    this.formDiscoveryPaths = [''];
     this.formDocumentTypeCode = 'news';
     this.ensureLanguageSelection();
     this.ensureCountrySelection();
@@ -302,20 +303,6 @@ export class SourcesCreateFormComponent implements OnInit {
     }
     const en = this.languagesCatalog.find((l) => l.code.toLowerCase() === 'en');
     this.formLanguageCode = en ? en.code : this.languagesCatalog[0].code;
-  }
-
-  private parseLineListInput(raw: string): string[] {
-    const seen = new Set<string>();
-    const out: string[] = [];
-    for (const part of raw.split(/[\n,]+/)) {
-      const p = part.trim();
-      if (!p || seen.has(p)) {
-        continue;
-      }
-      seen.add(p);
-      out.push(p);
-    }
-    return out;
   }
 
   private formatApiError(err: HttpErrorResponse): string {

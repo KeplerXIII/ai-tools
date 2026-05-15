@@ -1,0 +1,33 @@
+<div class="string-list-input">
+  @for (item of items; track trackByIndex($index); let i = $index) {
+    <div class="string-list-input__row">
+      <input
+        pInputText
+        class="string-list-input__field"
+        type="text"
+        [name]="inputNamePrefix + '_' + i"
+        [ngModel]="item"
+        (ngModelChange)="onItemInput(i, $event)"
+        [placeholder]="placeholder"
+        [disabled]="disabled"
+      />
+      <button
+        type="button"
+        class="string-list-input__remove"
+        [disabled]="disabled || items.length <= 1"
+        [attr.aria-label]="'Удалить поле ' + (i + 1)"
+        (click)="removeItem(i)"
+      >
+        ×
+      </button>
+    </div>
+  }
+  <button
+    type="button"
+    class="string-list-input__add"
+    [disabled]="disabled || items.length >= maxItems"
+    (click)="addItem()"
+  >
+    + {{ addButtonLabel }}
+  </button>
+</div>

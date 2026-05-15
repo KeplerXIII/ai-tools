@@ -17,8 +17,8 @@
     </p>
   } @else {
     <p class="source-edit__hint">
-      Пути обхода — от корня домена (<code>/news</code>). Главная только при <code>/</code>. Пусто — без
-      HTML-обхода.
+      Пути обхода — от корня домена (<code>/news</code>) или полный URL с параметрами; каждый путь — отдельное поле (+).
+      Главная только при <code>/</code>. Пусто — без HTML-обхода.
     </p>
 
     <form class="source-edit__form" (ngSubmit)="submitSave()">
@@ -89,29 +89,27 @@
         />
       </label>
 
-      <label class="filter-item source-edit__field source-edit__field_wide">
+      <div class="filter-item source-edit__field source-edit__field_wide">
         <span class="new-source-form-label">URL RSS</span>
-        <textarea
-          class="source-edit__discovery-paths"
-          [name]="'edit_rss_' + src.source_id"
-          [(ngModel)]="formRssUrls"
-          rows="3"
-          placeholder="По одному фиду на строку; пусто — без RSS"
+        <app-string-list-input
+          [(items)]="formRssUrls"
+          [inputNamePrefix]="'edit_rss_' + src.source_id"
+          placeholder="https://example.com/feed.xml"
+          addButtonLabel="Добавить RSS"
           [disabled]="saveSubmitting"
-        ></textarea>
-      </label>
+        />
+      </div>
 
-      <label class="filter-item source-edit__field source-edit__field_wide">
+      <div class="filter-item source-edit__field source-edit__field_wide">
         <span class="new-source-form-label">Пути обхода (HTML)</span>
-        <textarea
-          class="source-edit__discovery-paths"
-          [name]="'edit_paths_' + src.source_id"
-          [(ngModel)]="formDiscoveryPaths"
-          rows="3"
-          placeholder="/news&#10;/news/newsreleases"
+        <app-string-list-input
+          [(items)]="formDiscoveryPaths"
+          [inputNamePrefix]="'edit_paths_' + src.source_id"
+          placeholder="/news или полный URL с параметрами"
+          addButtonLabel="Добавить путь"
           [disabled]="saveSubmitting"
-        ></textarea>
-      </label>
+        />
+      </div>
 
       <div class="source-edit__actions">
         <app-primary-button
