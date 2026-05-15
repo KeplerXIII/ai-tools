@@ -47,6 +47,8 @@ export class SourcesCreateFormComponent implements OnInit {
   formLanguageCode = 'en';
   formCountryCode = '';
   formRssUrl = '';
+  /** По одному пути на строку, от корня сайта: /news */
+  formDiscoveryPaths = '';
   formDocumentTypeCode = 'news';
   languagesCatalog: LanguageCatalogItem[] = [];
   languagesLoadError = '';
@@ -208,6 +210,10 @@ export class SourcesCreateFormComponent implements OnInit {
     if (rss) {
       body.rss_url = rss;
     }
+    const discoveryPaths = this.parseDiscoveryPathsInput(this.formDiscoveryPaths);
+    if (discoveryPaths.length) {
+      body.discovery_paths = discoveryPaths;
+    }
 
     this.sourcesApi.createSource(body).subscribe({
       next: () => {
@@ -229,6 +235,7 @@ export class SourcesCreateFormComponent implements OnInit {
     this.formLanguageCode = 'en';
     this.formCountryCode = '';
     this.formRssUrl = '';
+    this.formDiscoveryPaths = '';
     this.formDocumentTypeCode = 'news';
     this.ensureLanguageSelection();
     this.ensureCountrySelection();
@@ -280,6 +287,20 @@ export class SourcesCreateFormComponent implements OnInit {
     }
     const en = this.languagesCatalog.find((l) => l.code.toLowerCase() === 'en');
     this.formLanguageCode = en ? en.code : this.languagesCatalog[0].code;
+  }
+
+  private parseDiscoveryPathsInput(raw: string): string[] {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const part of raw.split(/[\n,]+/)) {
+      const p = part.trim();
+      if (!p || seen.has(p)) {
+        continue;
+      }
+      seen.add(p);
+      out.push(p);
+    }
+    return out;
   }
 
   private formatApiError(err: HttpErrorResponse): string {

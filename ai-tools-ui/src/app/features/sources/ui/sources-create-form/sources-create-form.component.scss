@@ -76,6 +76,19 @@
   margin-bottom: 20px;
 }
 
+.source-create__discovery-paths {
+  width: 100%;
+  min-height: 88px;
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: var(--font-size-table);
+  line-height: 1.4;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
 .source-create__form {
   display: flex;
   flex-wrap: wrap;

@@ -162,6 +162,7 @@ async def execute_parse_source(
     discovered = await discover_source_news_urls(
         source.url,
         rss_url=source.rss_url,
+        discovery_paths=getattr(source, "discovery_paths", None),
         days=days,
         skip_undated=False,
     )

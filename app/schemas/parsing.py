@@ -5,7 +5,9 @@ from datetime import datetime
 
 from typing import Literal
 
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, Field, HttpUrl, field_validator
+
+from app.services.parsing.discovery_paths import MAX_DISCOVERY_PATHS, normalize_discovery_paths
 
 
 class SourceCreateRequest(BaseModel):
@@ -14,11 +16,30 @@ class SourceCreateRequest(BaseModel):
     language_code: str = Field(default="en", min_length=2, max_length=8)
     country_code: str | None = Field(default=None, min_length=2, max_length=8)
     rss_url: HttpUrl | None = None
+    discovery_paths: list[str] = Field(
+        default_factory=list,
+        max_length=MAX_DISCOVERY_PATHS,
+        description=(
+            "Пути от корня сайта для HTML-обхода, например /news и /news/newsreleases. "
+            "Пустой список — только URL источника."
+        ),
+    )
     document_type_code: str = Field(
         min_length=1,
         max_length=64,
         description="Код типа документа из справочника; при разборе источника документы создаются с этим типом.",
     )
+
+    @field_validator("discovery_paths", mode="before")
+    @classmethod
+    def _normalize_discovery_paths(cls, value: object) -> list[str]:
+        if value is None:
+            return []
+        if isinstance(value, str):
+            value = [value]
+        if not isinstance(value, list):
+            raise TypeError("discovery_paths must be a list of strings")
+        return normalize_discovery_paths([str(p) for p in value])
 
 
 class SourceCreateResponse(BaseModel):
@@ -28,6 +49,7 @@ class SourceCreateResponse(BaseModel):
     language_code: str
     country_code: str | None = None
     rss_url: str | None = None
+    discovery_paths: list[str] = Field(default_factory=list)
     is_active: bool
     document_type_code: str
     document_type_name: str
@@ -114,6 +136,7 @@ class SourceListItem(BaseModel):
     name: str | None = None
     url: str
     rss_url: str | None = None
+    discovery_paths: list[str] = Field(default_factory=list)
     language_code: str
     country_code: str | None = None
     document_type_code: str

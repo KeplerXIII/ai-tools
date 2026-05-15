@@ -493,6 +493,10 @@ export class SourcesListAccordionComponent implements OnChanges, OnDestroy {
     if (rss) {
       rows.push({ label: 'RSS', text: rss, href: rss });
     }
+    const paths = src.discovery_paths ?? [];
+    if (paths.length) {
+      rows.push({ label: 'Пути обхода', text: paths.join(', ') });
+    }
     const country = (src.country_code ?? '').trim();
     rows.push(
       {

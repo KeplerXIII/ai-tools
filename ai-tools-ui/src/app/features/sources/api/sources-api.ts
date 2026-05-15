@@ -9,6 +9,7 @@ export interface SourceListItem {
   name: string | null;
   url: string;
   rss_url: string | null;
+  discovery_paths: string[];
   language_code: string;
   country_code: string | null;
   document_type_code: string;
@@ -36,6 +37,7 @@ export interface SourceCreateRequestBody {
   language_code?: string;
   country_code?: string | null;
   rss_url?: string | null;
+  discovery_paths?: string[];
   document_type_code: string;
 }
 
@@ -46,6 +48,7 @@ export interface SourceCreateResponse {
   language_code: string;
   country_code: string | null;
   rss_url: string | null;
+  discovery_paths: string[];
   is_active: boolean;
   document_type_code: string;
   document_type_name: string;

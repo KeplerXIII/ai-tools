@@ -624,6 +624,7 @@ class ParseSourceEndpointTests(IsolatedAsyncioTestCase):
             name="News",
             url="https://news.example/",
             rss_url="https://news.example/rss",
+            discovery_paths=["/news"],
             is_active=True,
             created_at=created,
             last_parse_created_total=2,
@@ -643,6 +644,7 @@ class ParseSourceEndpointTests(IsolatedAsyncioTestCase):
         self.assertEqual(result.items[0].documents_total, 12)
         self.assertEqual(result.items[0].documents_unprocessed, 3)
         self.assertEqual(result.items[0].last_parse_created_total, 2)
+        self.assertEqual(result.items[0].discovery_paths, ["/news"])
 
     async def test_list_sources_admin_sets_filter_flag(self):
         """Администратор получает возможность фильтрации по всем пользователям (флаг в ответе)."""
@@ -653,6 +655,7 @@ class ParseSourceEndpointTests(IsolatedAsyncioTestCase):
             name=None,
             url="https://a.test/",
             rss_url=None,
+            discovery_paths=None,
             is_active=False,
             created_at=datetime.now(UTC),
             last_parse_created_total=None,

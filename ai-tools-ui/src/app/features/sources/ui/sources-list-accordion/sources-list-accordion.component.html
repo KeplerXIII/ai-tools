@@ -60,6 +60,13 @@
                 @if (src.rss_url) {
                   <p-chip label="RSS" class="chip-item status-chip status-chip_rss" [removable]="false" />
                 }
+                @if (src.discovery_paths?.length) {
+                  <p-chip
+                    [label]="'Обход: ' + src.discovery_paths.length"
+                    class="chip-item status-chip status-chip_paths"
+                    [removable]="false"
+                  />
+                }
               </div>
             </div>
           </div>

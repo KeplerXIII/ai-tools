@@ -1,7 +1,8 @@
 <div class="source-create__panel">
   <p class="source-create__hint">
-    Обязателен только <b>URL сайта</b>. Язык, тип документа (для материалов при разборе) и страна — из справочников;
-    страна необязательна.
+    Обязателен только <b>URL сайта</b> (корень сайта, например https://www.army.mil). Пути обхода — от корня домена,
+    по одному на строку (<code>/news</code>, <code>/news/newsreleases</code>). Без путей парсер смотрит только URL
+    источника и RSS. Язык, тип документа и страна — из справочников; страна необязательна.
   </p>
   <form class="source-create__form" (ngSubmit)="submitCreate()">
     <div class="filter-item source-create__field source-create__field_wide">
@@ -130,6 +131,18 @@
           aria-label="URL RSS"
         />
       </p-inputgroup>
+    </label>
+
+    <label class="filter-item source-create__field source-create__field_wide">
+      <span class="new-source-form-label">Пути обхода (HTML)</span>
+      <textarea
+        class="source-create__discovery-paths source-create__placeholder-hint"
+        name="discovery_paths"
+        [(ngModel)]="formDiscoveryPaths"
+        rows="4"
+        placeholder="/news&#10;/news/newsreleases"
+        aria-label="Пути обхода страниц источника"
+      ></textarea>
     </label>
 
     <div class="source-create__actions">

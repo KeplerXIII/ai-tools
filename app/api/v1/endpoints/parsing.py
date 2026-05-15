@@ -44,6 +44,7 @@ from app.schemas.parsing import (
 )
 from app.services.documents.db_refs import document_type_id_by_code
 from app.services.documents.url_norm import normalize_source_url
+from app.services.parsing.discovery_paths import normalize_discovery_paths
 from app.services.parsing.parse_source_runner import list_unprocessed_by_source
 from app.services.processing.jobs import JobStatus, JobType
 from app.services.processing.saq_queue import get_saq_parse_queue
@@ -166,6 +167,7 @@ async def list_sources(
             name=src.name,
             url=src.url,
             rss_url=src.rss_url,
+            discovery_paths=normalize_discovery_paths(src.discovery_paths),
             language_code=lang_code or "en",
             country_code=c_code,
             document_type_code=dt_code,
@@ -227,6 +229,7 @@ async def create_source(
     except NoResultFound as exc:
         raise HTTPException(status_code=400, detail="Неизвестный код типа документа") from exc
 
+    discovery_paths = payload.discovery_paths or None
     source = Source(
         user_id=user.id,
         document_type_id=dt_id,
@@ -235,6 +238,7 @@ async def create_source(
         country_id=country_id,
         language_id=language_id,
         rss_url=(normalize_source_url(str(payload.rss_url)) if payload.rss_url else None),
+        discovery_paths=discovery_paths,
         is_active=True,
     )
     db.add(source)
@@ -263,6 +267,7 @@ async def create_source(
         language_code=lang_code or "en",
         country_code=c_code,
         rss_url=source.rss_url,
+        discovery_paths=normalize_discovery_paths(source.discovery_paths),
         is_active=source.is_active,
         document_type_code=dt_code,
         document_type_name=dt_name,

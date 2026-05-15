@@ -10,10 +10,10 @@ from xml.etree import ElementTree
 from bs4 import BeautifulSoup
 
 from app.services.documents.url_norm import normalize_source_url
+from app.services.parsing.discovery_paths import build_discovery_page_urls
 from app.services.parsing.extractor import download_html
 
 MAX_DISCOVERED_LINKS = 400
-NEWS_PATH_HINTS = ("/news", "/press", "/articles", "/media", "/blog")
 ARTICLE_BLOCK_EXTENSIONS = (".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg", ".pdf", ".zip")
 
 
@@ -151,6 +151,7 @@ async def discover_source_news_urls(
     source_url: str,
     *,
     rss_url: str | None,
+    discovery_paths: list[str] | None = None,
     days: int,
     skip_undated: bool = True,
 ) -> list[DiscoveredUrl]:
@@ -166,9 +167,7 @@ async def discover_source_news_urls(
             if _within_days(item.published_at, threshold, skip_undated=skip_undated):
                 discovered[item.url] = item
 
-    pages = [base]
-    for suffix in NEWS_PATH_HINTS:
-        pages.append(f"{base.rstrip('/')}{suffix}")
+    pages = build_discovery_page_urls(base, discovery_paths)
 
     for page_url in pages:
         try:
