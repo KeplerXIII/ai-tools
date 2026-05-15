@@ -1,0 +1,60 @@
+<div class="source-row-top source-row-top_accordion">
+  <div class="row-cell row-cell_title">
+    <div class="source-title-line">
+      <span class="source-row__meta">
+        <span class="source-row__meta-language">{{ src.language_code.toUpperCase() }}</span
+        >{{ src.document_type_name }}
+      </span>
+      <h3 class="source-row__title source-row__title_link">
+        <a
+          [href]="src.url"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="source-row__title-link"
+          (click)="$event.stopPropagation()"
+          >{{ title(src) }}</a
+        >
+      </h3>
+    </div>
+  </div>
+
+  <div class="row-cell row-cell_user">
+    <span class="source-user-label">{{ src.added_by_username }}</span>
+  </div>
+
+  <div class="row-cell row-cell_date">
+    <p-chip
+      [label]="dateLabel(src.created_at)"
+      class="chip-item date-chip"
+      [removable]="false"
+    />
+  </div>
+
+  <div class="row-cell row-cell_statuses">
+    <div class="source-badges">
+      @if (src.is_active) {
+        <p-chip
+          label="Активен"
+          class="chip-item status-chip status-chip_active"
+          [removable]="false"
+        />
+      } @else {
+        <p-chip
+          label="Неактивен"
+          class="chip-item status-chip status-chip_inactive"
+          [removable]="false"
+        />
+      }
+      @if (src.rss_url) {
+        <p-chip label="RSS" class="chip-item status-chip status-chip_rss" [removable]="false" />
+      }
+      @if (src.discovery_paths?.length) {
+        <p-chip
+          [label]="'Обход: ' + src.discovery_paths.length"
+          class="chip-item status-chip status-chip_paths"
+          [removable]="false"
+        />
+      }
+    </div>
+  </div>
+</div>

@@ -1,419 +1,53 @@
 <div class="sources-list">
-  <p-accordion
-    class="sources-list-accordion"
-    [(value)]="expandedSourceId"
-    [multiple]="false"
-    (valueChange)="onSourcesListAccordionValueChange($event)"
-  >
-    @for (src of displayItems; track src.source_id) {
-      <p-accordion-panel [value]="src.source_id">
-        <p-accordion-header>
-          <div class="source-row-top source-row-top_accordion">
-            <div class="row-cell row-cell_title">
-              <div class="source-title-line">
-                <span class="source-row__meta">
-                  <span class="source-row__meta-language">{{
-                    src.language_code.toUpperCase()
-                  }}</span
-                  >{{ src.document_type_name }}
-                </span>
-                <h3 class="source-row__title source-row__title_link">
-                  <a
-                    [href]="src.url"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="source-row__title-link"
-                    (click)="$event.stopPropagation()"
-                    >{{ displayTitle(src) }}</a
-                  >
-                </h3>
+  @if (languagesLoadError) {
+    <div class="state-message state-message_error source-parse__languages-error">
+      {{ languagesLoadError }}
+    </div>
+  }
+
+  @if (listLoading && !displayItems.length) {
+    <div class="state-message">Загрузка источников...</div>
+  } @else if (listError && !displayItems.length) {
+    <div class="state-message state-message_error">{{ listError }}</div>
+  } @else if (listEmpty) {
+    <div class="state-message">Источники не найдены</div>
+  }
+
+  @if (parseRunState$ | async; as run) {
+    @if (displayItems.length) {
+      <p-accordion
+        class="sources-list-accordion"
+        [class.sources-list-accordion_loading]="listLoading"
+        [(value)]="expandedSourceId"
+        [multiple]="false"
+        (valueChange)="onSourcesListAccordionValueChange($event)"
+      >
+        @for (src of displayItems; track src.source_id) {
+          <p-accordion-panel [value]="src.source_id">
+            <p-accordion-header>
+              <app-source-accordion-header [src]="src" />
+            </p-accordion-header>
+            <p-accordion-content>
+              <div class="source-expanded">
+                <app-source-expanded-details [src]="src" />
+                <app-source-parse-panel
+                  [src]="src"
+                  [form]="getParseForm(src.source_id)"
+                  [parsingSourceId]="run.parsingSourceId"
+                  [languagesCatalog]="languagesCatalog"
+                  [parseError]="run.parseError"
+                  [parseFeedback]="run.parseFeedback"
+                  [lastParsedSourceId]="run.lastParsedSourceId"
+                  (parseRequested)="runParse(src)"
+                />
               </div>
-            </div>
-
-            <div class="row-cell row-cell_user">
-              <span class="source-user-label">{{ src.added_by_username }}</span>
-            </div>
-
-            <div class="row-cell row-cell_date">
-              <p-chip
-                [label]="formatDate(src.created_at)"
-                class="chip-item date-chip"
-                [removable]="false"
-              />
-            </div>
-
-            <div class="row-cell row-cell_statuses">
-              <div class="source-badges">
-                @if (src.is_active) {
-                  <p-chip
-                    label="Активен"
-                    class="chip-item status-chip status-chip_active"
-                    [removable]="false"
-                  />
-                } @else {
-                  <p-chip
-                    label="Неактивен"
-                    class="chip-item status-chip status-chip_inactive"
-                    [removable]="false"
-                  />
-                }
-                @if (src.rss_url) {
-                  <p-chip label="RSS" class="chip-item status-chip status-chip_rss" [removable]="false" />
-                }
-                @if (src.discovery_paths?.length) {
-                  <p-chip
-                    [label]="'Обход: ' + src.discovery_paths.length"
-                    class="chip-item status-chip status-chip_paths"
-                    [removable]="false"
-                  />
-                }
-              </div>
-            </div>
-          </div>
-        </p-accordion-header>
-        <p-accordion-content>
-          <div class="source-expanded">
-            <div class="source-stats" aria-label="Статистика по документам источника">
-              <div class="source-stats__item">
-                <span class="source-stats__label">Всего документов в базе</span>
-                @if (hasSourceStatNumber(src.documents_total)) {
-                  <p-knob
-                    [ngModel]="src.documents_total"
-                    [style.--p-knob-value-background]="
-                      sourceStatsKnobColor(src.documents_total, sourceStatsKnobMax(src))
-                    "
-                    [rangeColor]="'var(--super-light-grey-text-color)'"
-                    [readonly]="true"
-                    [size]="65"
-                    [strokeWidth]="8"
-                    [showValue]="true"
-                    [min]="0"
-                    [max]="sourceStatsKnobMax(src)"
-                    valueTemplate="{value}"
-                  />
-                } @else {
-                  <p-knob
-                    [ngModel]="0"
-                    [style.--p-knob-value-background]="sourceStatsKnobNullStroke"
-                    [rangeColor]="'var(--super-light-grey-text-color)'"
-                    [readonly]="true"
-                    [size]="65"
-                    [strokeWidth]="8"
-                    [showValue]="true"
-                    [min]="0"
-                    [max]="sourceStatsKnobMax(src)"
-                    valueTemplate="—"
-                  />
-                }
-              </div>
-              <div class="source-stats__item">
-                <span class="source-stats__label">Создано при последнем разборе</span>
-                @if (hasSourceStatNumber(src.last_parse_created_total)) {
-                  <p-knob
-                    [ngModel]="src.last_parse_created_total"
-                    [style.--p-knob-value-background]="
-                      sourceStatsKnobColor(
-                        src.last_parse_created_total,
-                        sourceStatsKnobMax(src)
-                      )
-                    "
-                    [rangeColor]="'var(--super-light-grey-text-color)'"
-                    [readonly]="true"
-                    [size]="65"
-                    [strokeWidth]="8"
-                    [showValue]="true"
-                    [min]="0"
-                    [max]="sourceStatsKnobMax(src)"
-                    valueTemplate="{value}"
-                  />
-                } @else {
-                  <p-knob
-                    [ngModel]="0"
-                    [style.--p-knob-value-background]="sourceStatsKnobNullStroke"
-                    [rangeColor]="'var(--super-light-grey-text-color)'"
-                    [readonly]="true"
-                    [size]="65"
-                    [strokeWidth]="8"
-                    [showValue]="true"
-                    [min]="0"
-                    [max]="sourceStatsKnobMax(src)"
-                    valueTemplate="—"
-                  />
-                }
-              </div>
-              <div class="source-stats__item">
-                <span class="source-stats__label">Необработанных</span>
-                @if (hasSourceStatNumber(src.documents_unprocessed)) {
-                  <span
-                    class="source-stats__knob-tooltip-target"
-                    [pTooltip]="lastParseAtTooltip(src)"
-                    [tooltipDisabled]="!src.last_parse_at"
-                    tooltipPosition="top"
-                    [appendTo]="'body'"
-                  >
-                    <p-knob
-                      [ngModel]="src.documents_unprocessed"
-                      [style.--p-knob-value-background]="
-                        sourceStatsKnobColor(src.documents_unprocessed, sourceStatsKnobMax(src))
-                      "
-                      [rangeColor]="'var(--super-light-grey-text-color)'"
-                      [readonly]="true"
-                      [size]="65"
-                      [strokeWidth]="8"
-                      [showValue]="true"
-                      [min]="0"
-                      [max]="sourceStatsKnobMax(src)"
-                      valueTemplate="{value}"
-                    />
-                  </span>
-                } @else {
-                  <p-knob
-                    [ngModel]="0"
-                    [style.--p-knob-value-background]="sourceStatsKnobNullStroke"
-                    [rangeColor]="'var(--super-light-grey-text-color)'"
-                    [readonly]="true"
-                    [size]="65"
-                    [strokeWidth]="8"
-                    [showValue]="true"
-                    [min]="0"
-                    [max]="sourceStatsKnobMax(src)"
-                    valueTemplate="—"
-                  />
-                }
-              </div>
-            </div>
-            <div class="source-detail-table-wrapper">
-              <p-table
-                [value]="sourceDetailRows(src)"
-                styleClass="source-detail-table"
-                [tableStyle]="{ 'min-width': '100%', width: '100%' }"
-              >
-                <ng-template pTemplate="body" let-row>
-                  <tr>
-                    <td class="source-detail-table__field">{{ row.label }}</td>
-                    <td class="source-detail-table__value" [class.source-id]="row.isMono">
-                      @if (row.href) {
-                        <a class="source-row__title-link" [href]="row.href" target="_blank" rel="noopener noreferrer">{{ row.text }}</a>
-                      } @else {
-                        {{ row.text }}
-                      }
-                    </td>
-                  </tr>
-                </ng-template>
-              </p-table>
-            </div>
-
-            <div class="source-parse">
-              <h4 class="source-parse__title">Разбор ленты</h4>
-              <p class="source-parse__hint">
-                Новые документы создаются с типом, заданным для источника. Глубина (1–30 дней, UTC):
-                отсекаются материалы старше порога после извлечения текста. Без даты — по чекбоксу
-                ниже.
-              </p>
-              <div class="source-parse__row">
-                <label class="filter-item source-parse__days">
-                  <span>Дней назад</span>
-                  <input
-                    type="number"
-                    name="parseDays_{{ src.source_id }}"
-                    [(ngModel)]="parseDays"
-                    min="1"
-                    max="30"
-                    [disabled]="!src.is_active || parsingSourceId === src.source_id"
-                  />
-                </label>
-                <label class="filter-item source-parse__skip-undated">
-                  <input
-                    type="checkbox"
-                    name="parseSkipUndated_{{ src.source_id }}"
-                    [(ngModel)]="parseSkipUndated"
-                    [disabled]="!src.is_active || parsingSourceId === src.source_id"
-                  />
-                  <span>Не пропускать материалы без даты</span>
-                </label>
-                <button
-                  class="submit-btn source-parse__btn"
-                  type="button"
-                  [disabled]="!src.is_active || parsingSourceId === src.source_id"
-                  (click)="runParse(src)"
-                >
-                  {{ parsingSourceId === src.source_id ? 'Разбор…' : 'Разобрать' }}
-                </button>
-              </div>
-              <div class="source-parse__llm">
-                <label class="source-parse__llm-main">
-                  <input
-                    type="checkbox"
-                    name="parsePostFullPipeline_{{ src.source_id }}"
-                    [(ngModel)]="parsePostFullPipeline"
-                    [disabled]="
-                      !src.is_active ||
-                      parsingSourceId === src.source_id ||
-                      parsePostHasAnyGranular()
-                    "
-                  />
-                  <span>После разбора — полный LLM-пайплайн (автоматические фазы A/B)</span>
-                </label>
-                <p class="source-parse__llm-hint">
-                  Если отмечено, отдельные шаги ниже игнорируются. Иначе: шаги без зависимости от
-                  перевода («Перевод» не считается) ставятся параллельно; тегирование по переводу,
-                  аннотация и категоризация совместно с «Перевод» ставятся только после успешного
-                  сохранения перевода.
-                </p>
-
-                <div class="source-parse__llm-granular">
-                  <span class="source-parse__llm-granular-title">Либо отдельные шаги</span>
-
-                  <div class="source-parse__llm-stage">
-                    <span class="source-parse__llm-stage-title"
-                      >По исходному тексту или без перевода</span
-                    >
-                    <div class="source-parse__llm-stage-grid">
-                      <label class="source-parse__llm-step">
-                        <input
-                          type="checkbox"
-                          name="parsePostTagOrig_{{ src.source_id }}"
-                          [(ngModel)]="parsePostLlmTagOriginal"
-                          [disabled]="
-                            !src.is_active ||
-                            parsingSourceId === src.source_id ||
-                            parsePostFullPipeline
-                          "
-                        />
-                        <span>Теги по оригиналу</span>
-                      </label>
-                      <label class="source-parse__llm-step">
-                        <input
-                          type="checkbox"
-                          name="parsePostTranslate_{{ src.source_id }}"
-                          [(ngModel)]="parsePostLlmTranslate"
-                          (ngModelChange)="parsePostOnTranslateToggled($event)"
-                          [disabled]="
-                            !src.is_active ||
-                            parsingSourceId === src.source_id ||
-                            parsePostFullPipeline
-                          "
-                        />
-                        <span>Перевод</span>
-                      </label>
-                      <label class="source-parse__llm-step">
-                        <input
-                          type="checkbox"
-                          name="parsePostExtractor_{{ src.source_id }}"
-                          [(ngModel)]="parsePostLlmExtractor"
-                          [disabled]="
-                            !src.is_active ||
-                            parsingSourceId === src.source_id ||
-                            parsePostFullPipeline
-                          "
-                        />
-                        <span>Сущности (extractor)</span>
-                      </label>
-                      <label class="source-parse__llm-step">
-                        <input
-                          type="checkbox"
-                          name="parsePostCategorize_{{ src.source_id }}"
-                          [(ngModel)]="parsePostLlmCategorize"
-                          [disabled]="
-                            !src.is_active ||
-                            parsingSourceId === src.source_id ||
-                            parsePostFullPipeline
-                          "
-                        />
-                        <span>Категоризация</span>
-                      </label>
-                    </div>
-                    <p class="source-parse__llm-microhint">
-                      Категоризация без «Перевода»: по текущему тексту в документе (есть перевод в
-                      базе — по нему, иначе по оригиналу). Если отмечены и «Перевод», и
-                      «Категоризация» — категоризация выполняется после успешного перевода и всегда
-                      по переводу.
-                    </p>
-                  </div>
-
-                  <div class="source-parse__llm-stage source-parse__llm-stage_after_translate">
-                    <span class="source-parse__llm-stage-title">Только при наличии перевода</span>
-                    <div class="source-parse__llm-stage-grid">
-                      <label class="source-parse__llm-step">
-                        <input
-                          type="checkbox"
-                          name="parsePostTagTr_{{ src.source_id }}"
-                          [(ngModel)]="parsePostLlmTagTranslated"
-                          [disabled]="
-                            parsePostDependsOnTranslateDisabled(
-                              src.is_active,
-                              parsingSourceId === src.source_id
-                            )
-                          "
-                        />
-                        <span>Теги по переводу</span>
-                      </label>
-                      <label class="source-parse__llm-step">
-                        <input
-                          type="checkbox"
-                          name="parsePostAnnotate_{{ src.source_id }}"
-                          [(ngModel)]="parsePostLlmAnnotate"
-                          [disabled]="
-                            parsePostDependsOnTranslateDisabled(
-                              src.is_active,
-                              parsingSourceId === src.source_id
-                            )
-                          "
-                        />
-                        <span>Аннотация (по переводу)</span>
-                      </label>
-                    </div>
-                    <p class="source-parse__llm-microhint">
-                      Сначала отметьте «Перевод». Эти шаги запускаются автоматически после того, как
-                      перевод сохранён в документе (без гонки с очередью перевода).
-                    </p>
-                  </div>
-                </div>
-
-                @if (parsePostShowLangAndMaxTags()) {
-                  <div class="source-parse__llm-row">
-                    <label class="filter-item source-parse__llm-lang">
-                      <span>Язык перевода</span>
-                      <input
-                        type="text"
-                        name="parsePostTargetLang_{{ src.source_id }}"
-                        [(ngModel)]="parsePostTargetLang"
-                        maxlength="8"
-                        autocomplete="off"
-                        [disabled]="!src.is_active || parsingSourceId === src.source_id"
-                      />
-                    </label>
-                    <label class="filter-item source-parse__llm-maxtags">
-                      <span>Макс. тегов</span>
-                      <input
-                        type="number"
-                        name="parsePostMaxTags_{{ src.source_id }}"
-                        [(ngModel)]="parsePostMaxTags"
-                        min="1"
-                        max="100"
-                        [disabled]="!src.is_active || parsingSourceId === src.source_id"
-                      />
-                    </label>
-                  </div>
-                }
-              </div>
-              @if (parseError && lastParsedSourceId === src.source_id) {
-                <div class="state-message state-message_error source-parse__message">
-                  {{ parseError }}
-                </div>
-              } @else if (parseFeedback && lastParsedSourceId === src.source_id) {
-                <div
-                  class="state-message source-parse__message"
-                  [class.state-message_ok]="parsingSourceId !== src.source_id"
-                  [class.state-message_loading]="parsingSourceId === src.source_id"
-                >
-                  {{ parseFeedback }}
-                </div>
-              }
-            </div>
-          </div>
-        </p-accordion-content>
-      </p-accordion-panel>
+            </p-accordion-content>
+          </p-accordion-panel>
+        }
+      </p-accordion>
+      @if (listLoading) {
+        <div class="state-message sources-list__refresh-hint">Обновление списка…</div>
+      }
     }
-  </p-accordion>
+  }
 </div>

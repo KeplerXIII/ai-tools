@@ -13,7 +13,7 @@
             optionLabel="label"
             optionValue="value"
             placeholder="Все"
-            (ngModelChange)="onFiltersChanged()"
+            (ngModelChange)="onUserFilterChange()"
           />
         </label>
       }
@@ -26,7 +26,6 @@
           [(ngModel)]="sortMode"
           optionLabel="label"
           optionValue="value"
-          (ngModelChange)="onFiltersChanged()"
         />
       </label>
 
@@ -41,17 +40,11 @@
 
   <app-sources-create-section (sourceCreated)="loadSources()" />
 
-  @if (listLoading) {
-    <div class="state-message">Загрузка источников...</div>
-  } @else if (listError) {
-    <div class="state-message state-message_error">{{ listError }}</div>
-  } @else if (!filteredAndSortedItems.length) {
-    <div class="state-message">Источники не найдены</div>
-  } @else {
-    <app-sources-list-accordion
-      [displayItems]="filteredAndSortedItems"
-      [allItems]="items"
-      (reloadSources)="loadSources($event)"
-    />
-  }
+  <app-sources-list-accordion
+    [displayItems]="sortedItems"
+    [allItems]="items"
+    [listLoading]="listLoading"
+    [listError]="listError"
+    [listEmpty]="listEmpty"
+  />
 </section>
