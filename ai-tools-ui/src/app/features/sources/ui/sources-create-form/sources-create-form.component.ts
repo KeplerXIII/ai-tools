@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, EventEmitter, OnInit, Output } from '@angular/core';
+import { Component, DestroyRef, EventEmitter, OnInit, Output } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { PrimeTemplate } from 'primeng/api';
 import { InputGroupAddonModule } from 'primeng/inputgroupaddon';
@@ -61,6 +62,7 @@ export class SourcesCreateFormComponent implements OnInit {
   constructor(
     private readonly sourcesApi: SourcesApi,
     private readonly documentsApi: DocumentsApi,
+    private readonly destroyRef: DestroyRef,
   ) {}
 
   ngOnInit(): void {
@@ -104,7 +106,10 @@ export class SourcesCreateFormComponent implements OnInit {
 
   loadDocumentTypesCatalog(): void {
     this.documentTypesLoadError = '';
-    this.documentsApi.getDocumentTypesCatalog().subscribe({
+    this.documentsApi
+      .getDocumentTypesCatalog()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
       next: (items) => {
         this.documentTypesCatalog = items;
         this.ensureDocumentTypeSelection();
@@ -117,7 +122,10 @@ export class SourcesCreateFormComponent implements OnInit {
 
   loadLanguagesCatalog(): void {
     this.languagesLoadError = '';
-    this.sourcesApi.getLanguagesCatalog().subscribe({
+    this.sourcesApi
+      .getLanguagesCatalog()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
       next: (items) => {
         this.languagesCatalog = items;
         this.ensureLanguageSelection();
@@ -130,7 +138,10 @@ export class SourcesCreateFormComponent implements OnInit {
 
   loadCountriesCatalog(): void {
     this.countriesLoadError = '';
-    this.sourcesApi.getCountriesCatalog().subscribe({
+    this.sourcesApi
+      .getCountriesCatalog()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
       next: (items) => {
         this.countriesCatalog = items;
         this.ensureCountrySelection();
@@ -209,7 +220,10 @@ export class SourcesCreateFormComponent implements OnInit {
       body.rss_url = rss;
     }
 
-    this.sourcesApi.createSource(body).subscribe({
+    this.sourcesApi
+      .createSource(body)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
       next: () => {
         this.createSubmitting = false;
         this.createSuccess = 'Источник добавлен';

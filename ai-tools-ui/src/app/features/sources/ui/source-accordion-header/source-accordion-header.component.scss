@@ -1,0 +1,149 @@
+.source-row-top_accordion {
+  grid-template-columns: minmax(0, 1fr) minmax(100px, 140px) minmax(120px, 160px) minmax(
+      180px,
+      220px
+    );
+}
+
+.source-row-top {
+  display: grid;
+  width: 100%;
+  grid-template-columns:
+    minmax(0, 0.7fr) minmax(100px, 130px) minmax(120px, 300px) minmax(180px, 260px)
+    36px;
+  align-items: center;
+  gap: 10px;
+}
+
+.row-cell {
+  display: flex;
+  align-items: center;
+  min-height: 42px;
+}
+
+.row-cell_title {
+  min-width: 0;
+}
+
+.row-cell_user .source-user-label {
+  color: var(--primary-text-color-light);
+  font-size: var(--font-size-prewiew);
+  font-weight: var(--font-weight-light);
+}
+
+:host ::ng-deep .row-cell_date .chip-item {
+  background-color: var(--bg-light-grey);
+  color: var(--dark-text-color);
+  font-weight: var(--font-weight-light);
+  border-radius: 20px;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.05),
+    0 4px 10px rgba(0, 0, 0, 0.06);
+}
+
+.source-title-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+}
+
+.source-row__title {
+  margin: 0;
+  font-size: var(--font-size-prewiew);
+  font-weight: var(--font-weight-regular);
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  color: var(--primary-text-color);
+  transition: color 0.4s ease;
+}
+
+.source-row__title a {
+  color: inherit;
+}
+
+.source-row__title a:hover {
+  color: var(--primary-text-color-light-hover);
+}
+
+.source-row__meta-language {
+  font-weight: var(--font-weight-medium);
+  padding: 5px;
+  background: var(--primary-text-color-light);
+  border-radius: 50%;
+  color: var(--light-text-color);
+  margin-right: 10px;
+  font-size: var(--font-size-small);
+}
+
+.source-row__meta {
+  color: var(--primary-text-color-light);
+  font-size: var(--font-size-prewiew);
+  font-weight: var(--font-weight-light);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.source-badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 6px;
+  width: 100%;
+}
+
+.date-chip {
+  background-color: var(--bg-light-grey);
+  color: var(--dark-text-color);
+  font-weight: var(--font-weight-light);
+  font-size: var(--font-size-prewiew);
+  border-radius: 20px;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.05),
+    0 4px 10px rgba(0, 0, 0, 0.06);
+}
+
+:host ::ng-deep .source-badges p-chip.chip-item.status-chip {
+  border-radius: 999px;
+  font-size: 12px;
+  min-height: auto;
+}
+
+:host ::ng-deep .source-badges p-chip.status-chip_active {
+  background: var(--accent-color-success);
+  color: var(--light-text-color);
+}
+
+:host ::ng-deep .source-badges p-chip.status-chip_active .p-chip-label {
+  color: var(--light-text-color);
+}
+
+:host ::ng-deep .source-badges p-chip.status-chip_inactive {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+:host ::ng-deep .source-badges p-chip.status-chip_inactive .p-chip-label {
+  color: #991b1b;
+}
+
+:host ::ng-deep .source-badges p-chip.status-chip_rss {
+  background: var(--bg-light-grey);
+  color: var(--primary-text-color);
+}
+
+:host ::ng-deep .source-badges p-chip.status-chip_rss .p-chip-label {
+  color: var(--primary-text-color);
+}
+
+.source-row__title-link {
+  color: var(--primary-text-color) !important;
+  transition: color 0.5s ease;
+  &:hover {
+    color: var(--primary-text-color-light-hover) !important;
+  }
+}

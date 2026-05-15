@@ -1,542 +1,90 @@
 import { CommonModule } from '@angular/common';
-import { HttpErrorResponse } from '@angular/common/http';
 import {
   ChangeDetectorRef,
   Component,
-  EventEmitter,
+  DestroyRef,
+  inject,
   Input,
   OnChanges,
-  OnDestroy,
   OnInit,
-  Output,
   SimpleChanges,
 } from '@angular/core';
-import { FormsModule } from '@angular/forms';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AccordionModule } from 'primeng/accordion';
-import { CheckboxModule } from 'primeng/checkbox';
-import { ChipModule } from 'primeng/chip';
-import { InputNumberModule } from 'primeng/inputnumber';
-import { KnobModule } from 'primeng/knob';
-import { SelectModule } from 'primeng/select';
-import { TableModule } from 'primeng/table';
-import { TooltipModule } from 'primeng/tooltip';
-import { PrimaryButtonComponent } from '../../../../shared/ui/primary-button/primary-button.component';
-import { finalize, switchMap, tap } from 'rxjs/operators';
-import { Subscription } from 'rxjs';
+import { SourceAccordionHeaderComponent } from '../source-accordion-header/source-accordion-header.component';
+import { SourceExpandedDetailsComponent } from '../source-expanded-details/source-expanded-details.component';
+import { SourceParsePanelComponent } from '../source-parse-panel/source-parse-panel.component';
+import { LanguageCatalogItem, SourceListItem, SourcesApi } from '../../api/sources-api';
+import { SourceParseRunService } from '../../services/source-parse-run.service';
 import {
-  LanguageCatalogItem,
-  ParseSourceRunResponse,
-  ParseSourceRunSnapshotPayload,
-  PostParseProcessingOptions,
-  SourceListItem,
-  SourcesApi,
-} from '../../api/sources-api';
-
-interface SourceDetailRow {
-  label: string;
-  text: string;
-  href?: string;
-  isMono?: boolean;
-}
+  createDefaultSourceParseFormState,
+  SourceParseFormState,
+} from './source-parse-form.model';
 
 @Component({
   selector: 'app-sources-list-accordion',
   standalone: true,
   imports: [
     CommonModule,
-    FormsModule,
     AccordionModule,
-    CheckboxModule,
-    ChipModule,
-    InputNumberModule,
-    KnobModule,
-    SelectModule,
-    TableModule,
-    TooltipModule,
-    PrimaryButtonComponent,
+    SourceAccordionHeaderComponent,
+    SourceExpandedDetailsComponent,
+    SourceParsePanelComponent,
   ],
   templateUrl: './sources-list-accordion.component.html',
   styleUrl: './sources-list-accordion.component.scss',
 })
-export class SourcesListAccordionComponent implements OnInit, OnChanges, OnDestroy {
-  /** Цвет дуги для p-knob без числового значения (центр «—»). */
-  readonly sourceStatsKnobNullStroke = '#94a3b8';
-
+export class SourcesListAccordionComponent implements OnInit, OnChanges {
   @Input({ required: true }) displayItems: SourceListItem[] = [];
   @Input({ required: true }) allItems: SourceListItem[] = [];
-  @Output() readonly reloadSources = new EventEmitter<{ silent?: boolean }>();
+  @Input() listLoading = false;
+  @Input() listError = '';
+  @Input() listEmpty = false;
 
   expandedSourceId: string | undefined = undefined;
-
-  /** Глубина разбора в днях; допустимый диапазон 1–30 (см. `clampParseDays`). */
-  parseDays = 3;
-  /** Соответствует skip_undated в API: после извлечения не сохранять материалы без итоговой даты. */
-  parseSkipUndated = true;
-
-  parsePostFullPipeline = true;
-  parsePostLlmTagOriginal = false;
-  parsePostLlmTranslate = false;
-  parsePostLlmExtractor = false;
-  parsePostLlmTagTranslated = false;
-  parsePostLlmAnnotate = false;
-  parsePostLlmCategorize = false;
-  parsePostTargetLang = 'ru';
-  parsePostMaxTags = 12;
   languagesCatalog: LanguageCatalogItem[] = [];
   languagesLoadError = '';
 
-  parsingSourceId: string | null = null;
-  lastParsedSourceId: string | null = null;
-  parseFeedback = '';
-  parseError = '';
-  private parseStreamSub: Subscription | null = null;
-  private attachedParseRunId: string | null = null;
+  private readonly parseForms = new Map<string, SourceParseFormState>();
+  private readonly parseRun = inject(SourceParseRunService);
+  readonly parseRunState$ = this.parseRun.viewState$;
 
   private readonly storageExpandedKey = 'ai-tools.sources.expandedSourceId';
-  private readonly storageParseUiKey = 'ai-tools.sources.lastParseUi';
 
-  constructor(
-    private readonly sourcesApi: SourcesApi,
-    private readonly cdr: ChangeDetectorRef,
-  ) {}
+  private readonly sourcesApi = inject(SourcesApi);
+  private readonly cdr = inject(ChangeDetectorRef);
+  private readonly destroyRef = inject(DestroyRef);
 
   ngOnInit(): void {
     this.loadLanguagesCatalog();
   }
 
-  get parsePostTargetLangSelectOptions(): { label: string; value: string }[] {
-    return this.languagesCatalog.map((l) => ({
-      value: l.code,
-      label: `${l.name} (${l.code})`,
-    }));
-  }
-
   ngOnChanges(changes: SimpleChanges): void {
+    if (changes['displayItems']) {
+      this.syncExpandedToVisibleItems();
+    }
     const allCh = changes['allItems'];
     if (!allCh || !this.allItems.length) {
       return;
     }
     this.applyExpandedFromStorage();
-    this.applyParseUiFromStorage();
-    this.reconcileActiveParseStreamsAfterListLoad();
+    const knownSourceIds = this.allItems.map((i) => i.source_id);
+    this.parseRun.restoreParseUiFromStorage(knownSourceIds);
+    this.parseRun.reconcileActiveRuns(this.allItems, this.expandedSourceId);
   }
 
-  ngOnDestroy(): void {
-    this.parseStreamSub?.unsubscribe();
-    this.parseStreamSub = null;
-    this.attachedParseRunId = null;
-  }
-
-  private applyExpandedFromStorage(): void {
-    const stored = sessionStorage.getItem(this.storageExpandedKey);
-    if (!stored) {
-      return;
+  getParseForm(sourceId: string): SourceParseFormState {
+    let form = this.parseForms.get(sourceId);
+    if (!form) {
+      form = createDefaultSourceParseFormState();
+      this.parseForms.set(sourceId, form);
+      this.ensureParsePostTargetLangSelection(form);
     }
-    if (this.allItems.some((i) => i.source_id === stored)) {
-      this.expandedSourceId = stored;
-    } else {
-      sessionStorage.removeItem(this.storageExpandedKey);
-      this.expandedSourceId = undefined;
-    }
-  }
-
-  private applyParseUiFromStorage(): void {
-    const raw = sessionStorage.getItem(this.storageParseUiKey);
-    if (!raw) {
-      return;
-    }
-    try {
-      const o = JSON.parse(raw) as {
-        sourceId: string;
-        feedback: string;
-        error: string;
-        status: string;
-      };
-      if (o.status !== 'completed' && o.status !== 'failed') {
-        return;
-      }
-      if (!this.allItems.some((i) => i.source_id === o.sourceId)) {
-        return;
-      }
-      this.lastParsedSourceId = o.sourceId;
-      this.parseFeedback = o.feedback ?? '';
-      this.parseError = o.error ?? '';
-    } catch {
-      sessionStorage.removeItem(this.storageParseUiKey);
-    }
-  }
-
-  private persistParseUiSnapshot(sourceId: string, status: string): void {
-    if (status !== 'completed' && status !== 'failed') {
-      return;
-    }
-    sessionStorage.setItem(
-      this.storageParseUiKey,
-      JSON.stringify({
-        sourceId,
-        feedback: this.parseFeedback,
-        error: this.parseError,
-        status,
-      }),
-    );
-  }
-
-  loadLanguagesCatalog(): void {
-    this.languagesLoadError = '';
-    this.sourcesApi.getLanguagesCatalog().subscribe({
-      next: (items) => {
-        this.languagesCatalog = items;
-        this.ensureParsePostTargetLangSelection();
-        this.cdr.markForCheck();
-      },
-      error: () => {
-        this.languagesLoadError = 'Не удалось загрузить список языков';
-        this.cdr.markForCheck();
-      },
-    });
-  }
-
-  private ensureParsePostTargetLangSelection(): void {
-    if (!this.languagesCatalog.length) {
-      return;
-    }
-    const lower = this.parsePostTargetLang.trim().toLowerCase();
-    const match = this.languagesCatalog.find((l) => l.code.toLowerCase() === lower);
-    if (match) {
-      this.parsePostTargetLang = match.code;
-      return;
-    }
-    const ru = this.languagesCatalog.find((l) => l.code.toLowerCase() === 'ru');
-    this.parsePostTargetLang = ru ? ru.code : this.languagesCatalog[0].code;
-  }
-
-  parsePostHasAnyGranular(): boolean {
-    return (
-      this.parsePostLlmTagOriginal ||
-      this.parsePostLlmTranslate ||
-      this.parsePostLlmExtractor ||
-      this.parsePostLlmTagTranslated ||
-      this.parsePostLlmAnnotate ||
-      this.parsePostLlmCategorize
-    );
-  }
-
-  parsePostShowLangAndMaxTags(): boolean {
-    return this.parsePostFullPipeline || this.parsePostHasAnyGranular();
-  }
-
-  parsePostDependsOnTranslateDisabled(srcActive: boolean, parsing: boolean): boolean {
-    return !srcActive || parsing || this.parsePostFullPipeline || !this.parsePostLlmTranslate;
-  }
-
-  parsePostOnTranslateToggled(enabled: boolean): void {
-    if (!enabled) {
-      this.parsePostLlmTagTranslated = false;
-      this.parsePostLlmAnnotate = false;
-    }
-  }
-
-  /** После выключения полного пайплайна — плавный скролл к низу страницы (после анимации блоков). */
-  onParsePostFullPipelineChange(checked: boolean): void {
-    if (checked) {
-      return;
-    }
-    this.cdr.markForCheck();
-    window.setTimeout(() => {
-      const top = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
-      window.scrollTo({ top, behavior: 'smooth' });
-    }, 320);
-  }
-
-  private buildPostParsePayload(): PostParseProcessingOptions | undefined {
-    const target_lang = (this.parsePostTargetLang || 'ru').trim().slice(0, 8) || 'ru';
-    const max_tags = Math.min(12, Math.max(1, Math.floor(Number(this.parsePostMaxTags)) || 12));
-    if (this.parsePostFullPipeline) {
-      return { full_llm_pipeline: true, target_lang, max_tags };
-    }
-    if (!this.parsePostHasAnyGranular()) {
-      return undefined;
-    }
-    return {
-      full_llm_pipeline: false,
-      llm_tag_original: this.parsePostLlmTagOriginal || undefined,
-      llm_translate: this.parsePostLlmTranslate || undefined,
-      llm_extractor: this.parsePostLlmExtractor || undefined,
-      llm_tag_translated: this.parsePostLlmTagTranslated || undefined,
-      llm_annotate: this.parsePostLlmAnnotate || undefined,
-      llm_categorize: this.parsePostLlmCategorize || undefined,
-      target_lang,
-      max_tags,
-    };
-  }
-
-  private formatParseProgress(
-    snap: Pick<ParseSourceRunSnapshotPayload, 'status' | 'phase' | 'found_total' | 'created_total'>,
-  ): string {
-    if (snap.status === 'failed') {
-      return 'Ошибка разбора';
-    }
-    if (snap.status === 'completed') {
-      return `Готово: ссылок ${snap.found_total ?? 0}, новых документов ${snap.created_total ?? 0}`;
-    }
-    const ph = snap.phase || '';
-    const found = snap.found_total;
-    const phaseLabels: Record<string, string> = {
-      queued: 'В очереди на воркер…',
-      discovery: 'Поиск страниц и RSS…',
-      extract:
-        found != null
-          ? `Загрузка и извлечение текста (найдено ссылок: ${found})…`
-          : 'Загрузка и извлечение текста…',
-      save: 'Сохранение документов в базу…',
-      complete: 'Завершение…',
-    };
-    return phaseLabels[ph] || `Статус: ${snap.status}`;
-  }
-
-  private applySnapToParseUi(
-    sourceId: string,
-    snap: ParseSourceRunResponse | ParseSourceRunSnapshotPayload,
-  ): void {
-    this.lastParsedSourceId = sourceId;
-    this.parseFeedback = this.formatParseProgress(snap);
-    if (snap.status === 'failed') {
-      this.parseError = snap.error_message || 'Разбор завершился с ошибкой';
-    } else {
-      this.parseError = '';
-    }
-  }
-
-  private handleParseStreamSnapshot(sourceId: string, snap: ParseSourceRunSnapshotPayload): void {
-    this.applySnapToParseUi(sourceId, snap);
-    if (snap.status === 'completed' || snap.status === 'failed') {
-      this.attachedParseRunId = null;
-      this.persistParseUiSnapshot(sourceId, snap.status);
-    }
-  }
-
-  private onParseStreamFinalize(sourceId: string): void {
-    this.parsingSourceId = null;
-    this.lastParsedSourceId = sourceId;
-    this.reloadSources.emit({ silent: true });
-    this.cdr.markForCheck();
-  }
-
-  private onParseStreamError(err: unknown): void {
-    this.parseError =
-      err instanceof HttpErrorResponse ? this.formatParseError(err) : 'Поток разбора прерван';
-    this.parseFeedback = '';
-  }
-
-  private reconcileActiveParseStreamsAfterListLoad(): void {
-    this.sourcesApi.listActiveSourceParseRuns().subscribe({
-      next: (resp) => {
-        const visible = resp.items.filter((row) =>
-          this.allItems.some((s) => s.source_id === row.source_id),
-        );
-        if (!visible.length) {
-          return;
-        }
-        const expanded = this.expandedSourceId;
-        const pick =
-          (expanded ? visible.find((i) => i.source_id === expanded) : undefined) ?? visible[0];
-        this.subscribeParseRunStreamIfNeeded(pick.source_id, pick.parse_run);
-      },
-      error: () => {
-        /* не блокируем список источников */
-      },
-    });
-  }
-
-  private subscribeParseRunStreamIfNeeded(sourceId: string, initial: ParseSourceRunResponse): void {
-    const parseRunId = String(initial.parse_run_id);
-    if (
-      this.attachedParseRunId === parseRunId &&
-      this.parseStreamSub !== null &&
-      !this.parseStreamSub.closed
-    ) {
-      return;
-    }
-    this.parseStreamSub?.unsubscribe();
-    this.parseStreamSub = null;
-
-    if (initial.status === 'completed' || initial.status === 'failed') {
-      this.applySnapToParseUi(sourceId, initial);
-      this.persistParseUiSnapshot(sourceId, initial.status);
-      this.parsingSourceId = null;
-      this.lastParsedSourceId = sourceId;
-      this.attachedParseRunId = null;
-      this.reloadSources.emit({ silent: true });
-      this.cdr.markForCheck();
-      return;
-    }
-
-    this.applySnapToParseUi(sourceId, initial);
-    this.parsingSourceId = sourceId;
-    this.attachedParseRunId = parseRunId;
-
-    this.parseStreamSub = this.sourcesApi
-      .streamParseRun(parseRunId)
-      .pipe(
-        finalize(() => {
-          this.attachedParseRunId = null;
-          this.onParseStreamFinalize(sourceId);
-        }),
-      )
-      .subscribe({
-        next: (snap) => {
-          this.handleParseStreamSnapshot(sourceId, snap);
-          this.cdr.markForCheck();
-        },
-        error: (err) => {
-          this.attachedParseRunId = null;
-          this.onParseStreamError(err);
-          this.cdr.markForCheck();
-        },
-      });
-  }
-
-  private static readonly parseDaysMin = 1;
-  private static readonly parseDaysMax = 30;
-  private static readonly parseMaxTagsMin = 1;
-  private static readonly parseMaxTagsMax = 12;
-
-  /** Целое число дней в диапазоне 1–30 для поля «Дней назад». */
-  clampParseDays(): void {
-    const raw = Number(this.parseDays);
-    if (!Number.isFinite(raw)) {
-      this.parseDays = 3;
-      return;
-    }
-    this.parseDays = Math.min(
-      SourcesListAccordionComponent.parseDaysMax,
-      Math.max(SourcesListAccordionComponent.parseDaysMin, Math.floor(raw)),
-    );
-  }
-
-  /** Не даёт ввести в поле «Дней назад» значение вне 1–30 (клавиатура и вставка). */
-  onParseDaysKeyDown(event: KeyboardEvent): void {
-    this.onBoundedIntegerKeyDown(
-      event,
-      SourcesListAccordionComponent.parseDaysMin,
-      SourcesListAccordionComponent.parseDaysMax,
-    );
-  }
-
-  /** Целое число тегов в диапазоне 1–12 для поля «Макс. тегов». */
-  clampParseMaxTags(): void {
-    const raw = Number(this.parsePostMaxTags);
-    if (!Number.isFinite(raw)) {
-      this.parsePostMaxTags = 12;
-      return;
-    }
-    this.parsePostMaxTags = Math.min(
-      SourcesListAccordionComponent.parseMaxTagsMax,
-      Math.max(SourcesListAccordionComponent.parseMaxTagsMin, Math.floor(raw)),
-    );
-  }
-
-  /** Не даёт ввести в поле «Макс. тегов» значение вне 1–12 (клавиатура и вставка). */
-  onParseMaxTagsKeyDown(event: KeyboardEvent): void {
-    this.onBoundedIntegerKeyDown(
-      event,
-      SourcesListAccordionComponent.parseMaxTagsMin,
-      SourcesListAccordionComponent.parseMaxTagsMax,
-    );
-  }
-
-  private onBoundedIntegerKeyDown(event: KeyboardEvent, min: number, max: number): void {
-    const controlKeys = [
-      'Backspace',
-      'Delete',
-      'Tab',
-      'Escape',
-      'Enter',
-      'ArrowLeft',
-      'ArrowRight',
-      'ArrowUp',
-      'ArrowDown',
-      'Home',
-      'End',
-    ];
-    if (controlKeys.includes(event.key) || event.ctrlKey || event.metaKey) {
-      return;
-    }
-    if (!/^\d$/.test(event.key)) {
-      event.preventDefault();
-      return;
-    }
-    const input = event.target;
-    if (!(input instanceof HTMLInputElement)) {
-      return;
-    }
-    const start = input.selectionStart ?? 0;
-    const end = input.selectionEnd ?? 0;
-    const next = `${input.value.slice(0, start)}${event.key}${input.value.slice(end)}`;
-    if (next === '') {
-      return;
-    }
-    const n = Number.parseInt(next, 10);
-    if (!Number.isFinite(n) || n < min || n > max) {
-      event.preventDefault();
-    }
+    return form;
   }
 
   runParse(src: SourceListItem): void {
-    if (!src.is_active) {
-      return;
-    }
-    this.parseStreamSub?.unsubscribe();
-    this.parseStreamSub = null;
-    this.attachedParseRunId = null;
-    this.parseError = '';
-    this.parseFeedback = '';
-    this.lastParsedSourceId = null;
-    sessionStorage.removeItem(this.storageParseUiKey);
-    this.clampParseDays();
-    this.clampParseMaxTags();
-    const days = this.parseDays;
-    this.parsingSourceId = src.source_id;
-    this.parseStreamSub = this.sourcesApi
-      .parseSource({
-        source_id: src.source_id,
-        days,
-        skip_undated: this.parseSkipUndated,
-        post_parse: this.buildPostParsePayload(),
-      })
-      .pipe(
-        tap((enq) => {
-          this.attachedParseRunId = enq.parse_run_id;
-        }),
-        switchMap((enq) =>
-          this.sourcesApi
-            .streamParseRun(enq.parse_run_id)
-            .pipe(finalize(() => this.onParseStreamFinalize(src.source_id))),
-        ),
-        finalize(() => {
-          this.parsingSourceId = null;
-          this.cdr.markForCheck();
-        }),
-      )
-      .subscribe({
-        next: (snap) => {
-          this.handleParseStreamSnapshot(src.source_id, snap);
-          this.cdr.markForCheck();
-        },
-        error: (err: unknown) => {
-          this.attachedParseRunId = null;
-          this.onParseStreamError(err);
-          this.cdr.markForCheck();
-        },
-      });
-  }
-
-  private formatParseError(err: HttpErrorResponse): string {
-    const detail = err.error?.detail;
-    if (typeof detail === 'string') {
-      return detail;
-    }
-    return 'Не удалось запустить разбор источника';
+    this.parseRun.runParse(src, this.getParseForm(src.source_id));
   }
 
   onSourcesListAccordionValueChange(value: unknown): void {
@@ -554,107 +102,61 @@ export class SourcesListAccordionComponent implements OnInit, OnChanges, OnDestr
     }
   }
 
-  displayTitle(item: SourceListItem): string {
-    const name = item.name?.trim();
-    if (name) {
-      return name;
+  private syncExpandedToVisibleItems(): void {
+    if (!this.expandedSourceId) {
+      return;
     }
-    try {
-      return new URL(item.url).hostname;
-    } catch {
-      return item.url;
+    if (this.displayItems.some((i) => i.source_id === this.expandedSourceId)) {
+      return;
+    }
+    this.expandedSourceId = undefined;
+    sessionStorage.removeItem(this.storageExpandedKey);
+  }
+
+  private applyExpandedFromStorage(): void {
+    const stored = sessionStorage.getItem(this.storageExpandedKey);
+    if (!stored) {
+      return;
+    }
+    if (this.allItems.some((i) => i.source_id === stored)) {
+      this.expandedSourceId = stored;
+    } else {
+      sessionStorage.removeItem(this.storageExpandedKey);
+      this.expandedSourceId = undefined;
     }
   }
 
-  formatDate(iso: string): string {
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) {
-      return iso;
-    }
-    return d.toLocaleString('ru-RU', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+  private loadLanguagesCatalog(): void {
+    this.languagesLoadError = '';
+    this.sourcesApi
+      .getLanguagesCatalog()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (items) => {
+          this.languagesCatalog = items;
+          for (const form of this.parseForms.values()) {
+            this.ensureParsePostTargetLangSelection(form);
+          }
+          this.cdr.markForCheck();
+        },
+        error: () => {
+          this.languagesLoadError = 'Не удалось загрузить список языков';
+          this.cdr.markForCheck();
+        },
+      });
   }
 
-  /**
-   * Общий max для трёх счётчиков в блоке статистики источника — дуги наглядно сопоставимы.
-   */
-  sourceStatsKnobMax(src: SourceListItem): number {
-    const total = this.sourceStatsCoalesceCount(src.documents_total);
-    const unprocessed = this.sourceStatsCoalesceCount(src.documents_unprocessed);
-    const last = this.sourceStatsCoalesceCount(src.last_parse_created_total);
-    const peak = Math.max(total, unprocessed, last, 1);
-    return Math.max(100, peak);
-  }
-
-  /** Есть число для статистики (null/undefined/NaN — нет). */
-  hasSourceStatNumber(value: unknown): boolean {
-    if (value === null || value === undefined) {
-      return false;
+  private ensureParsePostTargetLangSelection(form: SourceParseFormState): void {
+    if (!this.languagesCatalog.length) {
+      return;
     }
-    const n = Number(value);
-    return !Number.isNaN(n);
-  }
-
-  private sourceStatsCoalesceCount(value: unknown): number {
-    if (value === null || value === undefined) {
-      return 0;
+    const lower = form.parsePostTargetLang.trim().toLowerCase();
+    const match = this.languagesCatalog.find((l) => l.code.toLowerCase() === lower);
+    if (match) {
+      form.parsePostTargetLang = match.code;
+      return;
     }
-    const n = Number(value);
-    if (Number.isNaN(n)) {
-      return 0;
-    }
-    return Math.max(0, Math.floor(n));
-  }
-
-  /** Цвет дуги по доле value/max (как шкала уверенности в категориях). */
-  sourceStatsKnobColor(value: number | null | undefined, max: number): string {
-    const v = Math.max(0, Number(value) || 0);
-    const m = Math.max(1, max);
-    const pct = Math.round((v / m) * 100);
-    if (pct <= 10) {
-      return '#ef4444';
-    }
-    if (pct <= 30) {
-      return '#f97316';
-    }
-    if (pct <= 50) {
-      return '#eab308';
-    }
-    if (pct <= 80) {
-      return '#AEEB9D';
-    }
-    return '#22c55e';
-  }
-
-  lastParseAtTooltip(src: SourceListItem): string {
-    if (!src.last_parse_at) {
-      return '';
-    }
-    return `Последний разбор: ${this.formatDate(src.last_parse_at)}`;
-  }
-
-  /** Строки таблицы «поле — значение» в развёрнутом блоке источника. */
-  sourceDetailRows(src: SourceListItem): SourceDetailRow[] {
-    const rows: SourceDetailRow[] = [{ label: 'URL', text: src.url, href: src.url }];
-    const rss = (src.rss_url ?? '').trim();
-    if (rss) {
-      rows.push({ label: 'RSS', text: rss, href: rss });
-    }
-    const country = (src.country_code ?? '').trim();
-    rows.push(
-      {
-        label: 'Тип документа',
-        text: `${src.document_type_name} (${src.document_type_code})`,
-      },
-      { label: 'Страна', text: country ? country : '—' },
-      { label: 'Добавил', text: src.added_by_username },
-      { label: 'Идентификатор', text: src.source_id, isMono: true },
-    );
-    return rows;
+    const ru = this.languagesCatalog.find((l) => l.code.toLowerCase() === 'ru');
+    form.parsePostTargetLang = ru ? ru.code : this.languagesCatalog[0].code;
   }
 }
