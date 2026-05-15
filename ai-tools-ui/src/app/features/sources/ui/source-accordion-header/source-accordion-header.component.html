@@ -45,8 +45,12 @@
           [removable]="false"
         />
       }
-      @if (src.rss_url) {
-        <p-chip label="RSS" class="chip-item status-chip status-chip_rss" [removable]="false" />
+      @if (src.rss_urls?.length || src.rss_url) {
+        <p-chip
+          [label]="rssChipLabel(src)"
+          class="chip-item status-chip status-chip_rss"
+          [removable]="false"
+        />
       }
       @if (src.discovery_paths?.length) {
         <p-chip

@@ -47,7 +47,8 @@ export class SourcesCreateFormComponent implements OnInit {
   formName = '';
   formLanguageCode = 'en';
   formCountryCode = '';
-  formRssUrl = '';
+  /** По одному URL RSS на строку */
+  formRssUrls = '';
   /** По одному пути на строку, от корня сайта: /news */
   formDiscoveryPaths = '';
   formDocumentTypeCode = 'news';
@@ -217,11 +218,11 @@ export class SourcesCreateFormComponent implements OnInit {
       }
       body.country_code = countryUpper.slice(0, 8);
     }
-    const rss = this.formRssUrl.trim();
-    if (rss) {
-      body.rss_url = rss;
+    const rssUrls = this.parseLineListInput(this.formRssUrls);
+    if (rssUrls.length) {
+      body.rss_urls = rssUrls;
     }
-    const discoveryPaths = this.parseDiscoveryPathsInput(this.formDiscoveryPaths);
+    const discoveryPaths = this.parseLineListInput(this.formDiscoveryPaths);
     if (discoveryPaths.length) {
       body.discovery_paths = discoveryPaths;
     }
@@ -248,7 +249,7 @@ export class SourcesCreateFormComponent implements OnInit {
     this.formName = '';
     this.formLanguageCode = 'en';
     this.formCountryCode = '';
-    this.formRssUrl = '';
+    this.formRssUrls = '';
     this.formDiscoveryPaths = '';
     this.formDocumentTypeCode = 'news';
     this.ensureLanguageSelection();
@@ -303,7 +304,7 @@ export class SourcesCreateFormComponent implements OnInit {
     this.formLanguageCode = en ? en.code : this.languagesCatalog[0].code;
   }
 
-  private parseDiscoveryPathsInput(raw: string): string[] {
+  private parseLineListInput(raw: string): string[] {
     const seen = new Set<string>();
     const out: string[] = [];
     for (const part of raw.split(/[\n,]+/)) {

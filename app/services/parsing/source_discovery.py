@@ -11,6 +11,7 @@ from bs4 import BeautifulSoup
 
 from app.services.documents.url_norm import normalize_source_url
 from app.services.parsing.discovery_paths import build_discovery_page_urls
+from app.services.parsing.rss_urls import normalize_rss_urls
 from app.services.parsing.extractor import download_html
 
 MAX_DISCOVERED_LINKS = 400
@@ -150,7 +151,7 @@ def _parse_rss_items(xml_text: str) -> list[DiscoveredUrl]:
 async def discover_source_news_urls(
     source_url: str,
     *,
-    rss_url: str | None,
+    rss_urls: list[str] | None = None,
     discovery_paths: list[str] | None = None,
     days: int,
     skip_undated: bool = True,
@@ -161,8 +162,11 @@ async def discover_source_news_urls(
 
     discovered: dict[str, DiscoveredUrl] = {}
 
-    if rss_url:
-        rss_xml = await download_html(rss_url)
+    for rss_url in normalize_rss_urls(rss_urls):
+        try:
+            rss_xml = await download_html(rss_url)
+        except Exception:
+            continue
         for item in _parse_rss_items(rss_xml):
             if _within_days(item.published_at, threshold, skip_undated=skip_undated):
                 discovered[item.url] = item

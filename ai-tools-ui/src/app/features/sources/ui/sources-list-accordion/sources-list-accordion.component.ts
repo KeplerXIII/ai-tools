@@ -3,16 +3,19 @@ import {
   ChangeDetectorRef,
   Component,
   DestroyRef,
+  EventEmitter,
   inject,
   Input,
   OnChanges,
   OnInit,
+  Output,
   SimpleChanges,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AccordionModule } from 'primeng/accordion';
 import { SourceAccordionHeaderComponent } from '../source-accordion-header/source-accordion-header.component';
 import { SourceExpandedDetailsComponent } from '../source-expanded-details/source-expanded-details.component';
+import { SourceEditPanelComponent } from '../source-edit-panel/source-edit-panel.component';
 import { SourceParsePanelComponent } from '../source-parse-panel/source-parse-panel.component';
 import { LanguageCatalogItem, SourceListItem, SourcesApi } from '../../api/sources-api';
 import { SourceParseRunService } from '../../services/source-parse-run.service';
@@ -29,6 +32,7 @@ import {
     AccordionModule,
     SourceAccordionHeaderComponent,
     SourceExpandedDetailsComponent,
+    SourceEditPanelComponent,
     SourceParsePanelComponent,
   ],
   templateUrl: './sources-list-accordion.component.html',
@@ -40,6 +44,7 @@ export class SourcesListAccordionComponent implements OnInit, OnChanges {
   @Input() listLoading = false;
   @Input() listError = '';
   @Input() listEmpty = false;
+  @Output() readonly sourceUpdated = new EventEmitter<void>();
 
   expandedSourceId: string | undefined = undefined;
   languagesCatalog: LanguageCatalogItem[] = [];
@@ -85,6 +90,10 @@ export class SourcesListAccordionComponent implements OnInit, OnChanges {
 
   runParse(src: SourceListItem): void {
     this.parseRun.runParse(src, this.getParseForm(src.source_id));
+  }
+
+  onSourceUpdated(): void {
+    this.sourceUpdated.emit();
   }
 
   onSourcesListAccordionValueChange(value: unknown): void {

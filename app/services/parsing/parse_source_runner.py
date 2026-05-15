@@ -159,9 +159,14 @@ async def execute_parse_source(
         raise ValueError("document_type_missing")
     document_type_code = doc_type_row[0]
 
+    from app.services.parsing.rss_urls import resolve_source_rss_urls
+
     discovered = await discover_source_news_urls(
         source.url,
-        rss_url=source.rss_url,
+        rss_urls=resolve_source_rss_urls(
+            getattr(source, "rss_urls", None),
+            legacy_rss_url=getattr(source, "rss_url", None),
+        ),
         discovery_paths=getattr(source, "discovery_paths", None),
         days=days,
         skip_undated=False,

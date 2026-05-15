@@ -40,9 +40,12 @@ def normalize_discovery_paths(paths: list[str] | None) -> list[str]:
 
 
 def build_discovery_page_urls(source_url: str, discovery_paths: list[str] | None) -> list[str]:
-    """URL страниц для HTML-обхода: сначала ``source_url``, затем пути от origin сайта."""
-    base = normalize_source_url(source_url)
-    parsed = urlparse(base)
+    """URL страниц для HTML-обхода по явным путям от origin сайта.
+
+    Главная не обходится автоматически: для этого укажите ``/`` в ``discovery_paths``.
+    Пустой список путей — HTML-листинги не скачиваются (остаётся только RSS, если задан).
+    """
+    parsed = urlparse(normalize_source_url(source_url))
     origin = f"{parsed.scheme}://{parsed.netloc}"
 
     pages: list[str] = []
@@ -54,13 +57,14 @@ def build_discovery_page_urls(source_url: str, discovery_paths: list[str] | None
             seen.add(normalized)
             pages.append(normalized)
 
-    add(base)
-
     for raw in normalize_discovery_paths(discovery_paths):
         if raw.startswith("http://") or raw.startswith("https://"):
             add(raw)
             continue
         path = raw if raw.startswith("/") else f"/{raw}"
-        add(urljoin(f"{origin}/", path.lstrip("/")))
+        if path == "/":
+            add(f"{origin}/")
+        else:
+            add(urljoin(f"{origin}/", path.lstrip("/")))
 
     return pages

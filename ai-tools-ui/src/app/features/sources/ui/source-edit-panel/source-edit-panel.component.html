@@ -1,0 +1,146 @@
+<div class="source-edit">
+  <div class="source-edit__header">
+    <h4 class="source-edit__title">Настройки источника</h4>
+    @if (!editing) {
+      <app-outline-button
+        text="Редактировать"
+        size="medium"
+        [variant]="ButtonVariant.Rounded"
+        (clicked)="startEdit()"
+      />
+    }
+  </div>
+
+  @if (!editing) {
+    <p class="source-edit__hint">
+      URL, RSS, пути обхода и тип документа можно изменить по кнопке «Редактировать».
+    </p>
+  } @else {
+    <p class="source-edit__hint">
+      Пути обхода — от корня домена (<code>/news</code>). Главная только при <code>/</code>. Пусто — без
+      HTML-обхода.
+    </p>
+
+    <form class="source-edit__form" (ngSubmit)="submitSave()">
+      <label class="filter-item source-edit__field source-edit__field_wide">
+        <span class="new-source-form-label">URL сайта <span class="req">*</span></span>
+        <p-inputgroup>
+          <p-inputgroup-addon>www</p-inputgroup-addon>
+          <input
+            pInputText
+            type="url"
+            [name]="'edit_url_' + src.source_id"
+            [(ngModel)]="formUrl"
+            required
+            [disabled]="saveSubmitting"
+          />
+        </p-inputgroup>
+      </label>
+
+      <label class="filter-item source-edit__field">
+        <span class="new-source-form-label">Название</span>
+        <input
+          pInputText
+          type="text"
+          [name]="'edit_name_' + src.source_id"
+          [(ngModel)]="formName"
+          maxlength="255"
+          [disabled]="saveSubmitting"
+        />
+      </label>
+
+      <label class="filter-item source-edit__field">
+        <span class="new-source-form-label">Язык</span>
+        <p-select
+          [name]="'edit_lang_' + src.source_id"
+          [options]="languageSelectOptions"
+          [(ngModel)]="formLanguageCode"
+          optionLabel="label"
+          optionValue="value"
+          [disabled]="!languagesCatalog.length || saveSubmitting"
+        />
+      </label>
+
+      <label class="filter-item source-edit__field">
+        <span class="new-source-form-label">Страна</span>
+        <p-select
+          [name]="'edit_country_' + src.source_id"
+          [options]="countrySelectOptions"
+          [(ngModel)]="formCountryCode"
+          optionLabel="label"
+          optionValue="value"
+          [filter]="true"
+          filterBy="label"
+          [showClear]="true"
+          placeholder="Не указано"
+          [disabled]="!countriesCatalog.length || saveSubmitting"
+        />
+      </label>
+
+      <label class="filter-item source-edit__field source-edit__field_wide">
+        <span class="new-source-form-label">Тип документа <span class="req">*</span></span>
+        <p-select
+          [name]="'edit_doctype_' + src.source_id"
+          [options]="documentTypeSelectOptions"
+          [(ngModel)]="formDocumentTypeCode"
+          optionLabel="label"
+          optionValue="value"
+          [disabled]="!documentTypesCatalog.length || saveSubmitting"
+        />
+      </label>
+
+      <label class="filter-item source-edit__field source-edit__field_wide">
+        <span class="new-source-form-label">URL RSS</span>
+        <textarea
+          class="source-edit__discovery-paths"
+          [name]="'edit_rss_' + src.source_id"
+          [(ngModel)]="formRssUrls"
+          rows="3"
+          placeholder="По одному фиду на строку; пусто — без RSS"
+          [disabled]="saveSubmitting"
+        ></textarea>
+      </label>
+
+      <label class="filter-item source-edit__field source-edit__field_wide">
+        <span class="new-source-form-label">Пути обхода (HTML)</span>
+        <textarea
+          class="source-edit__discovery-paths"
+          [name]="'edit_paths_' + src.source_id"
+          [(ngModel)]="formDiscoveryPaths"
+          rows="3"
+          placeholder="/news&#10;/news/newsreleases"
+          [disabled]="saveSubmitting"
+        ></textarea>
+      </label>
+
+      <div class="source-edit__actions">
+        <app-primary-button
+          type="submit"
+          [text]="saveSubmitting ? 'Сохранение…' : 'Сохранить'"
+          [disabled]="saveSubmitting"
+          size="large"
+          variant="rounded"
+        />
+        <app-outline-button
+          text="Отмена"
+          size="large"
+          [variant]="ButtonVariant.Rounded"
+          [disabled]="saveSubmitting"
+          (clicked)="cancelEdit()"
+        />
+      </div>
+    </form>
+  }
+
+  @if (languagesLoadError || countriesLoadError || documentTypesLoadError) {
+    <div class="state-message state-message_error source-edit__message">
+      {{ languagesLoadError || countriesLoadError || documentTypesLoadError }}
+    </div>
+  }
+  @if (saveError) {
+    <div class="state-message state-message_error source-edit__message">{{ saveError }}</div>
+  }
+  @if (saveSuccess) {
+    <div class="state-message state-message_ok source-edit__message">{{ saveSuccess }}</div>
+  }
+</div>

@@ -30,6 +30,7 @@
             <p-accordion-content>
               <div class="source-expanded">
                 <app-source-expanded-details [src]="src" />
+                <app-source-edit-panel [src]="src" (sourceUpdated)="onSourceUpdated()" />
                 <app-source-parse-panel
                   [src]="src"
                   [form]="getParseForm(src.source_id)"

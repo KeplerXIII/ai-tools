@@ -5,9 +5,10 @@ from datetime import datetime
 
 from typing import Literal
 
-from pydantic import BaseModel, Field, HttpUrl, field_validator
+from pydantic import BaseModel, Field, HttpUrl, field_validator, model_validator
 
 from app.services.parsing.discovery_paths import MAX_DISCOVERY_PATHS, normalize_discovery_paths
+from app.services.parsing.rss_urls import MAX_RSS_URLS, normalize_rss_urls
 
 
 class SourceCreateRequest(BaseModel):
@@ -15,13 +16,18 @@ class SourceCreateRequest(BaseModel):
     name: str | None = Field(default=None, max_length=255)
     language_code: str = Field(default="en", min_length=2, max_length=8)
     country_code: str | None = Field(default=None, min_length=2, max_length=8)
-    rss_url: HttpUrl | None = None
+    rss_url: HttpUrl | None = Field(default=None, description="Устаревшее: один RSS; используйте rss_urls")
+    rss_urls: list[str] = Field(
+        default_factory=list,
+        max_length=MAX_RSS_URLS,
+        description="URL RSS/Atom-фидов (несколько фидов объединяются при разборе).",
+    )
     discovery_paths: list[str] = Field(
         default_factory=list,
         max_length=MAX_DISCOVERY_PATHS,
         description=(
             "Пути от корня сайта для HTML-обхода, например /news и /news/newsreleases. "
-            "Пустой список — только URL источника."
+            "Главная — только при явном /. Пустой список — без HTML-обхода (только RSS)."
         ),
     )
     document_type_code: str = Field(
@@ -41,6 +47,28 @@ class SourceCreateRequest(BaseModel):
             raise TypeError("discovery_paths must be a list of strings")
         return normalize_discovery_paths([str(p) for p in value])
 
+    @field_validator("rss_urls", mode="before")
+    @classmethod
+    def _normalize_rss_urls_field(cls, value: object) -> list[str]:
+        if value is None:
+            return []
+        if isinstance(value, str):
+            value = [value]
+        if not isinstance(value, list):
+            raise TypeError("rss_urls must be a list of strings")
+        return normalize_rss_urls([str(u) for u in value])
+
+    @model_validator(mode="before")
+    @classmethod
+    def _merge_legacy_rss_url(cls, data: object) -> object:
+        if not isinstance(data, dict):
+            return data
+        rss_urls = data.get("rss_urls")
+        rss_url = data.get("rss_url")
+        if (not rss_urls) and rss_url:
+            data = {**data, "rss_urls": [rss_url]}
+        return data
+
 
 class SourceCreateResponse(BaseModel):
     source_id: uuid.UUID
@@ -49,10 +77,71 @@ class SourceCreateResponse(BaseModel):
     language_code: str
     country_code: str | None = None
     rss_url: str | None = None
+    rss_urls: list[str] = Field(default_factory=list)
     discovery_paths: list[str] = Field(default_factory=list)
     is_active: bool
     document_type_code: str
     document_type_name: str
+
+
+class SourceUpdateRequest(BaseModel):
+    """Тело PATCH /parsing/sources/{source_id} — те же поля, что при создании."""
+
+    url: HttpUrl
+    name: str | None = Field(default=None, max_length=255)
+    language_code: str = Field(default="en", min_length=2, max_length=8)
+    country_code: str | None = Field(default=None, min_length=2, max_length=8)
+    rss_url: HttpUrl | None = Field(default=None, description="Устаревшее: один RSS; используйте rss_urls")
+    rss_urls: list[str] = Field(
+        default_factory=list,
+        max_length=MAX_RSS_URLS,
+        description="URL RSS/Atom-фидов.",
+    )
+    discovery_paths: list[str] = Field(
+        default_factory=list,
+        max_length=MAX_DISCOVERY_PATHS,
+        description=(
+            "Пути от корня сайта для HTML-обхода. Главная — только при явном /. "
+            "Пустой список — без HTML-обхода (только RSS)."
+        ),
+    )
+    document_type_code: str = Field(min_length=1, max_length=64)
+
+    @field_validator("discovery_paths", mode="before")
+    @classmethod
+    def _normalize_discovery_paths_update(cls, value: object) -> list[str]:
+        if value is None:
+            return []
+        if isinstance(value, str):
+            value = [value]
+        if not isinstance(value, list):
+            raise TypeError("discovery_paths must be a list of strings")
+        return normalize_discovery_paths([str(p) for p in value])
+
+    @field_validator("rss_urls", mode="before")
+    @classmethod
+    def _normalize_rss_urls_field_update(cls, value: object) -> list[str]:
+        if value is None:
+            return []
+        if isinstance(value, str):
+            value = [value]
+        if not isinstance(value, list):
+            raise TypeError("rss_urls must be a list of strings")
+        return normalize_rss_urls([str(u) for u in value])
+
+    @model_validator(mode="before")
+    @classmethod
+    def _merge_legacy_rss_url_update(cls, data: object) -> object:
+        if not isinstance(data, dict):
+            return data
+        rss_urls = data.get("rss_urls")
+        rss_url = data.get("rss_url")
+        if (not rss_urls) and rss_url:
+            data = {**data, "rss_urls": [rss_url]}
+        return data
+
+
+SourceUpdateResponse = SourceCreateResponse
 
 
 class PostParseProcessingOptions(BaseModel):
@@ -136,6 +225,7 @@ class SourceListItem(BaseModel):
     name: str | None = None
     url: str
     rss_url: str | None = None
+    rss_urls: list[str] = Field(default_factory=list)
     discovery_paths: list[str] = Field(default_factory=list)
     language_code: str
     country_code: str | None = None

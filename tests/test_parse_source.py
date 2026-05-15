@@ -49,8 +49,9 @@ from app.api.v1.endpoints.parsing import (
     list_languages_catalog,
     list_sources,
     parse_source,
+    update_source,
 )
-from app.schemas.parsing import ParseSourceRequest, SourceCreateRequest
+from app.schemas.parsing import ParseSourceRequest, SourceCreateRequest, SourceUpdateRequest
 from app.services.parsing.parse_source_runner import execute_parse_source
 from app.services.parsing.source_discovery import DiscoveredUrl
 
@@ -594,7 +595,7 @@ class ParseSourceEndpointTests(IsolatedAsyncioTestCase):
             name="Example",
             language_code="en",
             country_code=None,
-            rss_url="https://example.com/rss",
+            rss_urls=["https://example.com/rss"],
             document_type_code="news",
         )
         with (
@@ -609,9 +610,82 @@ class ParseSourceEndpointTests(IsolatedAsyncioTestCase):
 
         self.assertEqual(result.url, "https://example.com/")
         self.assertEqual(result.rss_url, "https://example.com/rss")
+        self.assertEqual(result.rss_urls, ["https://example.com/rss"])
         self.assertEqual(result.language_code, "en")
         self.assertEqual(result.document_type_code, "news")
         self.assertEqual(result.document_type_name, "Новость")
+
+    async def test_update_source_happy_path(self):
+        """Обновление источника: поля в ответе и запись в памяти _FakeDb."""
+        uid = uuid.uuid4()
+        sid = uuid.uuid4()
+        source = SimpleNamespace(
+            id=sid,
+            user_id=uid,
+            document_type_id=uuid.uuid4(),
+            name="Old",
+            url="https://example.com/",
+            country_id=None,
+            language_id=uuid.uuid4(),
+            rss_url=None,
+            discovery_paths=None,
+            is_active=True,
+        )
+        db = _FakeDb(source=source)
+        user = SimpleNamespace(id=uid, is_admin=False)
+        payload = SourceUpdateRequest(
+            url="https://example.com/",
+            name="New name",
+            language_code="en",
+            country_code=None,
+            rss_urls=[
+                "https://example.com/rss.xml",
+                "https://example.com/rss2.xml",
+            ],
+            discovery_paths=["/news"],
+            document_type_code="news",
+        )
+        with (
+            patch("app.api.v1.endpoints.parsing._language_id_by_code", AsyncMock(return_value=uuid.uuid4())),
+            patch("app.api.v1.endpoints.parsing._country_id_by_code", AsyncMock(return_value=None)),
+            patch(
+                "app.api.v1.endpoints.parsing.document_type_id_by_code",
+                AsyncMock(return_value=uuid.uuid4()),
+            ),
+        ):
+            result = await update_source(source_id=sid, payload=payload, db=db, user=user)
+
+        self.assertEqual(result.name, "New name")
+        self.assertEqual(result.rss_url, "https://example.com/rss.xml")
+        self.assertEqual(
+            result.rss_urls,
+            ["https://example.com/rss.xml", "https://example.com/rss2.xml"],
+        )
+        self.assertEqual(result.discovery_paths, ["/news"])
+        self.assertEqual(source.name, "New name")
+        self.assertEqual(source.rss_urls, ["https://example.com/rss.xml", "https://example.com/rss2.xml"])
+        self.assertEqual(source.discovery_paths, ["/news"])
+
+    async def test_update_source_forbidden_for_other_user(self):
+        """Чужой источник нельзя редактировать без прав администратора."""
+        sid = uuid.uuid4()
+        source = SimpleNamespace(
+            id=sid,
+            user_id=uuid.uuid4(),
+            document_type_id=uuid.uuid4(),
+            name=None,
+            url="https://a.test/",
+            is_active=True,
+        )
+        db = _FakeDb(source=source)
+        user = SimpleNamespace(id=uuid.uuid4(), is_admin=False)
+        payload = SourceUpdateRequest(
+            url="https://a.test/",
+            document_type_code="news",
+        )
+        with self.assertRaises(HTTPException) as ctx:
+            await update_source(source_id=sid, payload=payload, db=db, user=user)
+        self.assertEqual(ctx.exception.status_code, 403)
 
     async def test_list_sources_non_admin_response_shape(self):
         """Список источников для обычного пользователя: поля элемента и флаг фильтра."""
@@ -624,6 +698,7 @@ class ParseSourceEndpointTests(IsolatedAsyncioTestCase):
             name="News",
             url="https://news.example/",
             rss_url="https://news.example/rss",
+            rss_urls=["https://news.example/rss"],
             discovery_paths=["/news"],
             is_active=True,
             created_at=created,
@@ -645,6 +720,7 @@ class ParseSourceEndpointTests(IsolatedAsyncioTestCase):
         self.assertEqual(result.items[0].documents_unprocessed, 3)
         self.assertEqual(result.items[0].last_parse_created_total, 2)
         self.assertEqual(result.items[0].discovery_paths, ["/news"])
+        self.assertEqual(result.items[0].rss_urls, ["https://news.example/rss"])
 
     async def test_list_sources_admin_sets_filter_flag(self):
         """Администратор получает возможность фильтрации по всем пользователям (флаг в ответе)."""

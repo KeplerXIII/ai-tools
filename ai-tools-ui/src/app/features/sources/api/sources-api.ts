@@ -10,6 +10,7 @@ export interface SourceListItem {
   name: string | null;
   url: string;
   rss_url: string | null;
+  rss_urls: string[];
   discovery_paths: string[];
   language_code: string;
   country_code: string | null;
@@ -38,6 +39,7 @@ export interface SourceCreateRequestBody {
   language_code?: string;
   country_code?: string | null;
   rss_url?: string | null;
+  rss_urls?: string[];
   discovery_paths?: string[];
   document_type_code: string;
 }
@@ -49,11 +51,17 @@ export interface SourceCreateResponse {
   language_code: string;
   country_code: string | null;
   rss_url: string | null;
+  rss_urls: string[];
   discovery_paths: string[];
   is_active: boolean;
   document_type_code: string;
   document_type_name: string;
 }
+
+/** Тело PATCH /parsing/sources/{source_id} — совпадает с ``SourceUpdateRequest`` на бэкенде. */
+export type SourceUpdateRequestBody = SourceCreateRequestBody;
+
+export type SourceUpdateResponse = SourceCreateResponse;
 
 export interface PostParseProcessingOptions {
   full_llm_pipeline: boolean;
@@ -162,6 +170,13 @@ export class SourcesApi {
 
   createSource(body: SourceCreateRequestBody): Observable<SourceCreateResponse> {
     return this.http.post<SourceCreateResponse>('/api/v1/parsing/sources', body);
+  }
+
+  updateSource(sourceId: string, body: SourceUpdateRequestBody): Observable<SourceUpdateResponse> {
+    return this.http.patch<SourceUpdateResponse>(
+      `/api/v1/parsing/sources/${encodeURIComponent(sourceId)}`,
+      body,
+    );
   }
 
   /** POST возвращает 202 Accepted; разбор выполняется воркером ``ai-tools-parse-worker``. */

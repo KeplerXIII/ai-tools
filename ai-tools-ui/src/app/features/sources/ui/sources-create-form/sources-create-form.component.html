@@ -1,8 +1,9 @@
 <div class="source-create__panel">
   <p class="source-create__hint">
-    Обязателен только <b>URL сайта</b> (корень сайта, например https://www.army.mil). Пути обхода — от корня домена,
-    по одному на строку (<code>/news</code>, <code>/news/newsreleases</code>). Без путей парсер смотрит только URL
-    источника и RSS. Язык, тип документа и страна — из справочников; страна необязательна.
+    Обязателен только <b>URL сайта</b> (идентификатор источника, например https://www.army.mil). Пути обхода — от
+    корня домена, по одному на строку (<code>/news</code>, <code>/news/newsreleases</code>). Главная — только если
+    указать <code>/</code>. Без путей HTML не обходится; RSS — по одному URL на строку. Язык, тип документа и страна — из
+    справочников; страна необязательна.
   </p>
   <form class="source-create__form" (ngSubmit)="submitCreate()">
     <div class="filter-item source-create__field source-create__field_wide">
@@ -119,18 +120,14 @@
 
     <label class="filter-item source-create__field source-create__field_wide">
       <span class="new-source-form-label">URL RSS</span>
-      <p-inputgroup>
-        <p-inputgroup-addon>www</p-inputgroup-addon>
-        <input
-          pInputText
-          class="source-create__placeholder-hint"
-          type="url"
-          name="rss_url"
-          [(ngModel)]="formRssUrl"
-          placeholder="https://example.com/feed.xml"
-          aria-label="URL RSS"
-        />
-      </p-inputgroup>
+      <textarea
+        class="source-create__discovery-paths source-create__placeholder-hint"
+        name="rss_urls"
+        [(ngModel)]="formRssUrls"
+        rows="3"
+        placeholder="https://www.army.mil/rss/static/1.xml&#10;https://www.army.mil/rss/static/2.xml"
+        aria-label="URL RSS-фидов, по одному на строку"
+      ></textarea>
     </label>
 
     <label class="filter-item source-create__field source-create__field_wide">
@@ -140,7 +137,7 @@
         name="discovery_paths"
         [(ngModel)]="formDiscoveryPaths"
         rows="4"
-        placeholder="/news&#10;/news/newsreleases"
+        placeholder="/news&#10;/news/newsreleases&#10;(главная: /)"
         aria-label="Пути обхода страниц источника"
       ></textarea>
     </label>

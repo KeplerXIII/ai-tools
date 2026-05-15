@@ -20,4 +20,9 @@ export class SourceAccordionHeaderComponent {
   dateLabel(iso: string): string {
     return formatSourceDate(iso);
   }
+
+  rssChipLabel(src: SourceListItem): string {
+    const count = src.rss_urls?.length || (src.rss_url ? 1 : 0);
+    return count > 1 ? `RSS: ${count}` : 'RSS';
+  }
 }

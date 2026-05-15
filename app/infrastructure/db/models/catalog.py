@@ -159,6 +159,7 @@ class Source(Base):
     country_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("countries.id"), nullable=True)
     language_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("languages.id"), nullable=False)
     rss_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    rss_urls: Mapped[list | None] = mapped_column(JSON, nullable=True)
     discovery_paths: Mapped[list | None] = mapped_column(JSON, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=true())
     last_parse_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

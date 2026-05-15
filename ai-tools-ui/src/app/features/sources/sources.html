@@ -46,5 +46,6 @@
     [listLoading]="listLoading"
     [listError]="listError"
     [listEmpty]="listEmpty"
+    (sourceUpdated)="loadSources({ silent: true })"
   />
 </section>

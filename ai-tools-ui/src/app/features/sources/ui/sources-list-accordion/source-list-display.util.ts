@@ -35,9 +35,17 @@ export function formatSourceDate(iso: string): string {
 
 export function buildSourceDetailRows(src: SourceListItem): SourceDetailRow[] {
   const rows: SourceDetailRow[] = [{ label: 'URL', text: src.url, href: src.url }];
-  const rss = (src.rss_url ?? '').trim();
-  if (rss) {
-    rows.push({ label: 'RSS', text: rss, href: rss });
+  const rssFeeds = src.rss_urls?.length
+    ? src.rss_urls
+    : (src.rss_url ?? '').trim()
+      ? [src.rss_url!.trim()]
+      : [];
+  if (rssFeeds.length) {
+    rows.push({
+      label: rssFeeds.length > 1 ? 'RSS-фиды' : 'RSS',
+      text: rssFeeds.join('\n'),
+      href: rssFeeds[0],
+    });
   }
   const paths = src.discovery_paths ?? [];
   if (paths.length) {

@@ -41,10 +41,16 @@ from app.schemas.parsing import (
     SourceCreateResponse,
     SourceListItem,
     SourceListResponse,
+    SourceUpdateRequest,
 )
 from app.services.documents.db_refs import document_type_id_by_code
 from app.services.documents.url_norm import normalize_source_url
 from app.services.parsing.discovery_paths import normalize_discovery_paths
+from app.services.parsing.rss_urls import (
+    legacy_rss_url_from_list,
+    resolve_source_rss_urls,
+    rss_urls_for_storage,
+)
 from app.services.parsing.parse_source_runner import list_unprocessed_by_source
 from app.services.processing.jobs import JobStatus, JobType
 from app.services.processing.saq_queue import get_saq_parse_queue
@@ -65,6 +71,40 @@ async def _country_id_by_code(db: AsyncSession, code: str | None) -> UUID | None
     if not code:
         return None
     return await db.scalar(select(Country.id).where(Country.code == code.upper()))
+
+
+def _assert_source_write_access(source: Source, user: User) -> None:
+    is_admin = bool(getattr(user, "is_admin", False))
+    if not is_admin and source.user_id != user.id:
+        raise HTTPException(status_code=403, detail="Нет доступа к источнику")
+
+
+async def _build_source_response(db: AsyncSession, source: Source) -> SourceCreateResponse:
+    lang_code = await db.scalar(select(Language.code).where(Language.id == source.language_id))
+    c_code = await db.scalar(select(Country.code).where(Country.id == source.country_id)) if source.country_id else None
+    dt_row = (
+        await db.execute(
+            select(DocumentType.code, DocumentType.name).where(DocumentType.id == source.document_type_id),
+        )
+    ).one()
+    dt_code, dt_name = dt_row[0], dt_row[1]
+    rss_urls = resolve_source_rss_urls(
+        getattr(source, "rss_urls", None),
+        legacy_rss_url=getattr(source, "rss_url", None),
+    )
+    return SourceCreateResponse(
+        source_id=source.id,
+        url=source.url,
+        name=source.name,
+        language_code=lang_code or "en",
+        country_code=c_code,
+        rss_url=legacy_rss_url_from_list(rss_urls),
+        rss_urls=rss_urls,
+        discovery_paths=normalize_discovery_paths(source.discovery_paths),
+        is_active=source.is_active,
+        document_type_code=dt_code,
+        document_type_name=dt_name,
+    )
 
 
 async def _parse_run_to_response(db: AsyncSession, run: SourceParseRun) -> ParseSourceRunResponse:
@@ -166,7 +206,13 @@ async def list_sources(
             source_id=src.id,
             name=src.name,
             url=src.url,
-            rss_url=src.rss_url,
+            rss_urls=(
+                resolved_rss := resolve_source_rss_urls(
+                    getattr(src, "rss_urls", None),
+                    legacy_rss_url=getattr(src, "rss_url", None),
+                )
+            ),
+            rss_url=legacy_rss_url_from_list(resolved_rss),
             discovery_paths=normalize_discovery_paths(src.discovery_paths),
             language_code=lang_code or "en",
             country_code=c_code,
@@ -230,6 +276,7 @@ async def create_source(
         raise HTTPException(status_code=400, detail="Неизвестный код типа документа") from exc
 
     discovery_paths = payload.discovery_paths or None
+    rss_urls = rss_urls_for_storage(payload.rss_urls)
     source = Source(
         user_id=user.id,
         document_type_id=dt_id,
@@ -237,7 +284,8 @@ async def create_source(
         url=normalize_source_url(str(payload.url)),
         country_id=country_id,
         language_id=language_id,
-        rss_url=(normalize_source_url(str(payload.rss_url)) if payload.rss_url else None),
+        rss_urls=rss_urls,
+        rss_url=legacy_rss_url_from_list(rss_urls),
         discovery_paths=discovery_paths,
         is_active=True,
     )
@@ -251,27 +299,49 @@ async def create_source(
             detail="Источник с таким URL уже существует для текущего пользователя",
         ) from None
     await db.refresh(source)
+    return await _build_source_response(db, source)
 
-    lang_code = await db.scalar(select(Language.code).where(Language.id == source.language_id))
-    c_code = await db.scalar(select(Country.code).where(Country.id == source.country_id)) if source.country_id else None
-    dt_row = (
-        await db.execute(
-            select(DocumentType.code, DocumentType.name).where(DocumentType.id == source.document_type_id),
-        )
-    ).one()
-    dt_code, dt_name = dt_row[0], dt_row[1]
-    return SourceCreateResponse(
-        source_id=source.id,
-        url=source.url,
-        name=source.name,
-        language_code=lang_code or "en",
-        country_code=c_code,
-        rss_url=source.rss_url,
-        discovery_paths=normalize_discovery_paths(source.discovery_paths),
-        is_active=source.is_active,
-        document_type_code=dt_code,
-        document_type_name=dt_name,
-    )
+
+@router.patch("/sources/{source_id}", response_model=SourceCreateResponse)
+async def update_source(
+    source_id: UUID,
+    payload: SourceUpdateRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    source = await db.get(Source, source_id)
+    if source is None:
+        raise HTTPException(status_code=404, detail="Источник не найден")
+    _assert_source_write_access(source, user)
+
+    language_id = await _language_id_by_code(db, payload.language_code)
+    country_id = await _country_id_by_code(db, payload.country_code)
+    try:
+        dt_id = await document_type_id_by_code(db, payload.document_type_code.strip().lower())
+    except NoResultFound as exc:
+        raise HTTPException(status_code=400, detail="Неизвестный код типа документа") from exc
+
+    source.name = payload.name.strip() if payload.name else None
+    source.url = normalize_source_url(str(payload.url))
+    source.country_id = country_id
+    source.language_id = language_id
+    source.document_type_id = dt_id
+    rss_urls = rss_urls_for_storage(payload.rss_urls)
+    source.rss_urls = rss_urls
+    source.rss_url = legacy_rss_url_from_list(rss_urls)
+    source.discovery_paths = payload.discovery_paths or None
+    source.updated_at = datetime.now(UTC)
+
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Источник с таким URL уже существует для текущего пользователя",
+        ) from None
+    await db.refresh(source)
+    return await _build_source_response(db, source)
 
 
 @router.delete("/sources/{source_id}")
@@ -283,8 +353,7 @@ async def deactivate_source(
     source = await db.get(Source, source_id)
     if source is None:
         raise HTTPException(status_code=404, detail="Источник не найден")
-    if source.user_id != user.id:
-        raise HTTPException(status_code=403, detail="Нет доступа к источнику")
+    _assert_source_write_access(source, user)
 
     if source.is_active:
         source.is_active = False
