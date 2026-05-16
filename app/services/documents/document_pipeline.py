@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
-from contextlib import nullcontext
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from typing import Literal
@@ -59,6 +58,16 @@ from app.services.llm.summarizer import refine_summary, summarize_text
 from app.services.llm.tagger import tag_text
 from app.services.llm.translator import detect_language, translate_text
 from app.services.processing.jobs import JobStatus, JobType, processing_job
+from app.services.processing.document_api_jobs import (
+    manual_categorize_spec,
+    manual_entity_extract_spec,
+    manual_summary_refine_spec,
+    manual_summary_spec,
+    manual_tag_spec,
+    manual_translate_spec,
+    manual_translate_title_spec,
+    run_tracked_document_work,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -791,7 +800,7 @@ async def persist_document_translation(
     translated_text: str,
     target_lang: str,
     started_by_id: uuid.UUID | None,
-    track_job: bool = True,
+    track_job: bool = False,
 ) -> Document:
     doc = await session.get(Document, document_id)
     if doc is None:
@@ -842,16 +851,25 @@ async def run_translate_document(
     if doc is None:
         raise NotFoundError("Документ не найден")
 
-    text = await translate_text(doc.original_content, target_lang=target_lang, stream=False)
-    if not isinstance(text, str):
-        raise ValidationError("Ожидалась строка перевода")
-    return await persist_document_translation(
+    async def _translate_and_persist() -> Document:
+        text = await translate_text(doc.original_content, target_lang=target_lang, stream=False)
+        if not isinstance(text, str):
+            raise ValidationError("Ожидалась строка перевода")
+        return await persist_document_translation(
+            session,
+            document_id=document_id,
+            translated_text=text,
+            target_lang=target_lang,
+            started_by_id=started_by_id,
+            track_job=False,
+        )
+
+    spec = manual_translate_spec(document_id, started_by_id)
+    return await run_tracked_document_work(
         session,
-        document_id=document_id,
-        translated_text=text,
-        target_lang=target_lang,
-        started_by_id=started_by_id,
+        spec=spec,
         track_job=track_job,
+        work=_translate_and_persist,
     )
 
 
@@ -870,32 +888,27 @@ async def run_translate_document_title(
     if not raw_title:
         raise ValidationError("Пустой заголовок для перевода")
 
-    translated = await translate_text(raw_title, target_lang=target_lang, stream=False)
-    if not isinstance(translated, str):
-        raise ValidationError("Ожидалась строка перевода заголовка")
-    tt = translated.strip()[:512] if translated.strip() else None
-
-    if track_job:
-        async with processing_job(
+    async def _translate_title_and_finalize() -> Document:
+        translated = await translate_text(raw_title, target_lang=target_lang, stream=False)
+        if not isinstance(translated, str):
+            raise ValidationError("Ожидалась строка перевода заголовка")
+        tt = translated.strip()[:512] if translated.strip() else None
+        doc.translated_title = tt
+        doc.updated_at = datetime.now(UTC)
+        await sync_document_statuses(
             session,
             document_id=document_id,
-            job_type=JobType.TRANSLATE_TITLE,
-            model_name=settings.model_translation,
-            provider=None,
-            started_by_id=started_by_id,
-            llm_task_for_provider=LLMTask.TRANSLATION,
-        ):
-            doc.translated_title = tt
-    else:
-        doc.translated_title = tt
+            assigned_by_id=started_by_id,
+        )
+        return doc
 
-    doc.updated_at = datetime.now(UTC)
-    await sync_document_statuses(
+    spec = manual_translate_title_spec(document_id, started_by_id)
+    return await run_tracked_document_work(
         session,
-        document_id=document_id,
-        assigned_by_id=started_by_id,
+        spec=spec,
+        track_job=track_job,
+        work=_translate_title_and_finalize,
     )
-    return doc
 
 
 async def run_tag_document(
@@ -921,20 +934,7 @@ async def run_tag_document(
 
     llm_ps = await _llm_ps_id(session)
 
-    if track_job:
-        job_ctx = processing_job(
-            session,
-            document_id=document_id,
-            job_type=JobType.TAG,
-            model_name=settings.model_tagging,
-            provider=None,
-            started_by_id=started_by_id,
-            llm_task_for_provider=LLMTask.TAGGING,
-        )
-    else:
-        job_ctx = nullcontext()
-
-    async with job_ctx:
+    async def _tag_and_finalize() -> Document:
         await delete_auto_document_tags(session, document_id, language_id=lang_id)
         tags_payload = await tag_text(src, max_tags=max_tags)
         for tag_name in tags_payload.get("tags", []):
@@ -946,12 +946,20 @@ async def run_tag_document(
                     prediction_source_id=llm_ps,
                 ),
             )
-    await sync_document_statuses(
+        await sync_document_statuses(
+            session,
+            document_id=document_id,
+            assigned_by_id=started_by_id,
+        )
+        return doc
+
+    spec = manual_tag_spec(document_id, started_by_id)
+    return await run_tracked_document_work(
         session,
-        document_id=document_id,
-        assigned_by_id=started_by_id,
+        spec=spec,
+        track_job=track_job,
+        work=_tag_and_finalize,
     )
-    return doc
 
 
 async def run_entity_extract_document(
@@ -974,20 +982,7 @@ async def run_entity_extract_document(
     et_man = await entity_type_id_by_code(session, "manufacturer")
     et_con = await entity_type_id_by_code(session, "contract")
 
-    if track_job:
-        job_ctx = processing_job(
-            session,
-            document_id=document_id,
-            job_type=JobType.ENTITY_EXTRACT,
-            model_name=settings.model_entity_extraction,
-            provider=None,
-            started_by_id=started_by_id,
-            llm_task_for_provider=LLMTask.ENTITY_EXTRACTION,
-        )
-    else:
-        job_ctx = nullcontext()
-
-    async with job_ctx:
+    async def _extract_and_finalize() -> Document:
         await delete_auto_document_entities(session, document_id)
         raw = await extract_entities(src)
         military_equipment = [name.strip() for name in raw.get("military_equipment", []) if name and name.strip()]
@@ -1028,12 +1023,20 @@ async def run_entity_extract_document(
                     prediction_source_id=llm_ps,
                 ),
             )
-    await sync_document_statuses(
+        await sync_document_statuses(
+            session,
+            document_id=document_id,
+            assigned_by_id=started_by_id,
+        )
+        return doc
+
+    spec = manual_entity_extract_spec(document_id, started_by_id)
+    return await run_tracked_document_work(
         session,
-        document_id=document_id,
-        assigned_by_id=started_by_id,
+        spec=spec,
+        track_job=track_job,
+        work=_extract_and_finalize,
     )
-    return doc
 
 
 async def run_categorize_document(
@@ -1127,20 +1130,7 @@ async def run_categorize_document(
     llm_ps = await _llm_ps_id(session)
     assigned: list[DocumentCategorizeItem] = []
 
-    if track_job:
-        job_ctx = processing_job(
-            session,
-            document_id=document_id,
-            job_type=JobType.CATEGORIZE,
-            model_name=settings.model_categorization,
-            provider=None,
-            started_by_id=started_by_id,
-            llm_task_for_provider=LLMTask.CATEGORIZATION,
-        )
-    else:
-        job_ctx = nullcontext()
-
-    async with job_ctx:
+    async def _categorize_and_finalize() -> tuple[Document, list[DocumentCategorizeItem]]:
         await delete_auto_document_categories(session, document_id)
         items = await categorize_text(src, pairs)
         unique_items_by_category: dict[
@@ -1265,13 +1255,21 @@ async def run_categorize_document(
                 ),
             )
 
-    await sync_document_statuses(
+        await sync_document_statuses(
+            session,
+            document_id=document_id,
+            assigned_by_id=started_by_id,
+        )
+        assigned.sort(key=lambda x: x.confidence, reverse=True)
+        return doc, assigned
+
+    spec = manual_categorize_spec(document_id, started_by_id)
+    return await run_tracked_document_work(
         session,
-        document_id=document_id,
-        assigned_by_id=started_by_id,
+        spec=spec,
+        track_job=track_job,
+        work=_categorize_and_finalize,
     )
-    assigned.sort(key=lambda x: x.confidence, reverse=True)
-    return doc, assigned
 
 
 async def persist_document_refined_summary(
@@ -1281,21 +1279,25 @@ async def persist_document_refined_summary(
     source: SummarySource,
     refined_annotation: str,
     started_by_id: uuid.UUID | None,
+    track_job: bool = False,
 ) -> Document:
     doc = await session.get(Document, document_id)
     if doc is None:
         raise NotFoundError("Документ не найден")
 
-    async with processing_job(
-        session,
-        document_id=document_id,
-        job_type=JobType.SUMMARY_REFINE,
-        model_name=settings.model_summary_refine,
-        provider=None,
-        started_by_id=started_by_id,
-        llm_task_for_provider=LLMTask.SUMMARY_REFINE,
-    ):
-        # Summarizer/refiner prompts produce Russian; store in translated_summary only.
+    if track_job:
+        async with processing_job(
+            session,
+            document_id=document_id,
+            job_type=JobType.SUMMARY_REFINE,
+            model_name=settings.model_summary_refine,
+            provider=None,
+            started_by_id=started_by_id,
+            llm_task_for_provider=LLMTask.SUMMARY_REFINE,
+        ):
+            doc.translated_summary = refined_annotation
+            doc.translated_summary_stale = False
+    else:
         doc.translated_summary = refined_annotation
         doc.translated_summary_stale = False
     await sync_document_statuses(
@@ -1318,7 +1320,7 @@ async def persist_document_summary(
     source: SummarySource,
     annotation: str,
     started_by_id: uuid.UUID | None,
-    track_job: bool = True,
+    track_job: bool = False,
 ) -> Document:
     doc = await session.get(Document, document_id)
     if doc is None:
@@ -1372,18 +1374,27 @@ async def run_summary_document(
     if not text.strip():
         raise ValidationError("Нет текста для аннотации")
 
-    ann = await summarize_text(text, stream=False)
-    if not isinstance(ann, str):
-        raise ValidationError("Некорректный ответ суммаризатора")
-    doc = await persist_document_summary(
+    async def _summarize_and_persist() -> tuple[Document, str]:
+        ann = await summarize_text(text, stream=False)
+        if not isinstance(ann, str):
+            raise ValidationError("Некорректный ответ суммаризатора")
+        updated = await persist_document_summary(
+            session,
+            document_id=document_id,
+            source=source,
+            annotation=ann,
+            started_by_id=started_by_id,
+            track_job=False,
+        )
+        return updated, ann
+
+    spec = manual_summary_spec(document_id, started_by_id)
+    return await run_tracked_document_work(
         session,
-        document_id=document_id,
-        source=source,
-        annotation=ann,
-        started_by_id=started_by_id,
+        spec=spec,
         track_job=track_job,
+        work=_summarize_and_persist,
     )
-    return doc, ann
 
 
 async def run_refine_document(
@@ -1394,6 +1405,7 @@ async def run_refine_document(
     user_instruction: str,
     mode: RefineSummaryMode,
     started_by_id: uuid.UUID | None,
+    track_job: bool = True,
 ) -> tuple[Document, str]:
     doc = await session.get(Document, document_id)
     if doc is None:
@@ -1408,20 +1420,30 @@ async def run_refine_document(
     if not summary.strip():
         raise ValidationError("Нет аннотации для уточнения — сначала сгенерируйте summary")
 
-    refined = await refine_summary(
-        article_text=article,
-        summary=summary,
-        user_instruction=user_instruction,
-        mode=mode,
-        stream=False,
-    )
-    if not isinstance(refined, str):
-        raise ValidationError("Некорректный ответ уточнения аннотации")
-    doc = await persist_document_refined_summary(
+    async def _refine_and_persist() -> tuple[Document, str]:
+        refined = await refine_summary(
+            article_text=article,
+            summary=summary,
+            user_instruction=user_instruction,
+            mode=mode,
+            stream=False,
+        )
+        if not isinstance(refined, str):
+            raise ValidationError("Некорректный ответ уточнения аннотации")
+        updated = await persist_document_refined_summary(
+            session,
+            document_id=document_id,
+            source=source,
+            refined_annotation=refined,
+            started_by_id=started_by_id,
+            track_job=False,
+        )
+        return updated, refined
+
+    spec = manual_summary_refine_spec(document_id, started_by_id)
+    return await run_tracked_document_work(
         session,
-        document_id=document_id,
-        source=source,
-        refined_annotation=refined,
-        started_by_id=started_by_id,
+        spec=spec,
+        track_job=track_job,
+        work=_refine_and_persist,
     )
-    return doc, refined

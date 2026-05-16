@@ -22,6 +22,11 @@ def sse_data_event_bytes(payload: str) -> bytes:
     return f"{body}\n".encode("utf-8")
 
 
+def sse_error_event_bytes(message: str) -> bytes:
+    safe = message.replace("\n", " ").strip()
+    return f"event: error\ndata: {safe}\n\n".encode("utf-8")
+
+
 async def coop_text_chunks(stream: AsyncIterator[str]) -> AsyncIterator[str]:
     """Текстовый стрим с yield точками между чанками (как bytes_from_text_stream, без кодирования)."""
     async for chunk in stream:

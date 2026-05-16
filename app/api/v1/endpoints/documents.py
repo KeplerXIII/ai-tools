@@ -22,7 +22,7 @@ from app.api.deps import (
     get_optional_started_by_id,
 )
 from app.api.error_mapping import map_app_error
-from app.api.streaming_utils import coop_text_chunks, sse_data_event_bytes
+from app.core.config import settings
 from app.domain.errors import AppError, ValidationError
 from app.infrastructure.db.models import Category, Document, DocumentCategory, DocumentStatus, DocumentStatusAssignment
 from app.infrastructure.db.models import DocumentEntity, DocumentTag, Entity, EntityType, PredictionSource, Source, Tag, User
@@ -88,6 +88,12 @@ from app.services.documents.document_pipeline import (
 from app.services.documents.url_norm import normalize_source_url
 from app.services.llm.summarizer import refine_summary, summarize_text
 from app.services.llm.translator import detect_language, translate_text
+from app.api.document_streaming import stream_manual_api_llm
+from app.services.processing.document_api_jobs import (
+    manual_summary_refine_spec,
+    manual_summary_spec,
+    manual_translate_spec,
+)
 from app.services.parsing.extractor import download_html, extract_article_text
 router = APIRouter(prefix="/documents", tags=["documents"])
 logger = logging.getLogger(__name__)
@@ -99,15 +105,6 @@ TAG_LANGUAGE_SCOPES = frozenset({"original", "translated"})
 async def _prepare_write_session(db: AsyncSession) -> None:
     """Depends() уже мог выполнить SELECT — сессия в autobegin; иначе db.begin() даст InvalidRequestError."""
     await db.rollback()
-
-
-def _sse_data(payload: str) -> bytes:
-    return sse_data_event_bytes(payload)
-
-
-def _sse_error(message: str) -> bytes:
-    safe = message.replace("\n", " ").strip()
-    return f"event: error\ndata: {safe}\n\n".encode("utf-8")
 
 
 async def _get_document_status_items(db: AsyncSession, document_id: UUID) -> list[DocumentStatusItem]:
@@ -906,36 +903,29 @@ async def document_translate_stream(
         source_text = doc.original_content
     source_lang = await asyncio.to_thread(detect_language, source_text)
 
+    spec = manual_translate_spec(document_id, started_by_id, stream=True)
+
+    async def persist_translation(translated_text: str) -> None:
+        async with AsyncSessionLocal() as w_session:
+            async with w_session.begin():
+                await persist_document_translation(
+                    w_session,
+                    document_id=document_id,
+                    translated_text=translated_text,
+                    target_lang=target_lang,
+                    started_by_id=started_by_id,
+                    track_job=False,
+                )
+
     async def body():
-        try:
-            stream = await translate_text(source_text, target_lang=target_lang, stream=True)
-        except AppError as exc:
-            yield _sse_error(f"[stream_error] {exc}")
-            return
-        parts: list[str] = []
-        try:
-            async for s in coop_text_chunks(stream):
-                parts.append(s)
-                yield _sse_data(s)
-        except Exception as exc:
-            yield _sse_error(f"[stream_error] {exc}")
-            return
-        full = "".join(parts)
-        try:
-            async with AsyncSessionLocal() as w_session:
-                async with w_session.begin():
-                    await persist_document_translation(
-                        w_session,
-                        document_id=document_id,
-                        translated_text=full,
-                        target_lang=target_lang,
-                        started_by_id=started_by_id,
-                    )
-        except Exception as exc:
-            logger.exception("persist translation after stream failed")
-            yield _sse_error(f"[persist_error] {exc}")
-            return
-        yield _sse_data("[DONE]")
+        async for chunk in stream_manual_api_llm(
+            spec,
+            llm_stream_factory=lambda: translate_text(
+                source_text, target_lang=target_lang, stream=True
+            ),
+            persist=persist_translation,
+        ):
+            yield chunk
 
     return StreamingResponse(
         body(),
@@ -1498,42 +1488,33 @@ async def document_summary_refine_stream(
                 detail="Нет аннотации для уточнения — сначала сгенерируйте summary",
             )
 
+    spec = manual_summary_refine_spec(document_id, started_by_id, stream=True)
+
+    async def persist_refined(refined_annotation: str) -> None:
+        async with AsyncSessionLocal() as w_session:
+            async with w_session.begin():
+                await persist_document_refined_summary(
+                    w_session,
+                    document_id=document_id,
+                    source=source,
+                    refined_annotation=refined_annotation,
+                    started_by_id=started_by_id,
+                    track_job=False,
+                )
+
     async def body():
-        try:
-            stream = await refine_summary(
+        async for chunk in stream_manual_api_llm(
+            spec,
+            llm_stream_factory=lambda: refine_summary(
                 article_text=article,
                 summary=summary,
                 user_instruction=user_instruction,
                 mode=mode,
                 stream=True,
-            )
-        except AppError as exc:
-            yield _sse_error(f"[stream_error] {exc}")
-            return
-        parts: list[str] = []
-        try:
-            async for s in coop_text_chunks(stream):
-                parts.append(s)
-                yield _sse_data(s)
-        except Exception as exc:
-            yield _sse_error(f"[stream_error] {exc}")
-            return
-        full = "".join(parts)
-        try:
-            async with AsyncSessionLocal() as w_session:
-                async with w_session.begin():
-                    await persist_document_refined_summary(
-                        w_session,
-                        document_id=document_id,
-                        source=source,
-                        refined_annotation=full,
-                        started_by_id=started_by_id,
-                    )
-        except Exception as exc:
-            logger.exception("persist refined summary after stream failed")
-            yield _sse_error(f"[persist_error] {exc}")
-            return
-        yield _sse_data("[DONE]")
+            ),
+            persist=persist_refined,
+        ):
+            yield chunk
 
     return StreamingResponse(
         body(),
@@ -1587,36 +1568,27 @@ async def document_summary_stream(
         if not source_text.strip():
             raise HTTPException(status_code=400, detail="Нет текста для аннотации")
 
+    spec = manual_summary_spec(document_id, started_by_id, stream=True)
+
+    async def persist_summary(annotation: str) -> None:
+        async with AsyncSessionLocal() as w_session:
+            async with w_session.begin():
+                await persist_document_summary(
+                    w_session,
+                    document_id=document_id,
+                    source=source,
+                    annotation=annotation,
+                    started_by_id=started_by_id,
+                    track_job=False,
+                )
+
     async def body():
-        try:
-            stream = await summarize_text(source_text, stream=True)
-        except AppError as exc:
-            yield _sse_error(f"[stream_error] {exc}")
-            return
-        parts: list[str] = []
-        try:
-            async for s in coop_text_chunks(stream):
-                parts.append(s)
-                yield _sse_data(s)
-        except Exception as exc:
-            yield _sse_error(f"[stream_error] {exc}")
-            return
-        full = "".join(parts)
-        try:
-            async with AsyncSessionLocal() as w_session:
-                async with w_session.begin():
-                    await persist_document_summary(
-                        w_session,
-                        document_id=document_id,
-                        source=source,
-                        annotation=full,
-                        started_by_id=started_by_id,
-                    )
-        except Exception as exc:
-            logger.exception("persist summary after stream failed")
-            yield _sse_error(f"[persist_error] {exc}")
-            return
-        yield _sse_data("[DONE]")
+        async for chunk in stream_manual_api_llm(
+            spec,
+            llm_stream_factory=lambda: summarize_text(source_text, stream=True),
+            persist=persist_summary,
+        ):
+            yield chunk
 
     return StreamingResponse(
         body(),

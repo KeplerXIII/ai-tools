@@ -18,8 +18,9 @@ from __future__ import annotations
       достаточно набора полей для ветвления в коде.
     - Сетевые и «тяжёлые» зависимости подменяются ``unittest.mock.patch`` и
       ``AsyncMock``: обнаружение URL, извлечение текста статьи, создание
-      документа, справочники статусов/языка/страны. Так проверяется оркестрация
-      и бизнес-ветки, а не реальный HTTP, RSS или запись в таблицы.
+      документа, inline-embedding после create, справочники статусов/языка/страны.
+      Так проверяется оркестрация и бизнес-ветки, а не реальный HTTP, RSS,
+      TEI или полная запись в таблицы.
 
 Ограничения
     Эти тесты не заменяют интеграционные: они не гарантируют корректность SQL,
@@ -54,6 +55,14 @@ from app.api.v1.endpoints.parsing import (
 from app.schemas.parsing import ParseSourceRequest, SourceCreateRequest, SourceUpdateRequest
 from app.services.parsing.parse_source_runner import execute_parse_source
 from app.services.parsing.source_discovery import DiscoveredUrl
+
+
+def _stub_parse_source_embed():
+    """``execute_parse_source`` зовёт embed после create; ``_FakeDb`` не хранит Document."""
+    return patch(
+        "app.services.parsing.parse_source_runner.embed_document_if_stale",
+        new_callable=AsyncMock,
+    )
 
 
 class _FakeResult:
@@ -320,6 +329,7 @@ class ParseSourceEndpointTests(IsolatedAsyncioTestCase):
                 "app.services.parsing.parse_source_runner.create_document_after_extract",
                 AsyncMock(side_effect=_create_doc),
             ),
+            _stub_parse_source_embed() as embed_mock,
         ):
             outcome = await execute_parse_source(
                 db,
@@ -331,6 +341,7 @@ class ParseSourceEndpointTests(IsolatedAsyncioTestCase):
 
         self.assertEqual(outcome.found_total, 2)
         self.assertEqual(outcome.created_total, 2)
+        self.assertEqual(embed_mock.await_count, 2)
         self.assertEqual(len(create_doc_kwargs), 2)
         for kw in create_doc_kwargs:
             self.assertEqual(kw.get("document_type_code"), "news")
@@ -399,6 +410,7 @@ class ParseSourceEndpointTests(IsolatedAsyncioTestCase):
                 "app.services.parsing.parse_source_runner.create_document_after_extract",
                 AsyncMock(side_effect=_create_doc),
             ),
+            _stub_parse_source_embed(),
         ):
             await execute_parse_source(
                 db,
@@ -463,6 +475,7 @@ class ParseSourceEndpointTests(IsolatedAsyncioTestCase):
                 "app.services.parsing.parse_source_runner.create_document_after_extract",
                 AsyncMock(side_effect=_create_doc),
             ),
+            _stub_parse_source_embed() as embed_mock,
         ):
             mock_dt.now = MagicMock(return_value=fixed_now)
             mock_dt.UTC = UTC
@@ -474,6 +487,7 @@ class ParseSourceEndpointTests(IsolatedAsyncioTestCase):
                 created_by_id=None,
             )
 
+        self.assertEqual(embed_mock.await_count, 0)
         self.assertEqual(create_calls, 0)
         self.assertEqual(outcome.created_total, 0)
         self.assertEqual(outcome.found_total, 1)
@@ -525,6 +539,7 @@ class ParseSourceEndpointTests(IsolatedAsyncioTestCase):
                 "app.services.parsing.parse_source_runner.create_document_after_extract",
                 AsyncMock(side_effect=_create_doc),
             ),
+            _stub_parse_source_embed() as embed_mock,
         ):
             outcome = await execute_parse_source(
                 db,
@@ -535,6 +550,7 @@ class ParseSourceEndpointTests(IsolatedAsyncioTestCase):
             )
 
         self.assertEqual(create_calls, 0)
+        self.assertEqual(embed_mock.await_count, 0)
         self.assertEqual(outcome.created_total, 0)
 
     async def test_parse_source_does_not_filter_undated_during_discovery(self):
@@ -574,6 +590,7 @@ class ParseSourceEndpointTests(IsolatedAsyncioTestCase):
                 "app.services.parsing.parse_source_runner.create_document_after_extract",
                 AsyncMock(return_value=SimpleNamespace(id=uuid.uuid4(), version=1, source_id=None, published_at=None)),
             ),
+            _stub_parse_source_embed(),
         ):
             await execute_parse_source(
                 db,
