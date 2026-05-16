@@ -12,10 +12,10 @@ from app.seeds.util import rows_with_fresh_uuids
 
 STANDARD_EMBEDDING_MODELS: list[dict[str, Any]] = [
     {
-        "name": "default-1536",
-        "dimension": 1536,
-        "provider": "app",
-        "description": "Размерность столбца document_embeddings.embedding",
+        "name": "bge-m3",
+        "dimension": 1024,
+        "provider": "tei",
+        "description": "BAAI bge-m3; столбец document_embeddings.embedding = vector(1024)",
     },
 ]
 

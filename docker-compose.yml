@@ -13,6 +13,7 @@ services:
     depends_on:
       - postgres
       - redis
+      - embedding-tei
 
   ai-tools-translate-worker:
     build: .
@@ -98,6 +99,37 @@ services:
       - postgres
       - redis
 
+  # Text Embeddings Inference — OpenAI-compatible POST /v1/embeddings (часто на порту 8089 с хоста).
+  # Нужны NVIDIA-драйвер и NVIDIA Container Toolkit; при ошибке CDI:
+  # https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/cdi-support.html
+  # Первый старт скачивает модель в том tei_hf_cache. Без GPU замените образ на cpu-* (см. GHCR TEI).
+  embedding-tei:
+    image: ghcr.io/huggingface/text-embeddings-inference:cuda-1.6
+    container_name: ai-tools-embedding-tei
+    gpus: all
+    shm_size: "1gb"
+    environment:
+      HF_HOME: /data
+      HUGGINGFACE_HUB_CACHE: /data/hub
+    volumes:
+      - tei_hf_cache:/data
+    networks:
+      - ai_stack
+    ports:
+      - "8089:80"
+    command:
+      - --model-id
+      - BAAI/bge-m3
+      - --revision
+      - main
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:80/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 420s
+
   ai-tools-ui:
     build:
       context: ./ai-tools-ui
@@ -138,6 +170,7 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  tei_hf_cache:
 
 networks:
   ai_stack:

@@ -22,8 +22,8 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.infrastructure.db.base import Base
 
-# Должен совпадать с dimension основной модели в embedding_models (сиды / миграция).
-EMBEDDING_VECTOR_DIM = 1536
+# Должен совпадать с dimension основной модели в embedding_models (сиды / миграция 20260517_01).
+EMBEDDING_VECTOR_DIM = 1024
 
 
 class Document(Base):
@@ -80,6 +80,11 @@ class Document(Base):
 
     original_summary_stale: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     translated_summary_stale: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+
+    # SHA-256 hex источника текста по стадиям (миграция 20260518_01); None — не индексировали или устарело.
+    embedding_original_fp: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    embedding_translated_fp: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    embedding_annotation_fp: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
 
 class DocumentCategory(Base):
