@@ -8,7 +8,7 @@ import uuid
 from dataclasses import dataclass
 from enum import StrEnum
 
-from sqlalchemy import case, delete, func, select
+from sqlalchemy import case, delete, exists, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -93,8 +93,20 @@ def _sql_annotation_text():
     )
 
 
+def _sql_stage_chunks_exist(*, chunk_type: str, language_id) -> exists:  # noqa: ANN001
+    return exists(
+        select(1)
+        .select_from(DocumentChunk)
+        .where(
+            DocumentChunk.document_id == Document.id,
+            DocumentChunk.chunk_type == chunk_type,
+            DocumentChunk.language_id == language_id,
+        ),
+    )
+
+
 async def collect_embedding_counters(session: AsyncSession) -> dict[str, int]:
-    """Документы с неустаревшим эмбеддингом: fp в БД совпадает с fp текущего текста."""
+    """Документы с актуальным эмбеддингом: fp совпадает с текстом и есть чанки стадии."""
     orig_body = func.nullif(func.btrim(Document.original_content), "")
     orig_fp = _sql_content_fingerprint(Document.original_content)
     embedded_originals = int(
@@ -105,6 +117,10 @@ async def collect_embedding_counters(session: AsyncSession) -> dict[str, int]:
                 orig_body.is_not(None),
                 Document.embedding_original_fp.is_not(None),
                 Document.embedding_original_fp == orig_fp,
+                _sql_stage_chunks_exist(
+                    chunk_type=EmbeddingStage.ORIGINAL.value,
+                    language_id=Document.original_language_id,
+                ),
             ),
         )
         or 0,
@@ -112,14 +128,20 @@ async def collect_embedding_counters(session: AsyncSession) -> dict[str, int]:
 
     trans_body = func.nullif(func.btrim(Document.translated_content), "")
     trans_fp = _sql_content_fingerprint(Document.translated_content)
+    trans_lang = Document.translated_language_id
     embedded_translations = int(
         await session.scalar(
             select(func.count())
             .select_from(Document)
             .where(
                 trans_body.is_not(None),
+                trans_lang.is_not(None),
                 Document.embedding_translated_fp.is_not(None),
                 Document.embedding_translated_fp == trans_fp,
+                _sql_stage_chunks_exist(
+                    chunk_type=EmbeddingStage.TRANSLATED.value,
+                    language_id=trans_lang,
+                ),
             ),
         )
         or 0,
@@ -128,6 +150,7 @@ async def collect_embedding_counters(session: AsyncSession) -> dict[str, int]:
     ann_text = _sql_annotation_text()
     ann_body = func.nullif(ann_text, "")
     ann_fp = _sql_content_fingerprint(ann_text)
+    ann_lang = func.coalesce(Document.translated_language_id, Document.original_language_id)
     embedded_annotations = int(
         await session.scalar(
             select(func.count())
@@ -136,6 +159,10 @@ async def collect_embedding_counters(session: AsyncSession) -> dict[str, int]:
                 ann_body.is_not(None),
                 Document.embedding_annotation_fp.is_not(None),
                 Document.embedding_annotation_fp == ann_fp,
+                _sql_stage_chunks_exist(
+                    chunk_type=EmbeddingStage.ANNOTATION.value,
+                    language_id=ann_lang,
+                ),
             ),
         )
         or 0,
@@ -209,6 +236,25 @@ async def _delete_stage_chunks(
     )
 
 
+async def _stage_has_chunks(
+    session: AsyncSession,
+    *,
+    document_id: uuid.UUID,
+    language_id: uuid.UUID,
+    chunk_type: str,
+) -> bool:
+    count = await session.scalar(
+        select(func.count())
+        .select_from(DocumentChunk)
+        .where(
+            DocumentChunk.document_id == document_id,
+            DocumentChunk.language_id == language_id,
+            DocumentChunk.chunk_type == chunk_type,
+        ),
+    )
+    return bool(count)
+
+
 async def embed_document_if_stale(
     session: AsyncSession,
     *,
@@ -233,18 +279,17 @@ async def embed_document_if_stale(
             return EmbedStageResult(stage=stage, status="skipped_empty")
 
     fp = content_fingerprint(text)
-    if _stored_fp(doc, stage) == fp:
+    if _stored_fp(doc, stage) == fp and await _stage_has_chunks(
+        session,
+        document_id=document_id,
+        language_id=language_id,
+        chunk_type=stage.value,
+    ):
         return EmbedStageResult(stage=stage, status="skipped_current")
 
     chunk_type = stage.value
     try:
         model_id = await _embedding_model_id(session)
-        await _delete_stage_chunks(
-            session,
-            document_id=document_id,
-            language_id=language_id,
-            chunk_type=chunk_type,
-        )
         pieces = split_text_into_chunks(text, max_chars=settings.embedding_chunk_chars)
         if not pieces:
             return EmbedStageResult(stage=stage, status="skipped_empty")
@@ -253,6 +298,12 @@ async def embed_document_if_stale(
         if len(vectors) != len(pieces):
             raise ExternalServiceError("TEI вернул число векторов, не совпадающее с числом чанков")
 
+        await _delete_stage_chunks(
+            session,
+            document_id=document_id,
+            language_id=language_id,
+            chunk_type=chunk_type,
+        )
         for index, (piece, vector) in enumerate(zip(pieces, vectors, strict=True)):
             chunk = DocumentChunk(
                 document_id=document_id,

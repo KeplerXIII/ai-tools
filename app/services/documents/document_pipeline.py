@@ -20,7 +20,6 @@ from app.infrastructure.db.models import (
     Category,
     Document,
     DocumentCategory,
-    DocumentChunk,
     DocumentEntity,
     DocumentStatus,
     DocumentStatusAssignment,
@@ -589,15 +588,27 @@ async def delete_auto_document_categories(session: AsyncSession, document_id: uu
     )
 
 
-async def delete_all_document_chunks(session: AsyncSession, document_id: uuid.UUID) -> None:
-    await session.execute(delete(DocumentChunk).where(DocumentChunk.document_id == document_id))
-
-
-async def invalidate_auto_derivatives(session: AsyncSession, document_id: uuid.UUID) -> None:
-    await delete_auto_document_tags(session, document_id)
+async def invalidate_on_original_body_change(
+    session: AsyncSession,
+    document_id: uuid.UUID,
+    *,
+    original_language_id: uuid.UUID,
+) -> None:
+    """Сброс авто-производных оригинала (теги языка оригинала, сущности, категории)."""
+    await delete_auto_document_tags(session, document_id, language_id=original_language_id)
     await delete_auto_document_entities(session, document_id)
     await delete_auto_document_categories(session, document_id)
-    await delete_all_document_chunks(session, document_id)
+
+
+async def invalidate_on_translated_body_change(
+    session: AsyncSession,
+    document_id: uuid.UUID,
+    *,
+    translated_language_id: uuid.UUID | None,
+) -> None:
+    """Сброс авто-тегов перевода; текст саммари не трогаем (просроченность — у вызывающего)."""
+    if translated_language_id is not None:
+        await delete_auto_document_tags(session, document_id, language_id=translated_language_id)
 
 
 async def get_document_for_update(session: AsyncSession, document_id: uuid.UUID) -> Document | None:
@@ -670,8 +681,18 @@ async def save_document_after_edit(
     doc.lock_expires_at = None
     doc.updated_at = now
 
-    if original_changed or translated_changed:
-        await invalidate_auto_derivatives(session, document_id)
+    if original_changed:
+        await invalidate_on_original_body_change(
+            session,
+            document_id,
+            original_language_id=doc.original_language_id,
+        )
+    if translated_changed:
+        await invalidate_on_translated_body_change(
+            session,
+            document_id,
+            translated_language_id=doc.translated_language_id,
+        )
     await sync_document_statuses(
         session,
         document_id=document_id,
@@ -826,6 +847,11 @@ async def persist_document_translation(
         doc.translated_language_id = tl_id
         doc.translated_summary_stale = True
     await _fill_translated_title_after_body_translation(doc, target_lang=target_lang)
+    await invalidate_on_translated_body_change(
+        session,
+        document_id,
+        translated_language_id=tl_id,
+    )
     await sync_document_statuses(
         session,
         document_id=document_id,

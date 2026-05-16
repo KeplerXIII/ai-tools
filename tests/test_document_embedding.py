@@ -48,6 +48,54 @@ def test_annotation_embed_text_prefers_both_summaries() -> None:
     assert "en" in _annotation_embed_text(Doc())  # type: ignore[arg-type]
 
 
+def test_embed_runs_when_fp_matches_but_chunks_missing() -> None:
+    lang_id = uuid.uuid4()
+    doc_id = uuid.uuid4()
+
+    class Doc:
+        id = doc_id
+        original_content = "hello"
+        original_language_id = lang_id
+        translated_content = None
+        translated_language_id = None
+        translated_summary = None
+        original_summary = None
+        embedding_original_fp = content_fingerprint("hello")
+        embedding_translated_fp = None
+        embedding_annotation_fp = None
+
+    session = AsyncMock()
+    session.get = AsyncMock(return_value=Doc())
+    session.scalar = AsyncMock(return_value=0)
+
+    with (
+        patch("app.services.documents.document_embedding.settings") as mock_settings,
+        patch(
+            "app.services.documents.document_embedding.create_embeddings",
+            new_callable=AsyncMock,
+            return_value=[[0.1] * 1024],
+        ),
+        patch(
+            "app.services.documents.document_embedding._embedding_model_id",
+            new_callable=AsyncMock,
+            return_value=uuid.uuid4(),
+        ),
+    ):
+        mock_settings.embedding_enabled = True
+        mock_settings.embedding_chunk_chars = 10000
+        mock_settings.embedding_fail_open = False
+        result = asyncio.run(
+            embed_document_if_stale(
+                session,
+                document_id=doc_id,
+                stage=EmbeddingStage.ORIGINAL,
+            ),
+        )
+
+    assert result.status == "embedded"
+    assert session.scalar.await_count >= 1
+
+
 def test_embed_skips_when_fp_matches() -> None:
     class Doc:
         id = uuid.uuid4()
@@ -63,6 +111,7 @@ def test_embed_skips_when_fp_matches() -> None:
 
     session = AsyncMock()
     session.get = AsyncMock(return_value=Doc())
+    session.scalar = AsyncMock(return_value=1)
 
     with patch("app.services.documents.document_embedding.settings") as mock_settings:
         mock_settings.embedding_enabled = True

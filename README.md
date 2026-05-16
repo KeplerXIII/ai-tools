@@ -198,5 +198,6 @@ docker compose -f <compose-file> exec <app-service> \
 | Имена сервисов, порты, тома | `docker-compose.yml` |
 | Миграции | каталог `alembic/`, `alembic.ini` |
 | CLI: БД и админ | `app/cli/init_db.py`, `app/cli/promote_admin.py` |
+| Векторизация документов (когда пересчитываются эмбеддинги, сохранение, перевод, summary/refine) | [`docs/document-embeddings.md`](docs/document-embeddings.md) |
 
 При смене имён сервисов или портов достаточно обновить compose и `.env` — этот README менять не требуется.
