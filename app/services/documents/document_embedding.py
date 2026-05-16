@@ -18,6 +18,7 @@ from app.infrastructure.db.models import Document, DocumentChunk, DocumentEmbedd
 from app.infrastructure.db.session import AsyncSessionLocal
 from app.infrastructure.llm.clients.embedding_client import create_embeddings
 from app.services.documents.db_refs import language_id_by_code
+from app.services.documents.embedding_chunking import split_text_into_token_chunks
 
 _log = logging.getLogger(__name__)
 
@@ -194,18 +195,30 @@ def _resolve_stage_text_and_language(
     return _annotation_embed_text(doc), doc.translated_language_id or doc.original_language_id
 
 
-def split_text_into_chunks(text: str, *, max_chars: int) -> list[str]:
-    stripped = text.strip()
-    if not stripped:
-        return []
-    if len(stripped) <= max_chars:
-        return [stripped]
-    out: list[str] = []
-    start = 0
-    while start < len(stripped):
-        out.append(stripped[start : start + max_chars])
-        start += max_chars
-    return out
+def stage_chunk_token_limits(stage: EmbeddingStage) -> tuple[int, int]:
+    if stage == EmbeddingStage.ORIGINAL:
+        return (
+            settings.embedding_chunk_tokens_original,
+            settings.embedding_chunk_overlap_tokens_original,
+        )
+    if stage == EmbeddingStage.TRANSLATED:
+        return (
+            settings.embedding_chunk_tokens_translated,
+            settings.embedding_chunk_overlap_tokens_translated,
+        )
+    return (
+        settings.embedding_chunk_tokens_annotation,
+        settings.embedding_chunk_overlap_tokens_annotation,
+    )
+
+
+def split_text_for_embedding_stage(text: str, stage: EmbeddingStage) -> list[str]:
+    max_tokens, overlap_tokens = stage_chunk_token_limits(stage)
+    return split_text_into_token_chunks(
+        text,
+        max_tokens=max_tokens,
+        overlap_tokens=overlap_tokens,
+    )
 
 
 async def _embedding_model_id(session: AsyncSession) -> uuid.UUID:
@@ -290,7 +303,7 @@ async def embed_document_if_stale(
     chunk_type = stage.value
     try:
         model_id = await _embedding_model_id(session)
-        pieces = split_text_into_chunks(text, max_chars=settings.embedding_chunk_chars)
+        pieces = split_text_for_embedding_stage(text, stage)
         if not pieces:
             return EmbedStageResult(stage=stage, status="skipped_empty")
 

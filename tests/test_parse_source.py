@@ -60,7 +60,7 @@ from app.services.parsing.source_discovery import DiscoveredUrl
 def _stub_parse_source_embed():
     """``execute_parse_source`` зовёт embed после create; ``_FakeDb`` не хранит Document."""
     return patch(
-        "app.services.parsing.parse_source_runner.embed_document_if_stale",
+        "app.services.parsing.parse_source_runner.embed_document_stages_best_effort",
         new_callable=AsyncMock,
     )
 

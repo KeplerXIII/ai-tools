@@ -10,17 +10,11 @@ from app.services.documents.document_embedding import (
     content_fingerprint,
     embed_document_if_stale,
     is_embedding_fresh,
-    split_text_into_chunks,
 )
 
 
 def test_content_fingerprint_normalizes_whitespace() -> None:
     assert content_fingerprint("a  b") == content_fingerprint("a b")
-
-
-def test_split_text_into_chunks() -> None:
-    assert split_text_into_chunks("hi", max_chars=10) == ["hi"]
-    assert len(split_text_into_chunks("x" * 25, max_chars=10)) == 3
 
 
 def test_is_embedding_fresh_when_fp_matches() -> None:
@@ -82,7 +76,12 @@ def test_embed_runs_when_fp_matches_but_chunks_missing() -> None:
         ),
     ):
         mock_settings.embedding_enabled = True
-        mock_settings.embedding_chunk_chars = 10000
+        mock_settings.embedding_chunk_tokens_original = 100_000
+        mock_settings.embedding_chunk_overlap_tokens_original = 0
+        mock_settings.embedding_chunk_tokens_translated = 100_000
+        mock_settings.embedding_chunk_overlap_tokens_translated = 0
+        mock_settings.embedding_chunk_tokens_annotation = 100_000
+        mock_settings.embedding_chunk_overlap_tokens_annotation = 0
         mock_settings.embedding_fail_open = False
         result = asyncio.run(
             embed_document_if_stale(

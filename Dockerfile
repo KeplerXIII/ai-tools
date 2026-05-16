@@ -41,6 +41,9 @@ COPY pyproject.toml uv.lock ./
 
 RUN uv sync --frozen --no-dev
 
+ARG EMBEDDING_MODEL_NAME=BAAI/bge-m3
+RUN uv run python -c "from transformers import AutoTokenizer; AutoTokenizer.from_pretrained('${EMBEDDING_MODEL_NAME}')"
+
 RUN uv run playwright install chromium
 
 COPY app ./app

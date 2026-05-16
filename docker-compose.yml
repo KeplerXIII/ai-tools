@@ -1,5 +1,12 @@
+x-hf-tokenizer: &hf-tokenizer
+  environment:
+    EMBEDDING_TOKENIZER_HUB_ROOT: /tei-hub/hub
+  volumes:
+    - tei_hf_cache:/tei-hub:ro
+
 services:
   ai-tools:
+    <<: *hf-tokenizer
     build: .
     container_name: ai-tools
     env_file:
@@ -16,6 +23,7 @@ services:
       - embedding-tei
 
   ai-tools-translate-worker:
+    <<: *hf-tokenizer
     build: .
     container_name: ai-tools-translate-worker
     env_file:
@@ -30,6 +38,7 @@ services:
       - redis
 
   ai-tools-annotate-worker:
+    <<: *hf-tokenizer
     build: .
     container_name: ai-tools-annotate-worker
     env_file:
@@ -44,6 +53,7 @@ services:
       - redis
 
   ai-tools-categorize-worker:
+    <<: *hf-tokenizer
     build: .
     container_name: ai-tools-categorize-worker
     env_file:
@@ -58,6 +68,7 @@ services:
       - redis
 
   ai-tools-extractor-worker:
+    <<: *hf-tokenizer
     build: .
     container_name: ai-tools-extractor-worker
     env_file:
@@ -72,6 +83,7 @@ services:
       - redis
 
   ai-tools-tagger-worker:
+    <<: *hf-tokenizer
     build: .
     container_name: ai-tools-tagger-worker
     env_file:
@@ -86,6 +98,7 @@ services:
       - redis
 
   ai-tools-parse-worker:
+    <<: *hf-tokenizer
     build: .
     container_name: ai-tools-parse-worker
     env_file:

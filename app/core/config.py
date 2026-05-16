@@ -60,7 +60,17 @@ class Settings(BaseSettings):
     embedding_tei_api_key: str = "tei"
     embedding_model_name: str = "BAAI/bge-m3"
     embedding_catalog_model_name: str = "bge-m3"
-    embedding_chunk_chars: int = 3500
+    # Явный путь к snapshot (…/snapshots/<rev>) или корень HF hub (…/hub) с models--*.
+    embedding_tokenizer_local_path: str | None = None
+    embedding_tokenizer_hub_root: str | None = None
+    embedding_tokenizer_cache_dir: str | None = None
+    embedding_tokenizer_local_files_only: bool = False
+    embedding_chunk_tokens_original: int = 512
+    embedding_chunk_overlap_tokens_original: int = 128
+    embedding_chunk_tokens_translated: int = 512
+    embedding_chunk_overlap_tokens_translated: int = 128
+    embedding_chunk_tokens_annotation: int = 512
+    embedding_chunk_overlap_tokens_annotation: int = 64
     embedding_timeout_sec: int = 120
     embedding_fail_open: bool = True
 

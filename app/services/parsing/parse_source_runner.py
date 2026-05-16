@@ -23,7 +23,7 @@ from app.infrastructure.db.models import (
     SourceParseRun,
 )
 from app.schemas.parsing import ParseSourceDocumentItem
-from app.services.documents.document_embedding import EmbeddingStage, embed_document_if_stale
+from app.services.documents.document_embedding import EmbeddingStage, embed_document_stages_best_effort
 from app.services.documents.document_pipeline import (
     _published_at_from_extract_date,
     create_document_after_extract,
@@ -215,6 +215,7 @@ async def execute_parse_source(
             continue
 
         await prepare_write_session(db)
+        doc_id: UUID | None = None
         try:
             async with db.begin():
                 doc = await create_document_after_extract(
@@ -227,12 +228,7 @@ async def execute_parse_source(
                 doc.source_id = source_id
                 if item.published_at is not None:
                     doc.published_at = item.published_at
-
-                await embed_document_if_stale(
-                    db,
-                    document_id=doc.id,
-                    stage=EmbeddingStage.ORIGINAL,
-                )
+                doc_id = doc.id
                 new_doc_ids.add(doc.id)
         except ValidationError:
             await db.rollback()
@@ -240,6 +236,9 @@ async def execute_parse_source(
         except IntegrityError:
             await db.rollback()
             continue
+
+        if doc_id is not None:
+            await embed_document_stages_best_effort(doc_id, EmbeddingStage.ORIGINAL)
 
     await db.execute(
         update(Source)
