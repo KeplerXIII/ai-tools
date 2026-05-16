@@ -48,7 +48,7 @@
         >
           <span class="flow-node__label">С извлечёнными сущностями</span>
           <span class="flow-node__value">{{ counters.with_entities }}</span>
-          <span class="flow-node__cta">{{ bulkExtractorLoading ? 'Постановка…' : 'Догнать без сущностей' }}</span>
+          <span class="flow-node__cta">{{ bulkExtractorLoading ? 'Постановка…' : 'Извлечь сущности' }}</span>
         </button>
 
         <button
@@ -60,7 +60,7 @@
         >
           <span class="flow-node__label">Переведённые</span>
           <span class="flow-node__value">{{ counters.with_translations }}</span>
-          <span class="flow-node__cta">{{ bulkTranslateLoading ? 'Постановка…' : 'Догнать без перевода' }}</span>
+          <span class="flow-node__cta">{{ bulkTranslateLoading ? 'Постановка…' : 'Перевести' }}</span>
         </button>
 
         <button
@@ -72,7 +72,7 @@
         >
           <span class="flow-node__label">Тегированные (оригинал)</span>
           <span class="flow-node__value">{{ counters.tagged_original_lang }}</span>
-          <span class="flow-node__cta">{{ bulkTagOriginalLoading ? 'Постановка…' : 'Догнать теги оригинала' }}</span>
+          <span class="flow-node__cta">{{ bulkTagOriginalLoading ? 'Постановка…' : 'Тегировать оригинал' }}</span>
         </button>
       </div>
 
@@ -93,9 +93,9 @@
           [disabled]="bulkTagTranslatedLoading"
           (click)="enqueueTaggerTranslated()"
         >
-          <span class="flow-node__label">Тегированные (RU)</span>
+          <span class="flow-node__label">Тегированные (перевод)</span>
           <span class="flow-node__value">{{ counters.tagged_translated_lang }}</span>
-          <span class="flow-node__cta">{{ bulkTagTranslatedLoading ? 'Постановка…' : 'Догнать теги RU' }}</span>
+          <span class="flow-node__cta">{{ bulkTagTranslatedLoading ? 'Постановка…' : 'Тегировать перевод' }}</span>
         </button>
         <button
           type="button"
@@ -106,7 +106,7 @@
         >
           <span class="flow-node__label">Аннотированные</span>
           <span class="flow-node__value">{{ counters.with_annotations }}</span>
-          <span class="flow-node__cta">{{ bulkAnnotateLoading ? 'Постановка…' : 'Догнать аннотацию' }}</span>
+          <span class="flow-node__cta">{{ bulkAnnotateLoading ? 'Постановка…' : 'Аннотировать' }}</span>
         </button>
         <button
           type="button"
@@ -117,7 +117,7 @@
         >
           <span class="flow-node__label">Категоризированные</span>
           <span class="flow-node__value">{{ counters.categorized }}</span>
-          <span class="flow-node__cta">{{ bulkCategorizeLoading ? 'Постановка…' : 'Догнать категории' }}</span>
+          <span class="flow-node__cta">{{ bulkCategorizeLoading ? 'Постановка…' : 'Категоризировать' }}</span>
         </button>
       </div>
     </div>
