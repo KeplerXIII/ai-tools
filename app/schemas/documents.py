@@ -290,6 +290,8 @@ class CreateDocumentRawRequest(BaseModel):
     document_type_code: str = Field(default="undefined", min_length=1, max_length=64)
     source_url: HttpUrl | None = None
     main_image: HttpUrl | None = None
+    translated_content: str | None = None
+    target_lang: str = Field(default="ru", min_length=2, max_length=16)
 
     @field_validator("source_url", "main_image", mode="before")
     @classmethod

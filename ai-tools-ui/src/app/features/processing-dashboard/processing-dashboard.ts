@@ -12,6 +12,7 @@ import { TaggerBatchNotifierService } from '../../core/processing/tagger-batch-n
 import { TranslateBatchNotifierService } from '../../core/processing/translate-batch-notifier.service';
 import { DocumentsApi } from '../documents/documents-api';
 import {
+  EmbeddingCounters,
   ProcessingCounters,
   ProcessingDashboardApi,
   ProcessingDashboardSnapshot,
@@ -19,6 +20,7 @@ import {
 } from './processing-dashboard-api';
 
 type CounterKey = keyof ProcessingCounters;
+type EmbeddingCounterKey = keyof EmbeddingCounters;
 type CounterFlashKind = 'up' | 'down' | 'same';
 type JobFlashKind = 'new' | 'changed';
 type JobFieldKey = keyof ProcessingJobRow;
@@ -53,6 +55,7 @@ const BULK_FEEDBACK_HIDE_MS = 6000;
 export class ProcessingDashboard implements OnInit, OnDestroy {
   jobs: ProcessingJobRow[] = [];
   counters: ProcessingCounters | null = null;
+  embeddingCounters: EmbeddingCounters | null = null;
   snapshotAt = '';
   loading = true;
   error = '';
@@ -80,7 +83,9 @@ export class ProcessingDashboard implements OnInit, OnDestroy {
   bulkTagTranslatedError = '';
 
   counterFlash: Partial<Record<CounterKey, CounterFlashKind>> = {};
+  embeddingCounterFlash: Partial<Record<EmbeddingCounterKey, CounterFlashKind>> = {};
   jobFlash: Record<string, JobFlashKind> = {};
+  private previousEmbeddingCounters: EmbeddingCounters | null = null;
   jobCellFlash: Record<string, true> = {};
 
   private streamSub: Subscription | null = null;
@@ -326,9 +331,16 @@ export class ProcessingDashboard implements OnInit, OnDestroy {
 
   private applySnapshot(snapshot: ProcessingDashboardSnapshot): void {
     this.snapshotAt = snapshot.snapshot_at;
+    const embeddingCounters = snapshot.embedding_counters ?? {
+      embedded_originals: 0,
+      embedded_translations: 0,
+      embedded_annotations: 0,
+    };
     this.applyCounterFlash(snapshot.counters);
+    this.applyEmbeddingCounterFlash(embeddingCounters);
     this.applyJobs(snapshot.jobs);
     this.counters = snapshot.counters;
+    this.embeddingCounters = embeddingCounters;
     this.cdr.detectChanges();
   }
 
@@ -365,6 +377,28 @@ export class ProcessingDashboard implements OnInit, OnDestroy {
         });
       }
     }
+  }
+
+  private applyEmbeddingCounterFlash(nextCounters: EmbeddingCounters): void {
+    if (!this.previousEmbeddingCounters) {
+      this.embeddingCounterFlash = {};
+      this.previousEmbeddingCounters = { ...nextCounters };
+      return;
+    }
+
+    const keys = Object.keys(nextCounters) as EmbeddingCounterKey[];
+    for (const key of keys) {
+      const prev = this.previousEmbeddingCounters[key];
+      const next = nextCounters[key];
+      const flash: CounterFlashKind = next > prev ? 'up' : next < prev ? 'down' : 'same';
+      if (flash !== 'same') {
+        this.embeddingCounterFlash[key] = flash;
+        this.resetFlashLater(`embedding-counter:${key}`, () => {
+          this.embeddingCounterFlash[key] = 'same';
+        });
+      }
+    }
+    this.previousEmbeddingCounters = { ...nextCounters };
   }
 
   private applyJobs(nextJobs: ProcessingJobRow[]): void {

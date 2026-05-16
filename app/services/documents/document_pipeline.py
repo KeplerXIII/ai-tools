@@ -48,6 +48,10 @@ from app.services.documents.db_refs import (
     language_id_by_code,
     prediction_source_id,
 )
+from app.services.documents.document_embedding import (
+    EmbeddingStage,
+    embed_document_stages_if_stale,
+)
 from app.services.documents.url_norm import normalize_source_url
 from app.services.llm.categorizer import categorize_text
 from app.services.llm.entity_extractor import extract_entities
@@ -629,6 +633,9 @@ async def save_document_after_edit(
 
     original_changed = body.original_content is not None and body.original_content != doc.original_content
     translated_changed = body.translated_content is not None and body.translated_content != doc.translated_content
+    summary_changed = (body.original_summary is not None and body.original_summary != doc.original_summary) or (
+        body.translated_summary is not None and body.translated_summary != doc.translated_summary
+    )
 
     if original_changed:
         doc.original_summary_stale = body.original_summary is None
@@ -661,6 +668,20 @@ async def save_document_after_edit(
         document_id=document_id,
         assigned_by_id=user_id,
     )
+
+    embed_stages: list[EmbeddingStage] = []
+    if original_changed:
+        embed_stages.append(EmbeddingStage.ORIGINAL)
+    if translated_changed:
+        embed_stages.append(EmbeddingStage.TRANSLATED)
+    if summary_changed:
+        embed_stages.append(EmbeddingStage.ANNOTATION)
+    if embed_stages:
+        await embed_document_stages_if_stale(
+            session,
+            document_id=document_id,
+            stages=tuple(embed_stages),
+        )
     return doc
 
 
@@ -800,6 +821,11 @@ async def persist_document_translation(
         session,
         document_id=document_id,
         assigned_by_id=started_by_id,
+    )
+    await embed_document_stages_if_stale(
+        session,
+        document_id=document_id,
+        stages=(EmbeddingStage.TRANSLATED,),
     )
     return doc
 
@@ -1277,6 +1303,11 @@ async def persist_document_refined_summary(
         document_id=document_id,
         assigned_by_id=started_by_id,
     )
+    await embed_document_stages_if_stale(
+        session,
+        document_id=document_id,
+        stages=(EmbeddingStage.ANNOTATION,),
+    )
     return doc
 
 
@@ -1314,6 +1345,11 @@ async def persist_document_summary(
         session,
         document_id=document_id,
         assigned_by_id=started_by_id,
+    )
+    await embed_document_stages_if_stale(
+        session,
+        document_id=document_id,
+        stages=(EmbeddingStage.ANNOTATION,),
     )
     return doc
 

@@ -14,7 +14,8 @@
   <div class="state-box success" *ngIf="purgeMessage">{{ purgeMessage }}</div>
   <div class="state-box error" *ngIf="purgeError">{{ purgeError }}</div>
 
-  <section class="counters-panel bulk-pipeline-panel" *ngIf="counters">
+  <div class="dashboard-metrics" *ngIf="counters && embeddingCounters">
+    <section class="counters-panel bulk-pipeline-panel dashboard-metrics__pipeline">
     <h2>Массовая обработка</h2>
     <p class="bulk-pipeline-hint">
       Счётчики отражают, сколько документов уже прошли этап. Нажмите узел, чтобы поставить в очередь обработку для документов, у которых этот этап ещё не выполнен.
@@ -145,7 +146,38 @@
       <div class="state-inline state-inline_success" *ngIf="bulkTagTranslatedMessage">{{ bulkTagTranslatedMessage }}</div>
       <div class="state-inline state-inline_error" *ngIf="bulkTagTranslatedError">{{ bulkTagTranslatedError }}</div>
     </div>
-  </section>
+    </section>
+
+    <section class="counters-panel embedding-panel dashboard-metrics__embeddings">
+      <h2>Эмбеддинги</h2>
+      <p class="bulk-pipeline-hint embedding-panel__hint">
+        Документы с актуальным вектором: отпечаток текста совпадает с сохранённым fp (не устарело после правки).
+      </p>
+      <div class="embedding-stack">
+        <div
+          class="flow-node flow-node_static flow-node_embedding"
+          [ngClass]="'flash-' + (embeddingCounterFlash.embedded_originals || 'same')"
+        >
+          <span class="flow-node__label">Оригиналы</span>
+          <span class="flow-node__value">{{ embeddingCounters.embedded_originals }}</span>
+        </div>
+        <div
+          class="flow-node flow-node_static flow-node_embedding"
+          [ngClass]="'flash-' + (embeddingCounterFlash.embedded_translations || 'same')"
+        >
+          <span class="flow-node__label">Переводы</span>
+          <span class="flow-node__value">{{ embeddingCounters.embedded_translations }}</span>
+        </div>
+        <div
+          class="flow-node flow-node_static flow-node_embedding"
+          [ngClass]="'flash-' + (embeddingCounterFlash.embedded_annotations || 'same')"
+        >
+          <span class="flow-node__label">Аннотации</span>
+          <span class="flow-node__value">{{ embeddingCounters.embedded_annotations }}</span>
+        </div>
+      </div>
+    </section>
+  </div>
 
   <section class="jobs-panel">
     <h2>Processing Jobs (все поля)</h2>

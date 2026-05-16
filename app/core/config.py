@@ -54,6 +54,16 @@ class Settings(BaseSettings):
     # --- runtime ---
     llm_timeout: int = 120
 
+    # --- embeddings (TEI OpenAI-compatible /v1/embeddings → pgvector bge-m3 = 1024) ---
+    embedding_enabled: bool = True
+    embedding_tei_base_url: str = "http://embedding-tei/v1"
+    embedding_tei_api_key: str = "tei"
+    embedding_model_name: str = "BAAI/bge-m3"
+    embedding_catalog_model_name: str = "bge-m3"
+    embedding_chunk_chars: int = 3500
+    embedding_timeout_sec: int = 120
+    embedding_fail_open: bool = True
+
     # --- background processing (SAQ) ---
     saq_queue_url: str = "redis://localhost:6379/0"
     saq_translate_queue_name: str = "ai-tools-translate"

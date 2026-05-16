@@ -23,6 +23,7 @@ from app.infrastructure.db.models import (
     SourceParseRun,
 )
 from app.schemas.parsing import ParseSourceDocumentItem
+from app.services.documents.document_embedding import EmbeddingStage, embed_document_if_stale
 from app.services.documents.document_pipeline import (
     _published_at_from_extract_date,
     create_document_after_extract,
@@ -227,6 +228,11 @@ async def execute_parse_source(
                 if item.published_at is not None:
                     doc.published_at = item.published_at
 
+                await embed_document_if_stale(
+                    db,
+                    document_id=doc.id,
+                    stage=EmbeddingStage.ORIGINAL,
+                )
                 new_doc_ids.add(doc.id)
         except ValidationError:
             await db.rollback()

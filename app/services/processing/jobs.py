@@ -50,6 +50,12 @@ def provider_label_for_task(task: LLMTask) -> str:
     return _provider_for_llm_task(task)
 
 
+def provider_label_embedding() -> str:
+    from urllib.parse import urlparse
+
+    return urlparse(settings.embedding_tei_base_url).netloc or "tei"
+
+
 @asynccontextmanager
 async def processing_job(
     session: AsyncSession,

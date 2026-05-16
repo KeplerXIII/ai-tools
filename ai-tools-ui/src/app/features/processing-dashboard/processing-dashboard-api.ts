@@ -31,10 +31,17 @@ export interface ProcessingCounters {
   tagged_translated_lang: number;
 }
 
+export interface EmbeddingCounters {
+  embedded_originals: number;
+  embedded_translations: number;
+  embedded_annotations: number;
+}
+
 export interface ProcessingDashboardSnapshot {
   snapshot_at: string;
   jobs: ProcessingJobRow[];
   counters: ProcessingCounters;
+  embedding_counters?: EmbeddingCounters;
 }
 
 export interface PurgeDocumentsResponse {

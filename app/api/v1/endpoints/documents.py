@@ -63,6 +63,7 @@ from app.schemas.documents import (
     SummarySource,
 )
 from app.services.documents.db_refs import entity_type_id_by_code, language_id_by_code, prediction_source_id
+from app.services.documents.document_embedding import EmbeddingStage, embed_document_stages_best_effort
 from app.services.documents.document_pipeline import (
     acquire_edit_lock,
     create_document_after_extract,
@@ -644,6 +645,7 @@ async def extract_url_persist(
                 started_by_id=created_by_id,
             )
             doc_id = doc.id
+        await embed_document_stages_best_effort(doc_id, EmbeddingStage.ORIGINAL)
     except ValidationError as exc:
         await db.rollback()
         _handle(exc)
@@ -709,7 +711,16 @@ async def create_document_from_raw(
                 source_url=normalize_source_url(str(payload.source_url)) if payload.source_url else None,
                 main_image=str(payload.main_image).strip()[:8192] if payload.main_image else None,
             )
+            translated_body = (payload.translated_content or "").strip()
+            if translated_body:
+                doc.translated_content = translated_body
+                doc.translated_language_id = await language_id_by_code(db, payload.target_lang)
+                doc.translated_summary_stale = True
             doc_id = doc.id
+        embed_stages = [EmbeddingStage.ORIGINAL]
+        if (payload.translated_content or "").strip():
+            embed_stages.append(EmbeddingStage.TRANSLATED)
+        await embed_document_stages_best_effort(doc_id, *embed_stages)
     except ValidationError as exc:
         await db.rollback()
         _handle(exc)

@@ -42,6 +42,7 @@ from app.services.processing.document_stage_enqueue import (
     enqueue_translate_batch,
 )
 from app.services.processing.full_llm_pipeline_enqueue import enqueue_full_llm_pipeline_core
+from app.services.documents.document_embedding import collect_embedding_counters
 from app.services.processing.redis_batch_store import (
     ProcessingBatchKind,
     get_processing_batch,
@@ -150,6 +151,8 @@ async def _collect_dashboard_payload(session: AsyncSession) -> dict:
         or 0
     )
 
+    embedding_counters = await collect_embedding_counters(session)
+
     return {
         "jobs": jobs,
         "counters": {
@@ -161,6 +164,7 @@ async def _collect_dashboard_payload(session: AsyncSession) -> dict:
             "tagged_original_lang": docs_with_original_tags,
             "tagged_translated_lang": docs_with_translated_tags,
         },
+        "embedding_counters": embedding_counters,
     }
 
 

@@ -1,0 +1,78 @@
+from __future__ import annotations
+
+import asyncio
+import uuid
+from unittest.mock import AsyncMock, patch
+
+from app.services.documents.document_embedding import (
+    EmbeddingStage,
+    _annotation_embed_text,
+    content_fingerprint,
+    embed_document_if_stale,
+    is_embedding_fresh,
+    split_text_into_chunks,
+)
+
+
+def test_content_fingerprint_normalizes_whitespace() -> None:
+    assert content_fingerprint("a  b") == content_fingerprint("a b")
+
+
+def test_split_text_into_chunks() -> None:
+    assert split_text_into_chunks("hi", max_chars=10) == ["hi"]
+    assert len(split_text_into_chunks("x" * 25, max_chars=10)) == 3
+
+
+def test_is_embedding_fresh_when_fp_matches() -> None:
+    class Doc:
+        original_content = "hello world"
+        original_language_id = uuid.uuid4()
+        translated_content = None
+        translated_language_id = None
+        translated_summary = None
+        original_summary = None
+        embedding_original_fp = content_fingerprint("hello world")
+        embedding_translated_fp = None
+        embedding_annotation_fp = None
+
+    assert is_embedding_fresh(Doc(), EmbeddingStage.ORIGINAL) is True  # type: ignore[arg-type]
+    assert is_embedding_fresh(Doc(), EmbeddingStage.TRANSLATED) is False  # type: ignore[arg-type]
+
+
+def test_annotation_embed_text_prefers_both_summaries() -> None:
+    class Doc:
+        translated_summary = "ru"
+        original_summary = "en"
+
+    assert "ru" in _annotation_embed_text(Doc())  # type: ignore[arg-type]
+    assert "en" in _annotation_embed_text(Doc())  # type: ignore[arg-type]
+
+
+def test_embed_skips_when_fp_matches() -> None:
+    class Doc:
+        id = uuid.uuid4()
+        original_content = "hello"
+        original_language_id = uuid.uuid4()
+        translated_content = None
+        translated_language_id = None
+        translated_summary = None
+        original_summary = None
+        embedding_original_fp = content_fingerprint("hello")
+        embedding_translated_fp = None
+        embedding_annotation_fp = None
+
+    session = AsyncMock()
+    session.get = AsyncMock(return_value=Doc())
+
+    with patch("app.services.documents.document_embedding.settings") as mock_settings:
+        mock_settings.embedding_enabled = True
+        result = asyncio.run(
+            embed_document_if_stale(
+                session,
+                document_id=Doc.id,
+                stage=EmbeddingStage.ORIGINAL,
+            ),
+        )
+
+    assert result.status == "skipped_current"
+    session.execute.assert_not_called()
