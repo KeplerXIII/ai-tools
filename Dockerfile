@@ -47,6 +47,7 @@ RUN uv run python -c "from transformers import AutoTokenizer; AutoTokenizer.from
 RUN uv run playwright install chromium
 
 COPY app ./app
+COPY scripts ./scripts
 COPY alembic ./alembic
 COPY alembic.ini ./alembic.ini
 

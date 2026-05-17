@@ -21,6 +21,7 @@ services:
       - postgres
       - redis
       - embedding-tei
+      - rerank-tei
 
   ai-tools-translate-worker:
     <<: *hf-tokenizer
@@ -133,6 +134,35 @@ services:
     command:
       - --model-id
       - BAAI/bge-m3
+      - --revision
+      - main
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:80/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 420s
+
+  # Cross-encoder rerank (POST /rerank). Отдельный процесс от embedding-tei.
+  # С хоста: http://127.0.0.1:8090/rerank . В .env: RAG_RERANK_BASE_URL=http://rerank-tei:80
+  rerank-tei:
+    image: ghcr.io/huggingface/text-embeddings-inference:cuda-1.6
+    container_name: ai-tools-rerank-tei
+    gpus: all
+    shm_size: "1gb"
+    environment:
+      HF_HOME: /data
+      HUGGINGFACE_HUB_CACHE: /data/hub
+    volumes:
+      - tei_hf_cache:/data
+    networks:
+      - ai_stack
+    ports:
+      - "8090:80"
+    command:
+      - --model-id
+      - BAAI/bge-reranker-v2-m3
       - --revision
       - main
     restart: unless-stopped

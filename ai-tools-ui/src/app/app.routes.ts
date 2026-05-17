@@ -5,6 +5,7 @@ import { Documents } from './features/documents/documents';
 import { Sources } from './features/sources/sources';
 import { Login } from './features/login/login';
 import { ProcessingDashboard } from './features/processing-dashboard/processing-dashboard';
+import { RagQa } from './features/rag-qa/rag-qa';
 import { authGuard } from './core/auth/auth.guard';
 
 export const routes: Routes = [
@@ -50,6 +51,11 @@ export const routes: Routes = [
   {
     path: 'processing-dashboard',
     component: ProcessingDashboard,
+    canActivate: [authGuard],
+  },
+  {
+    path: 'rag',
+    component: RagQa,
     canActivate: [authGuard],
   },
 ];

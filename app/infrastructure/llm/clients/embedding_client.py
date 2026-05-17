@@ -33,3 +33,18 @@ async def create_embeddings(texts: list[str]) -> list[list[float]]:
 
     by_index = sorted(response.data, key=lambda row: row.index)
     return [row.embedding for row in by_index]
+
+
+async def create_embeddings_batched(
+    texts: list[str],
+    *,
+    batch_size: int | None = None,
+) -> list[list[float]]:
+    """Несколько запросов к embedding-tei (fallback rerank, лимит токенов на batch)."""
+    if not texts:
+        return []
+    size = max(1, batch_size or settings.rag_embedding_request_batch_size)
+    vectors: list[list[float]] = []
+    for start in range(0, len(texts), size):
+        vectors.extend(await create_embeddings(texts[start : start + size]))
+    return vectors

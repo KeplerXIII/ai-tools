@@ -221,6 +221,11 @@ def split_text_for_embedding_stage(text: str, stage: EmbeddingStage) -> list[str
     )
 
 
+async def resolve_embedding_model_id(session: AsyncSession) -> uuid.UUID:
+    """ID каталоговой модели эмбеддингов (для индексации и RAG retrieval)."""
+    return await _embedding_model_id(session)
+
+
 async def _embedding_model_id(session: AsyncSession) -> uuid.UUID:
     global _model_id_cache
     if _model_id_cache is not None:
@@ -337,6 +342,14 @@ async def embed_document_if_stale(
                 set_={"embedding": stmt.excluded.embedding},
             )
             await session.execute(stmt)
+            if settings.rag_bm25_index_on_embed:
+                from app.services.rag.bm25_index import sync_bm25_terms_for_chunk
+
+                await sync_bm25_terms_for_chunk(
+                    session,
+                    chunk_id=chunk.id,
+                    content=piece,
+                )
 
         _set_stored_fp(doc, stage, fp)
         return EmbedStageResult(stage=stage, status="embedded", chunk_count=len(pieces))

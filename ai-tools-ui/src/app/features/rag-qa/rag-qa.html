@@ -1,0 +1,318 @@
+<ng-template #chunkScores let-source="source">
+  <div class="rag-page__chunk-tags">
+    @if (wasReranked(source)) {
+      <span class="rag-page__stage-tag rag-page__stage-tag_reranked">Reranked</span>
+    } @else {
+      <span class="rag-page__stage-tag rag-page__stage-tag_retrieval">Retrieval</span>
+    }
+    <span
+      class="rag-page__stage-tag rag-page__stage-tag_type rag-page__stage-tag_type_{{
+        source.chunk_type
+      }}"
+    >
+      {{ chunkTypeLabel(source.chunk_type) }}
+    </span>
+    <span class="rag-page__stage-tag rag-page__stage-tag_fragment">
+      Фрагмент №{{ fragmentNumber(source.chunk_index) }}
+    </span>
+    @if (source.rank > 0) {
+      <span class="rag-page__stage-tag rag-page__stage-tag_place">
+        Место {{ source.rank }}
+      </span>
+    }
+  </div>
+  <div class="rag-page__chunk-scores">
+    @if (wasReranked(source)) {
+      <span class="rag-page__score-pill rag-page__score-pill_rerank">
+        Rerank {{ source.score | number: '1.2-2' }}
+      </span>
+    } @else {
+      <span class="rag-page__score-pill rag-page__score-pill_retrieval">
+        Retrieval {{ source.score | number: '1.2-2' }}
+      </span>
+    }
+    @for (b of retrievalScoreBadges(source); track b.key) {
+      <span class="rag-page__score-pill rag-page__score-pill_{{ b.key }}">
+        {{ b.label }} {{ b.value | number: '1.2-2' }}
+      </span>
+    }
+  </div>
+</ng-template>
+
+<section class="rag-page">
+  <header class="rag-page__header">
+    <h1 class="rag-page__title">Вопрос по базе</h1>
+    <p class="rag-page__subtitle">
+      Поиск по проиндексированным документам (векторный и гибридный режим) с ответом по найденным фрагментам
+    </p>
+    @if (metrics) {
+      <p class="rag-page__metrics">
+        Запросов: {{ metrics.total_queries }} · за 24 ч: {{ metrics.queries_last_24h }}
+        @if (metrics.avg_retrieval_ms != null) {
+          · retrieval ~{{ metrics.avg_retrieval_ms | number: '1.0-0' }} ms
+        }
+      </p>
+    }
+  </header>
+
+  <div class="rag-page__workspace">
+    <div class="rag-page__answer-pane">
+      <div class="rag-page__answer-pane-header">
+        <h2 class="rag-page__panel-title">Ответ</h2>
+        <div class="rag-page__timings">
+          @if (retrievalMs != null) {
+            <span class="rag-page__timing">retrieval {{ retrievalMs }} ms</span>
+          }
+          @if (generationMs != null && !retrieveOnly) {
+            <span class="rag-page__timing">generation {{ generationMs }} ms</span>
+          }
+        </div>
+      </div>
+      <div class="rag-page__answer" [class.rag-page__answer_empty]="!answer && !loading">
+        @if (answer) {
+          <div class="rag-page__answer-md" [innerHTML]="answerMarkdownHtml()"></div>
+        } @else {
+          <span class="rag-page__answer-placeholder">
+            {{ loading ? '…' : 'Ответ появится здесь' }}
+          </span>
+        }
+      </div>
+    </div>
+
+    <div class="rag-page__compose">
+      <div class="rag-page__options rag-page__options_inline">
+        <mat-checkbox
+          [(ngModel)]="retrieveOnly"
+          matTooltip="Только поиск по базе: фрагменты и источники без генерации ответа LLM."
+          matTooltipPosition="above"
+        >
+          Только поиск
+        </mat-checkbox>
+        <mat-checkbox
+          [(ngModel)]="useStream"
+          [disabled]="retrieveOnly"
+          matTooltip="Ответ LLM приходит потоком по мере генерации (SSE). Недоступно в режиме «только поиск»."
+          matTooltipPosition="above"
+        >
+          Поток
+        </mat-checkbox>
+        <mat-checkbox
+          [(ngModel)]="expandQuery"
+          matTooltip="LLM расширит запрос на несколько формулировок; поиск по каждой, затем слияние списков (RRF)."
+          matTooltipPosition="above"
+        >
+          Multi-query
+        </mat-checkbox>
+        <label class="rag-page__select-label rag-page__select-label_inline">
+          <span>Стратегия</span>
+          <select [(ngModel)]="strategy" class="rag-page__select">
+            <option value="vector">Вектор</option>
+            <option value="hybrid_all">Гибрид all</option>
+            <option value="hybrid">Вектор + FTS</option>
+            <option value="hybrid_bm25">Вектор + BM25</option>
+          </select>
+        </label>
+        <label class="rag-page__select-label rag-page__select-label_inline">
+          <span>Rerank</span>
+          <select [(ngModel)]="reranker" class="rag-page__select">
+            <option value="none">Нет</option>
+            <option value="cross_encoder">Cross-encoder</option>
+          </select>
+        </label>
+        <label class="rag-page__select-label rag-page__select-label_inline">
+          <span>Мин. score</span>
+          <input
+            type="number"
+            class="rag-page__select rag-page__score-input"
+            [(ngModel)]="minScore"
+            min="0"
+            max="1"
+            step="0.05"
+            placeholder="выкл"
+            title="Порог после rerank (0-1). Пусто или 0 = без отсечения."
+          />
+        </label>
+      </div>
+
+      <div class="rag-page__query-row">
+        <textarea
+          pTextarea
+          id="rag_query"
+          class="rag-page__query-input"
+          rows="2"
+          [(ngModel)]="query"
+          [disabled]="loading"
+          placeholder="Вопрос по содержимому материалов…"
+          (keydown.enter)="onQueryKeydown($event)"
+        ></textarea>
+        <div class="rag-page__query-actions">
+          <app-primary-button
+            text="Спросить"
+            size="large"
+            [disabled]="loading || !query.trim()"
+            (clicked)="submit()"
+          />
+          <app-outline-button text="Очистить" size="large" [disabled]="loading" (clicked)="clear()" />
+          @if (loading) {
+            <mat-spinner diameter="28" />
+          }
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  @if (hasLlmContext) {
+    <section class="rag-page__sources rag-page__sources_context">
+      <h2 class="rag-page__panel-title">
+        Контекст для ответа LLM ({{ contextSources.length }}) — ссылки [1]…[{{ contextSources.length }}]
+      </h2>
+      <p class="rag-page__sources-hint">
+        Именно эти фрагменты (top {{ ragLlmTopK }} после rerank и лимита токенов) переданы в модель. Номера
+        в ответе LLM совпадают с [N] здесь.
+      </p>
+      <ul class="rag-page__source-list rag-page__source-list_context">
+        @for (s of contextSources; track s.chunk_id) {
+          <li class="rag-page__chunk-item rag-page__chunk-item_context">
+            <div class="rag-page__chunk-head">
+              <span class="rag-page__source-rank">[{{ s.citation_id ?? s.rank }}]</span>
+              <a
+                class="rag-page__source-link"
+                [routerLink]="documentLink(s)"
+                [queryParams]="documentQueryParams(s)"
+              >
+                {{ s.title }}
+              </a>
+            </div>
+            <ng-container *ngTemplateOutlet="chunkScores; context: { source: s }" />
+            <p class="rag-page__source-excerpt">{{ s.excerpt }}</p>
+          </li>
+        }
+      </ul>
+    </section>
+  }
+
+  @if (sources.length) {
+    <section class="rag-page__sources">
+      <div class="rag-page__sources-header">
+        @if (groupByDocument) {
+          <h2 class="rag-page__panel-title">
+            Все результаты поиска: документы ({{ searchDocumentHits.length }}) · фрагментов
+            {{ sources.length }}
+          </h2>
+        } @else {
+          <h2 class="rag-page__panel-title">Все результаты поиска ({{ sortedSearchSources.length }})</h2>
+        }
+        <div class="rag-page__results-toolbar">
+          <label class="rag-page__toolbar-control">
+            <span>Группировка</span>
+            <span class="rag-page__toolbar-checkbox">
+              <mat-checkbox
+                [(ngModel)]="groupByDocument"
+                (ngModelChange)="onSortChange()"
+                matTooltip="Включено: один документ на карточку, внутри все его чанки. Выключено: плоский список чанков."
+                matTooltipPosition="above"
+              >
+                По документу
+              </mat-checkbox>
+            </span>
+          </label>
+          <label class="rag-page__toolbar-control">
+            <span>Сортировка</span>
+            <select
+              [(ngModel)]="resultSortOrder"
+              (ngModelChange)="onSortChange()"
+              class="rag-page__select"
+            >
+              <option value="retrieval">Как после rerank</option>
+              <option value="score_desc">Score ↓</option>
+              <option value="score_asc">Score ↑</option>
+            </select>
+          </label>
+        </div>
+      </div>
+      <p class="rag-page__sources-hint">
+        До {{ ragFetchK }} фрагментов после rerank. Настройки ниже меняют только этот список, не номера
+        [N] в ответе LLM.
+      </p>
+      @if (groupByDocument) {
+        <ul class="rag-page__source-list rag-page__source-list_docs">
+          @for (doc of searchDocumentHits; track doc.document_id) {
+            <li
+              class="rag-page__doc-group"
+              [class.rag-page__doc-group_in-llm]="docHasLlmChunk(doc)"
+            >
+              <div class="rag-page__doc-header">
+                <span class="rag-page__source-rank">#{{ doc.rank }}</span>
+                <a
+                  class="rag-page__source-link"
+                  [routerLink]="documentLink(bestChunk(doc))"
+                  [queryParams]="documentQueryParams(bestChunk(doc))"
+                >
+                  {{ doc.title }}
+                </a>
+                <span class="rag-page__doc-summary">
+                  лучший rerank {{ doc.bestScore | number: '1.2-2' }}
+                  · {{ doc.chunks.length }} фрагм.
+                  @if (docHasLlmChunk(doc)) {
+                    · в LLM:
+                    @for (c of llmChunks(doc); track c.chunk_id; let last = $last) {
+                      [{{ c.citation_id }}]{{ last ? '' : ', ' }}
+                    }
+                  }
+                </span>
+              </div>
+              <ul class="rag-page__chunk-list">
+                @for (chunk of doc.chunks; track chunk.chunk_id) {
+                  <li
+                    class="rag-page__chunk-item"
+                    [class.rag-page__chunk-item_in-llm]="chunk.citation_id != null"
+                  >
+                    <div class="rag-page__chunk-head">
+                      @if (chunk.citation_id != null) {
+                        <span class="rag-page__chunk-llm-tag">LLM [{{ chunk.citation_id }}]</span>
+                      }
+                    </div>
+                    <ng-container
+                      *ngTemplateOutlet="chunkScores; context: { source: chunk }"
+                    />
+                    <p class="rag-page__source-excerpt">{{ chunk.excerpt }}</p>
+                  </li>
+                }
+              </ul>
+            </li>
+          }
+        </ul>
+      } @else {
+        <ul class="rag-page__source-list">
+          @for (s of sortedSearchSources; track s.chunk_id) {
+            <li
+              class="rag-page__source-item"
+              [class.rag-page__source-item_in-llm]="s.citation_id != null"
+            >
+              <span class="rag-page__source-rank">
+                @if (s.citation_id != null) {
+                  LLM [{{ s.citation_id }}] ·
+                }
+                #{{ $index + 1 }}
+              </span>
+              <a
+                class="rag-page__source-link"
+                [routerLink]="documentLink(s)"
+                [queryParams]="documentQueryParams(s)"
+              >
+                {{ s.title }}
+              </a>
+              <ng-container *ngTemplateOutlet="chunkScores; context: { source: s }" />
+              <p class="rag-page__source-excerpt">{{ s.excerpt }}</p>
+            </li>
+          }
+        </ul>
+      }
+    </section>
+  }
+
+  @if (error) {
+    <p class="rag-page__error">{{ error }}</p>
+  }
+</section>

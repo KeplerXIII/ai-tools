@@ -1,3 +1,4 @@
+from app.infrastructure.db.models.bm25 import DocumentChunkTerm
 from app.infrastructure.db.models.catalog import (
     Category,
     Country,
@@ -25,6 +26,7 @@ from app.infrastructure.db.models.document import (
     ProcessingJob,
 )
 from app.infrastructure.db.models.role import Role, UserRole
+from app.infrastructure.db.models.rag_query import RagQuery
 from app.infrastructure.db.models.user import User
 
 __all__ = [
@@ -33,6 +35,7 @@ __all__ = [
     "Document",
     "DocumentCategory",
     "DocumentChunk",
+    "DocumentChunkTerm",
     "DocumentEmbedding",
     "DocumentEntity",
     "DocumentStatus",
@@ -47,6 +50,7 @@ __all__ = [
     "Language",
     "PredictionSource",
     "ProcessingJob",
+    "RagQuery",
     "Role",
     "Source",
     "SourceParseRun",

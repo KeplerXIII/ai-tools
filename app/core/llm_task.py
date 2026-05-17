@@ -8,3 +8,4 @@ class LLMTask(StrEnum):
     TAGGING = "tagging"
     ENTITY_EXTRACTION = "entity_extraction"
     CATEGORIZATION = "categorization"
+    RAG = "rag"
