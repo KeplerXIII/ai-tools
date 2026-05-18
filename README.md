@@ -72,6 +72,18 @@ docker compose exec ai-tools uv run python -m app.cli.promote_admin admin
 
 С хоста, если в `.env` для Docker указан `ai-tools-postgres`, а CLI нужно гонять локально — см. **`DATABASE_URL_FOR_CLI`** в [`.env.example`](.env.example) (URL на `127.0.0.1:5432` с тем же пользователем, БД и паролем).
 
+## Разработка без GPU (TEI на CPU)
+
+Для ПК без видеокарты — [`docker-compose.dev.yml`](docker-compose.dev.yml): тот же стек, но `embedding-tei` и `rerank-tei` на образе `cpu-1.6` (без `gpus`). Модели и порты те же (`8089` / `8090`), `.env` не меняется.
+
+```bash
+docker network create ai_stack
+docker compose -f docker-compose.dev.yml up -d --build
+docker compose -f docker-compose.dev.yml exec ai-tools uv run python -m app.cli.init_db
+```
+
+Первый запуск TEI дольше (загрузка весов в том `tei_hf_cache`). Нужно достаточно RAM (ориентир **≥16 GB** на машине); inference медленнее, чем на CUDA. Прод и GPU-хост: обычный `docker compose up` из `docker-compose.yml`.
+
 ## Frontend `ai-tools-ui`
 
 UI перенесен в подпапку [`ai-tools-ui`](ai-tools-ui).

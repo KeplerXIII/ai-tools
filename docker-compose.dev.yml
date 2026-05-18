@@ -1,0 +1,28 @@
+# Dev-стек без GPU: TEI на CPU (bge-m3 + bge-reranker-v2-m3).
+# Прод / машина с NVIDIA: docker compose up (docker-compose.yml).
+#
+# Запуск:
+#   docker network create ai_stack   # один раз
+#   docker compose -f docker-compose.dev.yml up -d --build
+#
+# Порты TEI те же: embedding 8089, rerank 8090. .env как для основного compose.
+# Первый старт: скачивание моделей в tei_hf_cache (общий том с prod, если тот же хост).
+# Рекомендуется ≥16 GB RAM; inference заметно медленнее, чем на CUDA.
+
+include:
+  - docker-compose.yml
+
+services:
+  embedding-tei:
+    image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.6
+    gpus: !reset null
+    shm_size: "2gb"
+    healthcheck:
+      start_period: 900s
+
+  rerank-tei:
+    image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.6
+    gpus: !reset null
+    shm_size: "2gb"
+    healthcheck:
+      start_period: 900s
