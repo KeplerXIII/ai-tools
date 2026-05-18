@@ -28,6 +28,12 @@ from app.infrastructure.db.models.document import (
 from app.infrastructure.db.models.role import Role, UserRole
 from app.infrastructure.db.models.rag_query import RagQuery
 from app.infrastructure.db.models.user import User
+from app.infrastructure.db.models.workbook import (
+    Workbook,
+    WorkbookDocument,
+    WorkbookEntry,
+    WorkbookEntryDocument,
+)
 
 __all__ = [
     "Category",
@@ -57,4 +63,8 @@ __all__ = [
     "Tag",
     "User",
     "UserRole",
+    "Workbook",
+    "WorkbookDocument",
+    "WorkbookEntry",
+    "WorkbookEntryDocument",
 ]

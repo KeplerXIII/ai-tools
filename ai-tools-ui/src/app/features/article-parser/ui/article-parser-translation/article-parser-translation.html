@@ -1,5 +1,9 @@
 @if (state.translatedText.trim() || loadingTranslation) {
-  <section class="panel full print-translation-middle">
+  <section
+    class="panel full print-translation-middle"
+    [attr.data-wb-document-id]="state.article?.document_id"
+    [attr.data-wb-document-title]="(state.article?.translated_title || state.article?.title || '').trim()"
+  >
     <div class="title-wrapper translation-title-row">
       <h3 class="panel-title">Перевод</h3>
 

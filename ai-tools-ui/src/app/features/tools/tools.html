@@ -4,6 +4,16 @@
       type="button"
       class="tools-page__mode-btn"
       role="tab"
+      [attr.aria-selected]="activeTab === 'workbook'"
+      [class.tools-page__mode-btn_active]="activeTab === 'workbook'"
+      (click)="setTab('workbook')"
+    >
+      Рабочая тетрадь
+    </button>
+    <button
+      type="button"
+      class="tools-page__mode-btn"
+      role="tab"
       [attr.aria-selected]="activeTab === 'translate'"
       [class.tools-page__mode-btn_active]="activeTab === 'translate'"
       (click)="setTab('translate')"
@@ -32,7 +42,11 @@
     </button>
   </div>
 
-  @if (activeTab === 'translate') {
+  @if (activeTab === 'workbook') {
+    <div class="tools-page__panel">
+      <app-workbook />
+    </div>
+  } @else if (activeTab === 'translate') {
     <div class="tools-page__panel">
       <app-translate [embedded]="true" />
     </div>

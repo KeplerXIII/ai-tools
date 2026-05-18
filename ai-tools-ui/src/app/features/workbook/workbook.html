@@ -1,0 +1,324 @@
+<div class="wb">
+  <nav class="wb-nav" aria-label="Список тетрадей">
+    <div class="wb-nav__top">
+      <h2 class="wb-nav__title">Тетради</h2>
+      <button type="button" class="wb-btn wb-btn--ghost wb-btn--icon" (click)="toggleCreateForm()" title="Новая тетрадь">
+        +
+      </button>
+    </div>
+
+    @if (showCreateForm) {
+      <div class="wb-nav__create">
+        <input
+          type="text"
+          class="wb-input"
+          [(ngModel)]="newWorkbookName"
+          placeholder="Название"
+          maxlength="255"
+          (keyup.enter)="createWorkbook()"
+        />
+        <button
+          type="button"
+          class="wb-btn wb-btn--primary"
+          [disabled]="creatingWorkbook || !newWorkbookName.trim()"
+          (click)="createWorkbook()"
+        >
+          Создать
+        </button>
+      </div>
+    }
+
+    <input
+      type="search"
+      class="wb-input wb-nav__search"
+      [(ngModel)]="sidebarSearch"
+      placeholder="Поиск…"
+      aria-label="Поиск тетради"
+    />
+
+    @if (listLoading) {
+      <p class="wb-muted">Загрузка…</p>
+    } @else if (listError) {
+      <p class="wb-error">{{ listError }}</p>
+    } @else if (filteredWorkbooks().length === 0) {
+      <p class="wb-muted">Нет тетрадей</p>
+    } @else {
+      <ul class="wb-nav__list">
+        @for (wb of filteredWorkbooks(); track wb.workbook_id) {
+          <li>
+            <button
+              type="button"
+              class="wb-nav__item"
+              [class.wb-nav__item--active]="selectedId === wb.workbook_id"
+              (click)="selectWorkbook(wb.workbook_id)"
+            >
+              <span class="wb-nav__item-name">{{ wb.name }}</span>
+              <span class="wb-nav__item-meta">
+                {{ wb.entries_count }} {{ thesesCountLabel(wb.entries_count) }}
+              </span>
+            </button>
+          </li>
+        }
+      </ul>
+    }
+  </nav>
+
+  <main class="wb-main">
+    @if (!selectedId) {
+      <div class="wb-empty">
+        <p class="wb-empty__title">Рабочая тетрадь</p>
+        <p class="wb-muted">Выберите тетрадь слева или создайте новую — здесь будут черновик, тезисы и источники.</p>
+      </div>
+    } @else if (detailLoading) {
+      <p class="wb-muted">Загрузка…</p>
+    } @else if (detailError) {
+      <p class="wb-error">{{ detailError }}</p>
+    } @else if (detail) {
+      <header class="wb-header">
+        <input
+          type="text"
+          class="wb-header__title"
+          [(ngModel)]="editName"
+          maxlength="255"
+          aria-label="Название тетради"
+        />
+        <div class="wb-header__actions">
+          @if (workbookIsDirty()) {
+            <span class="wb-badge wb-badge--warn">Есть изменения</span>
+          } @else if (lastSavedAt) {
+            <span class="wb-badge">Сохранено</span>
+          }
+          <button
+            type="button"
+            class="wb-btn wb-btn--primary"
+            [disabled]="savingWorkbook || !workbookIsDirty()"
+            (click)="saveWorkbook()"
+          >
+            {{ savingWorkbook ? 'Сохранение…' : 'Сохранить' }}
+          </button>
+          <button type="button" class="wb-btn wb-btn--danger-ghost" (click)="deleteWorkbook()">
+            Удалить
+          </button>
+        </div>
+      </header>
+
+      @if (workbookSaveError) {
+        <p class="wb-error wb-error--inline">{{ workbookSaveError }}</p>
+      }
+
+      <section class="wb-panel">
+        <div class="wb-panel__head">
+          <h3 class="wb-panel__title">Черновик</h3>
+          <p class="wb-panel__hint">Свободный текст тетради — план, контекст, общие заметки</p>
+        </div>
+        <textarea
+          class="wb-textarea wb-textarea--draft"
+          appWbAutosize
+          [appWbAutosizeMinRows]="2"
+          [appWbAutosizeMaxRows]="20"
+          [(ngModel)]="editNotes"
+          rows="1"
+          placeholder="Начните писать черновик тетради…"
+        ></textarea>
+      </section>
+
+      <details
+        class="wb-panel wb-panel--entries"
+        [open]="entriesOpen"
+        (toggle)="onEntriesToggle($event)"
+      >
+        <summary class="wb-panel__summary">
+          <span>Тезисы</span>
+          <span class="wb-badge">{{ detail.entries.length }} {{ thesesCountLabel(detail.entries.length) }}</span>
+        </summary>
+        <p class="wb-panel__hint wb-panel__hint--inset">
+          Тезисы с привязкой к источникам — для анализа и будущей генерации
+        </p>
+
+        <div class="wb-compose">
+          <textarea
+            class="wb-textarea"
+            appWbAutosize
+            [appWbAutosizeMinRows]="2"
+            [appWbAutosizeMaxRows]="12"
+            [(ngModel)]="newEntryText"
+            rows="1"
+            placeholder="Новый тезис: мысль, цитата, вывод…"
+          ></textarea>
+          @if (newEntrySourceIds.size > 0) {
+            <ul class="wb-chips" aria-label="Источники нового тезиса">
+              @for (label of newEntrySourceLabels(); track $index) {
+                <li class="wb-chip">{{ label }}</li>
+              }
+            </ul>
+          }
+          <div class="wb-compose__actions">
+            <button type="button" class="wb-btn wb-btn--secondary" (click)="openSourcePicker({ kind: 'new-entry' })">
+              Источник
+            </button>
+            <button
+              type="button"
+              class="wb-btn wb-btn--primary"
+              [disabled]="creatingEntry || !newEntryText.trim()"
+              (click)="addEntry()"
+            >
+              {{ creatingEntry ? 'Добавление…' : 'Добавить тезис' }}
+            </button>
+          </div>
+        </div>
+
+        @if (entryError) {
+          <p class="wb-error wb-error--inline">{{ entryError }}</p>
+        }
+
+        @if (detail.entries.length === 0) {
+          <p class="wb-muted wb-muted--center">Пока нет тезисов — добавьте первый выше</p>
+        } @else {
+          <ol class="wb-feed">
+            @for (entry of detail.entries; track entry.entry_id) {
+              <li class="wb-card">
+                <textarea
+                  class="wb-textarea wb-textarea--entry"
+                  appWbAutosize
+                  [appWbAutosizeMinRows]="2"
+                  [appWbAutosizeMaxRows]="16"
+                  [(ngModel)]="entryEdits[entry.entry_id]"
+                  rows="1"
+                  [attr.aria-label]="'Текст тезиса от ' + formatDate(entry.created_at)"
+                ></textarea>
+
+                <div class="wb-card__sources">
+                  <span class="wb-card__sources-label">Источники</span>
+                  @if (entry.sources.length === 0) {
+                    <span class="wb-muted">не привязаны</span>
+                  } @else {
+                    <ul class="wb-chips">
+                      @for (src of entry.sources; track src.document_id) {
+                        <li class="wb-chip wb-chip--linked">
+                          <span class="wb-chip__text">{{ documentTitle(src) }}</span>
+                          <button
+                            type="button"
+                            class="wb-chip__remove"
+                            (click)="removeEntrySource(entry, src)"
+                            aria-label="Отвязать источник"
+                          >
+                            ×
+                          </button>
+                        </li>
+                      }
+                    </ul>
+                  }
+                  <button
+                    type="button"
+                    class="wb-btn wb-btn--ghost wb-btn--sm"
+                    (click)="openSourcePicker({ kind: 'entry', entryId: entry.entry_id })"
+                  >
+                    + Источник
+                  </button>
+                </div>
+
+                <footer class="wb-card__foot">
+                  <time class="wb-muted" [attr.datetime]="entry.updated_at">
+                    {{ formatDate(entry.updated_at) }}
+                  </time>
+                  <div class="wb-card__foot-actions">
+                    <button
+                      type="button"
+                      class="wb-btn wb-btn--secondary wb-btn--sm"
+                      [disabled]="savingEntryId === entry.entry_id || !entryIsDirty(entry)"
+                      (click)="saveEntry(entry)"
+                    >
+                      {{ savingEntryId === entry.entry_id ? '…' : 'Сохранить' }}
+                    </button>
+                    <button type="button" class="wb-btn wb-btn--ghost wb-btn--sm" (click)="deleteEntry(entry)">
+                      Удалить
+                    </button>
+                  </div>
+                </footer>
+              </li>
+            }
+          </ol>
+        }
+      </details>
+
+      <details class="wb-panel wb-panel--gen" [open]="generationOpen" (toggle)="generationOpen = $any($event.target).open">
+        <summary class="wb-panel__summary">
+          <span>Генерация документов</span>
+          <span class="wb-badge wb-badge--soon">скоро</span>
+        </summary>
+        <p class="wb-panel__hint">
+          Промпт и материалы тетради (черновик, тезисы, источники) будут использоваться для создания документов через LLM.
+        </p>
+        <label class="wb-label">
+          Промпт
+          <textarea
+            class="wb-textarea"
+            appWbAutosize
+            [appWbAutosizeMinRows]="2"
+            [appWbAutosizeMaxRows]="8"
+            [(ngModel)]="editPrompt"
+            rows="1"
+            placeholder="Какой документ нужно получить на выходе?"
+          ></textarea>
+        </label>
+        <button type="button" class="wb-btn wb-btn--secondary" disabled>Сгенерировать</button>
+      </details>
+    }
+  </main>
+
+  @if (sourcePicker) {
+    <div class="wb-dialog-backdrop" (click)="closeSourcePicker()">
+      <div
+        class="wb-dialog"
+        role="dialog"
+        [attr.aria-label]="sourcePickerTitle()"
+        (click)="$event.stopPropagation()"
+      >
+        <header class="wb-dialog__head">
+          <h3 class="wb-dialog__title">{{ sourcePickerTitle() }}</h3>
+          <button type="button" class="wb-btn wb-btn--ghost wb-btn--icon" (click)="closeSourcePicker()">×</button>
+        </header>
+        <input
+          type="search"
+          class="wb-input"
+          [(ngModel)]="documentSearch"
+          placeholder="Поиск по названию документа…"
+        />
+        @if (pickerLoading) {
+          <p class="wb-muted">Загрузка…</p>
+        } @else if (pickerError) {
+          <p class="wb-error">{{ pickerError }}</p>
+        } @else if (filteredPickerDocuments().length === 0) {
+          <p class="wb-muted">Документы не найдены</p>
+        } @else {
+          <ul class="wb-dialog__list">
+            @for (doc of filteredPickerDocuments(); track doc.document_id) {
+              <li>
+                <label class="wb-dialog__row">
+                  <input
+                    type="checkbox"
+                    [checked]="isPickerSelected(doc.document_id)"
+                    (change)="togglePickerDocument(doc.document_id)"
+                  />
+                  <span class="wb-dialog__row-title">{{ documentTitle(doc) }}</span>
+                  <span class="wb-muted">{{ doc.document_type_name }}</span>
+                </label>
+              </li>
+            }
+          </ul>
+        }
+        <footer class="wb-dialog__foot">
+          <button type="button" class="wb-btn wb-btn--ghost" (click)="closeSourcePicker()">Отмена</button>
+          <button
+            type="button"
+            class="wb-btn wb-btn--primary"
+            [disabled]="linkingSources"
+            (click)="confirmSourcePicker()"
+          >
+            {{ linkingSources ? 'Сохранение…' : 'Готово' }}
+          </button>
+        </footer>
+      </div>
+    </div>
+  }
+</div>

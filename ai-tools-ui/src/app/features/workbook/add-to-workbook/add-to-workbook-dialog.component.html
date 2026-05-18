@@ -1,0 +1,127 @@
+@if (visible) {
+  <div class="atw-backdrop" (click)="close()">
+    <div
+      class="atw-dialog"
+      role="dialog"
+      aria-labelledby="atw-dialog-title"
+      aria-modal="true"
+      (click)="$event.stopPropagation()"
+    >
+      <header class="atw-dialog__head">
+        <h2 id="atw-dialog-title" class="atw-dialog__title">Новый тезис</h2>
+        <button type="button" class="atw-icon-btn" (click)="close()" aria-label="Закрыть">×</button>
+      </header>
+
+      @if (successMessage) {
+        <div class="atw-success">
+          <p>{{ successMessage }}</p>
+          <div class="atw-success__actions">
+            <button type="button" class="atw-btn atw-btn--primary" (click)="openWorkbookInTools()">
+              Открыть тетрадь
+            </button>
+            <button type="button" class="atw-btn atw-btn--ghost" (click)="close()">Закрыть</button>
+          </div>
+        </div>
+      } @else {
+        <p class="atw-hint">
+          @if (hasSelectionPrefill) {
+            Подставлен выделенный текст. При необходимости отредактируйте тезис и выберите источник.
+          } @else {
+            Напишите тезис и при необходимости привяжите документ-источник.
+          }
+        </p>
+
+        <label class="atw-field">
+          <span class="atw-label">Тетрадь</span>
+          @if (workbooksLoading) {
+            <span class="atw-muted">Загрузка…</span>
+          } @else if (workbooksError) {
+            <span class="atw-error">{{ workbooksError }}</span>
+          } @else if (workbooks.length === 0) {
+            <span class="atw-muted">
+              Нет тетрадей —
+              <a routerLink="/tools" (click)="close()">создайте в «Инструменты»</a>
+            </span>
+          } @else {
+            <select class="atw-select" [(ngModel)]="selectedWorkbookId">
+              @for (wb of workbooks; track wb.workbook_id) {
+                <option [value]="wb.workbook_id">{{ wb.name }}</option>
+              }
+            </select>
+          }
+        </label>
+
+        <label class="atw-field">
+          <span class="atw-label">Тезис</span>
+          <textarea
+            class="atw-textarea"
+            [(ngModel)]="entryText"
+            rows="5"
+            placeholder="Тезис, цитата, заметка…"
+          ></textarea>
+        </label>
+
+        <fieldset class="atw-source">
+          <legend class="atw-label">Источник (документ)</legend>
+          @if (attachSource && documentId) {
+            <div class="atw-source-card">
+              <span class="atw-source-card__title">{{ documentTitle || documentId }}</span>
+              <button type="button" class="atw-link-btn" (click)="clearSource()">Убрать источник</button>
+            </div>
+          } @else {
+            <p class="atw-muted">Без привязки к документу.</p>
+            <button type="button" class="atw-btn atw-btn--secondary atw-btn--sm" (click)="openDocumentPicker()">
+              Выбрать документ
+            </button>
+          }
+        </fieldset>
+
+        @if (showDocumentPicker) {
+          <div class="atw-picker">
+            <input
+              type="search"
+              class="atw-input"
+              [(ngModel)]="documentSearch"
+              placeholder="Поиск документа…"
+            />
+            @if (pickerLoading) {
+              <p class="atw-muted">Загрузка…</p>
+            } @else if (pickerError) {
+              <p class="atw-error">{{ pickerError }}</p>
+            } @else {
+              <ul class="atw-picker__list">
+                @for (doc of filteredPickerDocuments(); track doc.document_id) {
+                  <li>
+                    <button type="button" class="atw-picker__item" (click)="pickDocument(doc)">
+                      <span>{{ docTitle(doc) }}</span>
+                      <span class="atw-muted">{{ doc.document_type_name }}</span>
+                    </button>
+                  </li>
+                }
+              </ul>
+            }
+            <button type="button" class="atw-link-btn" (click)="showDocumentPicker = false">Скрыть список</button>
+          </div>
+        }
+
+        @if (submitError) {
+          <p class="atw-error">{{ submitError }}</p>
+        }
+
+        <footer class="atw-dialog__foot">
+          <button type="button" class="atw-btn atw-btn--ghost" (click)="close()" [disabled]="submitting">
+            Отмена
+          </button>
+          <button
+            type="button"
+            class="atw-btn atw-btn--primary"
+            [disabled]="submitting || !selectedWorkbookId || !entryText.trim()"
+            (click)="submit()"
+          >
+            {{ submitting ? 'Добавление…' : 'Добавить' }}
+          </button>
+        </footer>
+      }
+    </div>
+  </div>
+}

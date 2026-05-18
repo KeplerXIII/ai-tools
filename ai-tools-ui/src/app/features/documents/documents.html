@@ -80,7 +80,11 @@
   } @else {
     <div class="documents-list">
       @for (doc of documents; track doc.document_id) {
-        <article class="document-row">
+        <article
+          class="document-row"
+          [attr.data-wb-document-id]="doc.document_id"
+          [attr.data-wb-document-title]="documentListTitle(doc)"
+        >
           <div class="document-row-head">
             <div class="document-row-head__title-block">
               <span class="document-row__meta document-row__meta_type">{{ doc.document_type_name }}</span>

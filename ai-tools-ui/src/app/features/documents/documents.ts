@@ -14,7 +14,6 @@ import {
   DocumentStatusCatalogItem,
   DocumentTypeCatalogItem,
 } from './documents-api';
-
 @Component({
   selector: 'app-documents',
   standalone: true,

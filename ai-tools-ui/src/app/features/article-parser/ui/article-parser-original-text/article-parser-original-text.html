@@ -1,5 +1,9 @@
 @if (state.article; as article) {
-  <section class="panel full print-original-last">
+  <section
+    class="panel full print-original-last"
+    [attr.data-wb-document-id]="article.document_id"
+    [attr.data-wb-document-title]="(article.translated_title || article.title || '').trim()"
+  >
     <div class="title-wrapper original-title-row">
       <h3 class="panel-title">Исходный текст</h3>
 

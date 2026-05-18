@@ -199,7 +199,11 @@
       </p>
       <ul class="rag-page__source-list rag-page__source-list_context">
         @for (s of contextSources; track s.chunk_id) {
-          <li class="rag-page__chunk-item rag-page__chunk-item_context">
+          <li
+            class="rag-page__chunk-item rag-page__chunk-item_context"
+            [attr.data-wb-document-id]="s.document_id"
+            [attr.data-wb-document-title]="s.title"
+          >
             <div class="rag-page__chunk-head">
               <span class="rag-page__source-rank">[{{ s.citation_id ?? s.rank }}]</span>
               <a
@@ -267,6 +271,8 @@
             <li
               class="rag-page__doc-group"
               [class.rag-page__doc-group_in-llm]="docHasLlmChunk(doc)"
+              [attr.data-wb-document-id]="doc.document_id"
+              [attr.data-wb-document-title]="doc.title"
             >
               <div class="rag-page__doc-header">
                 <span class="rag-page__source-rank">#{{ doc.rank }}</span>
@@ -293,6 +299,8 @@
                   <li
                     class="rag-page__chunk-item"
                     [class.rag-page__chunk-item_in-llm]="chunk.citation_id != null"
+                    [attr.data-wb-document-id]="doc.document_id"
+                    [attr.data-wb-document-title]="doc.title"
                   >
                     <div class="rag-page__chunk-head">
                       @if (chunk.citation_id != null) {
@@ -315,6 +323,8 @@
             <li
               class="rag-page__source-item"
               [class.rag-page__source-item_in-llm]="s.citation_id != null"
+              [attr.data-wb-document-id]="s.document_id"
+              [attr.data-wb-document-title]="s.title"
             >
               <span class="rag-page__source-rank">
                 @if (s.citation_id != null) {

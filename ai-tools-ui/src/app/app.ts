@@ -13,12 +13,16 @@ import { ExtractorBatchNotifierService } from './core/processing/extractor-batch
 import { TaggerBatchNotifierService } from './core/processing/tagger-batch-notifier.service';
 import { AuthService } from './core/auth/auth.service';
 import { TranslateBatchNotifierService } from './core/processing/translate-batch-notifier.service';
+import { AddToWorkbookDialogComponent } from './features/workbook/add-to-workbook/add-to-workbook-dialog.component';
+import { AddToWorkbookFabComponent } from './features/workbook/add-to-workbook/add-to-workbook-fab.component';
 
 @Component({
   selector: 'app-root',
   imports: [
     AsyncPipe,
     RouterOutlet,
+    AddToWorkbookDialogComponent,
+    AddToWorkbookFabComponent,
     MatSidenavModule,
     MatListModule,
     MatToolbarModule,

@@ -547,4 +547,5 @@ export class ArticleParser implements OnInit {
   get documentIdClearDisabled(): boolean {
     return this.isDisabled || (!this.documentIdDraft.trim() && !this.state.article);
   }
+
 }
