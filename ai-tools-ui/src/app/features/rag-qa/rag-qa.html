@@ -63,7 +63,7 @@
           @if (retrievalMs != null) {
             <span class="rag-page__timing">retrieval {{ retrievalMs }} ms</span>
           }
-          @if (generationMs != null && !retrieveOnly) {
+          @if (generationMs != null && answerMode === 'ai') {
             <span class="rag-page__timing">generation {{ generationMs }} ms</span>
           }
         </div>
@@ -81,21 +81,47 @@
 
     <div class="rag-page__compose">
       <div class="rag-page__options rag-page__options_inline">
-        <mat-checkbox
-          [(ngModel)]="retrieveOnly"
-          matTooltip="Только поиск по базе: фрагменты и источники без генерации ответа LLM."
-          matTooltipPosition="above"
+        <div
+          class="rag-page__mode-switch"
+          role="radiogroup"
+          aria-label="Режим ответа"
         >
-          Только поиск
-        </mat-checkbox>
-        <mat-checkbox
-          [(ngModel)]="useStream"
-          [disabled]="retrieveOnly"
-          matTooltip="Ответ LLM приходит потоком по мере генерации (SSE). Недоступно в режиме «только поиск»."
-          matTooltipPosition="above"
-        >
-          Поток
-        </mat-checkbox>
+          <button
+            type="button"
+            class="rag-page__mode-switch-btn"
+            role="radio"
+            [attr.aria-checked]="answerMode === 'search'"
+            [class.rag-page__mode-switch-btn_active]="answerMode === 'search'"
+            (click)="setAnswerMode('search')"
+            matTooltip="Только поиск по базе: фрагменты и источники без ответа модели."
+            matTooltipPosition="above"
+          >
+            Поиск
+          </button>
+          <button
+            type="button"
+            class="rag-page__mode-switch-btn"
+            role="radio"
+            [attr.aria-checked]="answerMode === 'ai'"
+            [class.rag-page__mode-switch-btn_active]="answerMode === 'ai'"
+            (click)="setAnswerMode('ai')"
+            matTooltip="Ответ модели по найденным фрагментам, потоком по мере генерации (SSE)."
+            matTooltipPosition="above"
+          >
+            ИИ
+          </button>
+          <button
+            type="button"
+            class="rag-page__mode-switch-btn rag-page__mode-switch-btn_disabled"
+            role="radio"
+            disabled
+            aria-disabled="true"
+            matTooltip="Режим агента — скоро."
+            matTooltipPosition="above"
+          >
+            Агент
+          </button>
+        </div>
         <mat-checkbox
           [(ngModel)]="expandQuery"
           matTooltip="LLM расширит запрос на несколько формулировок; поиск по каждой, затем слияние списков (RRF)."

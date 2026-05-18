@@ -23,6 +23,9 @@ import {
 const RAG_FETCH_K = 32;
 const RAG_LLM_TOP_K = 12;
 
+/** Режим ответа: только retrieval, LLM (поток), агент — в разработке. */
+export type RagAnswerMode = 'search' | 'ai' | 'agent';
+
 @Component({
   selector: 'app-rag-qa',
   standalone: true,
@@ -51,8 +54,7 @@ export class RagQa implements OnInit {
   loading = false;
   error = '';
 
-  retrieveOnly = false;
-  useStream = true;
+  answerMode: RagAnswerMode = 'search';
   strategy: 'vector' | 'hybrid' | 'hybrid_bm25' | 'hybrid_all' = 'hybrid_all';
   reranker: 'none' | 'cross_encoder' = 'cross_encoder';
   expandQuery = false;
@@ -119,7 +121,14 @@ export class RagQa implements OnInit {
   }
 
   get hasLlmContext(): boolean {
-    return this.contextSources.length > 0 && !this.retrieveOnly;
+    return this.contextSources.length > 0 && this.answerMode === 'ai';
+  }
+
+  setAnswerMode(mode: RagAnswerMode): void {
+    if (mode === 'agent') {
+      return;
+    }
+    this.answerMode = mode;
   }
 
   bestChunk(doc: RagDocumentHit): RagSource {
@@ -209,12 +218,12 @@ export class RagQa implements OnInit {
     const body = this.buildRequest();
 
     try {
-      if (this.retrieveOnly) {
+      if (this.answerMode === 'search') {
         const res = await this.ragApi.ask(body, true);
         this.applyMeta(res.sources, []);
         this.retrievalMs = res.retrieval_ms;
         this.generationMs = res.generation_ms;
-      } else if (this.useStream) {
+      } else if (this.answerMode === 'ai') {
         const started = performance.now();
         await this.ragApi.askStream(body, {
           onMeta: (meta) => {
@@ -228,12 +237,6 @@ export class RagQa implements OnInit {
           },
         });
         this.generationMs = Math.round(performance.now() - started - (this.retrievalMs ?? 0));
-      } else {
-        const res = await this.ragApi.ask(body, false);
-        this.answer = res.answer ?? '';
-        this.applyMeta(res.sources, res.context_sources ?? []);
-        this.retrievalMs = res.retrieval_ms;
-        this.generationMs = res.generation_ms;
       }
       await this.loadMetrics();
     } catch (e) {
